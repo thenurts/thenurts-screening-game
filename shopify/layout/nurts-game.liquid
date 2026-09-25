@@ -1,0 +1,21 @@
+{%- comment -%}
+  The Nurts screening game – bare layout (no theme header/footer). Assign via templates/page.nurts-game.liquid.
+  The game bundle lives on GitHub Pages; loader.js always fetches the latest build, so this file never changes on release.
+{%- endcomment -%}
+<!doctype html>
+<html lang="{{ request.locale.iso_code }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#FED33C">
+  <meta name="robots" content="noindex">
+  <title>Play with The Nurts</title>
+  {{ content_for_header }}
+  <style>html,body{margin:0;height:100%;background:#FFFBEF}</style>
+</head>
+<body>
+  <div id="nurts-game"></div>
+  <script src="https://thenurts.github.io/thenurts-screening-game/loader.js" defer></script>
+  {{ content_for_layout }}
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "thenurts-screening-game",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/check-size.mjs",
+    "preview": "vite preview --port 4173",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@fontsource/montserrat": "^5.2.0",
+    "phaser": "4.2.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "vite": "^8.0.0"
+  }
+}
