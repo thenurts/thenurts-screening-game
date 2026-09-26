@@ -21,9 +21,9 @@ export const CONSENT = {
 <h3>Who can see it</h3>
 <p>Only The Nurts staff involved in hiring. The data is stored in Google Workspace (Google Sheets and Drive), whose servers may be outside Singapore/Malaysia. Google's safeguards apply. We don't sell your data or share it with anyone else unless the law requires it.</p>
 <h3>How long we keep it</h3>
-<p>Up to [12] months after your last activity, or longer if you join us (it then forms part of your employee records). After that it is deleted or anonymised.</p>
+<p>Up to 12 months after your last activity, or longer if you join us (it then forms part of your employee records). After that it is deleted or anonymised.</p>
 <h3>Your choices</h3>
-<p>Taking part is voluntary. You can ask to see or correct your data, or withdraw your consent, at any time by emailing [privacy@thenurts.com]. If you withdraw, we'll stop using your game data. This may mean we can't consider it in your application.</p>
+<p>Taking part is voluntary. You can ask to see or correct your data, or withdraw your consent, at any time by emailing hello@thenurts.com. If you withdraw, we'll stop using your game data. This may mean we can't consider it in your application.</p>
 `,
   ms: `
 <h3>Sebelum anda bermain: cara kami menggunakan maklumat anda</h3>
@@ -45,8 +45,8 @@ export const CONSENT = {
 <h3>Siapa yang boleh melihatnya</h3>
 <p>Hanya kakitangan The Nurts yang terlibat dalam pengambilan pekerja. Data disimpan dalam Google Workspace (Google Sheets dan Drive), yang pelayannya mungkin berada di luar Singapura/Malaysia. Perlindungan Google terpakai. Kami tidak menjual data anda atau berkongsinya dengan pihak lain kecuali jika dikehendaki oleh undang-undang.</p>
 <h3>Berapa lama kami menyimpannya</h3>
-<p>Sehingga [12] bulan selepas aktiviti terakhir anda, atau lebih lama jika anda menyertai kami (data kemudiannya menjadi sebahagian daripada rekod pekerja anda). Selepas itu, data akan dipadam atau dijadikan tanpa nama.</p>
+<p>Sehingga 12 bulan selepas aktiviti terakhir anda, atau lebih lama jika anda menyertai kami (data kemudiannya menjadi sebahagian daripada rekod pekerja anda). Selepas itu, data akan dipadam atau dijadikan tanpa nama.</p>
 <h3>Pilihan anda</h3>
-<p>Penyertaan adalah secara sukarela. Anda boleh meminta untuk melihat atau membetulkan data anda, atau menarik balik persetujuan anda, pada bila-bila masa dengan menghantar e-mel kepada [privacy@thenurts.com]. Jika anda menarik balik persetujuan, kami akan berhenti menggunakan data permainan anda. Ini mungkin bermakna kami tidak dapat mengambil kiranya dalam permohonan anda.</p>
+<p>Penyertaan adalah secara sukarela. Anda boleh meminta untuk melihat atau membetulkan data anda, atau menarik balik persetujuan anda, pada bila-bila masa dengan menghantar e-mel kepada hello@thenurts.com. Jika anda menarik balik persetujuan, kami akan berhenti menggunakan data permainan anda. Ini mungkin bermakna kami tidak dapat mengambil kiranya dalam permohonan anda.</p>
 `,
 };

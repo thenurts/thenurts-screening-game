@@ -4,6 +4,7 @@ import { session } from './session.js';
 import { log, claimAnonymous, flush } from './logger.js';
 import { modules, nextModule } from './registry.js';
 import { hideUi, show, h, toast } from './ui/dom.js';
+import { friendly } from './errors.js';
 import { homeScreen, applicantScreen, registerScreen, loginScreen } from './screens/entry.js';
 import { preGameScreen, howToModal, postGameScreen, reportScreen } from './screens/game.js';
 
@@ -28,20 +29,23 @@ function applicant() {
 async function casual() {
   session.userId = session.CASUAL_ID; session.casual = true; // provisional so the request carries casual auth
   try { await enter(await api.casualStart(), 'casual_start'); }
-  catch { session.userId = null; session.casual = false; toast('Connection problem. Please try again.', 'bad'); }
+  catch (e) { session.userId = null; session.casual = false; toast(friendly(e, 'start the game'), 'bad'); }
 }
 
 function register() {
   registerScreen({
     onBack: applicant,
     onSubmit: async (payload) => {
-      try {
-        const data = await api.register(payload);
-        await enter(data, 'register');
-      } catch (e) {
-        if (e.code === 'already_registered') { toast('That email or mobile number is already registered. Please continue as a returning candidate.'); login(payload.profile.email); }
-        else toast(e.code === 'network' ? 'Connection problem. Please try again.' : 'Something went wrong. Please check your details.', 'bad');
+      let data;
+      try { data = await api.register(payload); }
+      catch (e) {
+        log('core', 'register_error', { code: e.code, ref: e.ref || '' });
+        if (e.code === 'already_registered') { toast(friendly(e)); login(payload.profile.email); }
+        else toast(friendly(e, 'save your registration'), 'bad');
+        return;
       }
+      await enter(data, 'register');
+      if (data.cvFailed) toast('You’re registered! Your CV couldn’t be uploaded, so please email it to hello@thenurts.com.', 'bad');
     },
   });
 }
@@ -52,7 +56,7 @@ function login(email = '') {
     onBack: applicant,
     onSubmit: async (p) => {
       try { await enter(await api.login(p), 'login_ok'); }
-      catch (e) { toast(e.code === 'network' ? 'Connection problem. Please try again.' : 'We couldn’t find a match for those details.', 'bad'); }
+      catch (e) { toast(friendly(e, 'log you in'), 'bad'); }
     },
   });
 }
@@ -84,7 +88,7 @@ async function play(manifest, mode) {
   let start;
   try {
     start = await api.roundStart({ module: manifest.id, mode, moduleVersion: manifest.version });
-  } catch { toast('Connection problem. Please try again.', 'bad'); return; }
+  } catch (e) { toast(friendly(e, 'start this round'), 'bad'); return; }
   const ctx = { roundNo: start.roundNo, moduleVersion: manifest.version };
   log(manifest.id, mode === 'practice' ? 'practice_start' : 'round_start', { seed: start.seed }, ctx);
   flush();
@@ -124,7 +128,7 @@ async function roundDone(manifest, mode, roundNo, res, key) {
 
 async function report() {
   let data;
-  try { data = await api.report(session.runNo); } catch { toast('Couldn’t load your report. Please refresh.', 'bad'); return; }
+  try { data = await api.report(session.runNo); } catch (e) { toast(friendly(e, 'load your report'), 'bad'); return; }
   backdrop()?.celebrate();
   reportScreen({
     report: data, runNo: session.runNo, casual: session.casual,
@@ -136,7 +140,7 @@ async function report() {
         session.set(d);
         log('core', 'run_start', { runNo: session.runNo });
         preGame(modules[0]);
-      } catch { toast('Connection problem. Please try again.', 'bad'); }
+      } catch (e) { toast(friendly(e, 'start a new run'), 'bad'); }
     },
   });
 }

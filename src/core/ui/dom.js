@@ -69,8 +69,10 @@ export function toast(msg, kind = 'info') {
   toastEl?.remove();
   toastEl = h('div', { class: `tn-toast tn-toast--${kind}`, role: 'status' }, msg);
   document.getElementById('tn-ui').append(toastEl);
-  setTimeout(() => toastEl?.classList.add('is-out'), 3200);
-  setTimeout(() => toastEl?.remove(), 3700);
+  const ms = kind === 'bad' ? 7000 : 3200; // error messages stay long enough to read
+  const el = toastEl;
+  setTimeout(() => el.classList.add('is-out'), ms);
+  setTimeout(() => el.remove(), ms + 500);
 }
 
 export function busy(btn, on) {

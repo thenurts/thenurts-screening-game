@@ -78,7 +78,7 @@ function fresh() {
     },
     DriveApp: {
       createFolder: () => ({ getId: () => 'folder-1' }),
-      getFolderById: () => ({ createFile: (blob) => { files.push(blob.name); return { getUrl: () => 'https://drive.example/' + blob.name }; } }),
+      getFolderById: () => ({ createFile: (blob) => { if (process.env.GAS_FAIL_DRIVE) throw new Error('Simulated Drive failure'); files.push(blob.name); return { getUrl: () => 'https://drive.example/' + blob.name }; } }),
     },
     ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased() { return this; }, everyHours() { return this; }, create() {} }) },
   };

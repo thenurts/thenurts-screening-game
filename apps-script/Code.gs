@@ -43,8 +43,10 @@ function doPost(e) {
     return out_({ ok: true, data: fn(body) });
   } catch (err) {
     if (err && err.code) return out_({ ok: false, error: err.code });
-    console.error(err && err.stack ? err.stack : err);
-    return out_({ ok: false, error: 'server_error' });
+    // Unexpected failure: keep a record in the Errors tab so it can be diagnosed, and give the player a reference.
+    var ref = Utilities.getUuid().slice(0, 8).toUpperCase();
+    reportError_(ref, body, err);
+    return out_({ ok: false, error: 'server_error', ref: ref });
   } finally {
     try { lock.releaseLock(); } catch (x) { /* not held */ }
   }
@@ -196,11 +198,14 @@ var ACTIONS = {
     var users = rows_('Users');
     for (var i = 0; i < users.length; i++) if (users[i][UC.email] === email || String(users[i][UC.phone]) === phone) fail_('already_registered');
     var uid = userIdOf_(email, phone);
-    var cvLink = saveCv_(b.cv, email);
+    // A CV problem must never block registration: record why, and tell the player to email it instead.
+    var cvLink = '', cvFailed = false;
+    try { cvLink = saveCv_(b.cv, email); }
+    catch (cvErr) { cvFailed = true; cvLink = 'NOT SAVED: ' + (cvErr.code || 'error'); if (!cvErr.code) reportError_('CV', b, cvErr); }
     var t = now_();
     append_('Users', [[uid, email, phone, safe_(p.name), t, 1, 0, t]]);
     append_('Registrations', [[t, uid, safe_(p.name), email, phone, safe_(p.employmentType), safe_(p.desiredFunction), cvLink, str_(b.consentVersion), str_(b.consentLang), str_(b.userAgent || '', 300)]]);
-    return { identity: { userId: uid, email: email, phone: phone, name: p.name }, runNo: 1, completed: [] };
+    return { identity: { userId: uid, email: email, phone: phone, name: p.name }, runNo: 1, completed: [], cvFailed: cvFailed };
   },
 
   login: function (b) {
@@ -298,6 +303,17 @@ var ACTIONS = {
     return identity_(w);
   },
 };
+
+/** Append a diagnostic row to the Errors tab (created on first use). Never includes the CV contents. */
+function reportError_(ref, body, err) {
+  try {
+    console.error(ref, err && err.stack ? err.stack : err);
+    var ss = ss_(); var sh = ss.getSheetByName('Errors');
+    if (!sh) { sh = ss.insertSheet('Errors'); sh.getRange(1, 1, 1, 6).setValues([['timestamp', 'ref', 'action', 'user', 'message', 'stack']]).setFontWeight('bold'); }
+    var who = body && body.auth ? (body.auth.casual ? CASUAL_ID : body.auth.userId) : (body && body.profile ? normEmail_(body.profile.email) : '');
+    sh.getRange(sh.getLastRow() + 1, 1, 1, 6).setValues([[now_(), ref, body && body.action || '', who || '', str_(err && err.message || err, 500), str_(err && err.stack || '', 2000)]]);
+  } catch (x) { console.error('reportError_ failed', x); }
+}
 
 // ---------------------------------------------------------------- setup & maintenance
 

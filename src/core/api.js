@@ -5,7 +5,7 @@ import { session } from './session.js';
 import { mockCall } from './mockServer.js';
 
 export class ApiError extends Error {
-  constructor(code, message) { super(message || code); this.code = code; }
+  constructor(code, message, ref) { super(message || code); this.code = code; this.ref = ref; }
 }
 
 async function call(action, payload = {}, { retries = 2 } = {}) {
@@ -18,7 +18,7 @@ async function call(action, payload = {}, { retries = 2 } = {}) {
     try {
       const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
       const j = await r.json();
-      if (!j.ok) throw new ApiError(j.error || 'server_error', j.message);
+      if (!j.ok) throw new ApiError(j.error || 'server_error', j.message, j.ref);
       return j.data;
     } catch (e) {
       if (e instanceof ApiError) throw e; // don't retry business errors
