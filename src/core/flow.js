@@ -2,9 +2,10 @@
 import { api } from './api.js';
 import { session } from './session.js';
 import { log, claimAnonymous, flush, openTrace, takeTrace, resolveRound, queueEnd } from './logger.js';
-import { modules, nextModule } from './registry.js';
+import { modules, nextModule, runOrder } from './registry.js';
 import { hideUi, show, h, toast } from './ui/dom.js';
 import { friendly } from './errors.js';
+import { MOCK } from './config.js';
 import { homeScreen, applicantScreen, registerScreen, loginScreen } from './screens/entry.js';
 import { preGameScreen, howToModal, postGameScreen, reportScreen } from './screens/game.js';
 
@@ -60,11 +61,21 @@ function login(email = '') {
   });
 }
 
+const playerKey = () => (session.casual ? session.sessionId : session.userId);
+function setOrder() {
+  session.order = runOrder(playerKey(), session.runNo);
+  // Test hook (mock / localhost only): ?first=<module id> plays that game first
+  const first = (MOCK || location.hostname === 'localhost') && new URLSearchParams(location.search).get('first');
+  const m = first && session.order.find((x) => x.id === first);
+  if (m) session.order = [m, ...session.order.filter((x) => x !== m)];
+}
+
 async function enter(data, how) {
   session.set(data);
   claimAnonymous();
-  const next = nextModule(session.completed);
-  log('core', how, { runNo: session.runNo, completed: session.completed.length, resumeAt: next ? next.id : 'report' });
+  setOrder();
+  const next = nextModule(session.completed, session.order);
+  log('core', how, { runNo: session.runNo, completed: session.completed.length, resumeAt: next ? next.id : 'report', moduleOrder: session.order.map((m) => m.id).join('>') });
   log('core', 'session_start', { ua: navigator.userAgent.slice(0, 160), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio, touch: navigator.maxTouchPoints > 0 });
   if (how === 'casual_start') { next ? preGame(next) : report(); return; }
   next ? preGame(next) : report();
@@ -73,7 +84,7 @@ async function enter(data, how) {
 function preGame(manifest, practiceResult = null) {
   backdrop()?.setMood();
   const scr = preGameScreen({
-    manifest, completed: session.completed, practiceResult,
+    manifest, completed: session.completed, practiceResult, order: session.order,
     onHowTo: () => howToModal(manifest, scr),
     onPractice: () => play(manifest, 'practice'),
     onStart: () => play(manifest, 'real'),
@@ -91,7 +102,8 @@ async function play(manifest, mode) {
   const roundUid = session.uuid();
   const seed = seed32();
   const ctx = { roundUid, moduleVersion: manifest.version };
-  const base = { roundUid, module: manifest.id, mode, moduleVersion: manifest.version, seed };
+  const base = { roundUid, module: manifest.id, mode, moduleVersion: manifest.version, seed,
+    positionInRun: session.order.indexOf(manifest) + 1, moduleOrder: session.order.map((m) => m.id).join('>') };
   openTrace(roundUid, { module: manifest.id, moduleVersion: manifest.version, mode });
   log(manifest.id, mode === 'practice' ? 'practice_start' : 'round_start', { seed }, ctx);
   const key = `mod:${manifest.id}`;
@@ -114,7 +126,7 @@ async function play(manifest, mode) {
   if (mode === 'real') attempts[attemptKey] = (attempts[attemptKey] || 0) + 1;
   game.scene.add(key, SceneClass, true, {
     manifest, mode, roundUid, roundNo: null, runNo: session.runNo, seed,
-    playerKey: session.casual ? session.sessionId : session.userId, attemptNo: attempts[attemptKey] || 0,
+    playerKey: playerKey(), attemptNo: attempts[attemptKey] || 0,
     onDone: (res) => roundDone(manifest, mode, base, res, key),
   });
   scene = game.scene.getScene(key);
@@ -134,10 +146,10 @@ function roundDone(manifest, mode, base, res, key) {
   session.completed = [...new Set([...session.completed, manifest.id])];
   backdrop()?.celebrate();
   const scr = postGameScreen({
-    manifest, metrics: res.metrics, benchmark: null, completed: session.completed, casual: session.casual,
+    manifest, metrics: res.metrics, benchmark: null, completed: session.completed, casual: session.casual, order: session.order,
     onContinue: () => {
       log(manifest.id, 'continue', '', ctx);
-      const next = nextModule(session.completed);
+      const next = nextModule(session.completed, session.order);
       next ? preGame(next) : report();
     },
   });
@@ -159,8 +171,9 @@ async function report() {
       try {
         const d = await api.newRun();
         session.set(d);
-        log('core', 'run_start', { runNo: session.runNo });
-        preGame(modules[0]);
+        setOrder();
+        log('core', 'run_start', { runNo: session.runNo, moduleOrder: session.order.map((m) => m.id).join('>') });
+        preGame(session.order[0]);
       } catch (e) { toast(friendly(e, 'start a new run'), 'bad'); }
     },
   });

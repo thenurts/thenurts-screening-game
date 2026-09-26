@@ -28,7 +28,7 @@ var TABS = {
   Registrations: ['timestamp', 'user_id', 'name', 'email', 'phone', 'employment_type', 'desired_function', 'cv_link', 'consent_version', 'consent_lang', 'user_agent'],
   Users: ['user_id', 'email', 'phone', 'name', 'created_at', 'current_run', 'runs_completed', 'last_seen'],
   Casual: ['session_id', 'created_at', 'current_run', 'last_seen'],
-  Rounds: ['user_id', 'session_id', 'is_casual', 'run_no', 'module', 'module_version', 'round_no', 'mode', 'started_at', 'ended_at', 'status', 'primary_score', 'metrics_json', 'player_key', 'round_uid', 'seed', 'summary_json'],
+  Rounds: ['user_id', 'session_id', 'is_casual', 'run_no', 'module', 'module_version', 'round_no', 'mode', 'started_at', 'ended_at', 'status', 'primary_score', 'metrics_json', 'player_key', 'round_uid', 'seed', 'summary_json', 'position_in_run', 'module_order'],
   RoundTraces: ['round_uid', 'user_id', 'session_id', 'run_no', 'module', 'module_version', 'round_no', 'mode', 'status', 'started_at', 'updated_at', 'elapsed_ms', 'event_count', 'partial_metrics', 'trace', 'trace_overflow', 'truncated_events'],
 };
 // Columns stored as plain text so Sheets never turns "+60129876543" or round "1" into numbers.
@@ -221,7 +221,7 @@ function ensureRound_(w, b) {
   rows_('Rounds').forEach(function (r) { if (r[RC.player_key] === w.key && Number(r[RC.run_no]) === w.run && r[RC.module] === b.module && r[RC.mode] === mode) n++; });
   var roundNo = mode === 'practice' ? 'P' + n : String(n);
   var t = now_();
-  var row = append_('Rounds', [[w.userId, w.casual ? w.sessionId : '', w.casual, w.run, safe_(b.module), str_(b.moduleVersion), roundNo, mode, t, '', 'started', '', '', w.key, uid, Number(b.seed) >>> 0]]);
+  var row = append_('Rounds', [[w.userId, w.casual ? w.sessionId : '', w.casual, w.run, safe_(b.module), str_(b.moduleVersion), roundNo, mode, t, '', 'started', '', '', w.key, uid, Number(b.seed) >>> 0, '', Number(b.positionInRun) || '', str_(b.moduleOrder || '', 200)]]);
   cache_().put('row:Rounds:' + uid, String(row), 21600);
   cache_().put('rno:' + uid, roundNo, 21600);
   var tr = cachedRow_('RoundTraces', TC.round_uid, uid);

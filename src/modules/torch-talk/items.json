@@ -1,0 +1,3509 @@
+{
+ "version": "1.0",
+ "date": "2026-09-26",
+ "questions": {
+  "when": "When?",
+  "where": "Where?",
+  "bring": "Bring what?"
+ },
+ "items": [
+  {
+   "id": "A-01",
+   "pool": "real",
+   "form": "A",
+   "slot": 1,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Hi Liam! The bike ride is on Saturday morning. Don't forget your helmet.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "bike"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Saturday"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "helmet"
+     ]
+    }
+   ],
+   "breakers": [
+    "Sunday",
+    "evening",
+    "gloves",
+    "forget"
+   ],
+   "fillers": [
+    "ride",
+    "morning",
+    "hi",
+    "the",
+    "on",
+    "your",
+    "bring",
+    "please",
+    "remember",
+    "not",
+    "go"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "bike",
+    "Saturday",
+    "helmet",
+    "Sunday",
+    "evening",
+    "gloves",
+    "forget",
+    "ride",
+    "morning",
+    "hi",
+    "the",
+    "on",
+    "your",
+    "bring",
+    "please",
+    "remember",
+    "not",
+    "go"
+   ],
+   "ideal": [
+    "bike",
+    "Saturday",
+    "helmet"
+   ],
+   "cap": 7
+  },
+  {
+   "id": "A-02",
+   "pool": "real",
+   "form": "A",
+   "slot": 2,
+   "tier": "E",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, the bake sale starts at 10am at school. Please bring the cupcakes you made.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "sale"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "10am"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "school"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "cupcakes"
+     ]
+    }
+   ],
+   "breakers": [
+    "11am",
+    "cookies",
+    "hall"
+   ],
+   "fillers": [
+    "bake",
+    "bring",
+    "please",
+    "starts",
+    "the",
+    "at",
+    "you",
+    "made",
+    "not",
+    "our",
+    "hi"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "sale",
+    "10am",
+    "school",
+    "cupcakes",
+    "11am",
+    "cookies",
+    "hall",
+    "bake",
+    "bring",
+    "please",
+    "starts",
+    "the",
+    "at",
+    "you",
+    "made",
+    "not",
+    "our",
+    "hi"
+   ],
+   "ideal": [
+    "sale",
+    "10am",
+    "school",
+    "cupcakes"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "A-03",
+   "pool": "real",
+   "form": "A",
+   "slot": 3,
+   "tier": "M",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, football is back on Saturday! We meet at the usual time and place (the park at 4pm). Bring your own water bottle.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "football"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Saturday"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "usual",
+      "park"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "usual",
+      "4pm"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "water",
+      "bottle"
+     ]
+    }
+   ],
+   "breakers": [
+    "Sunday",
+    "5pm",
+    "field"
+   ],
+   "fillers": [
+    "bring",
+    "own",
+    "meet",
+    "back",
+    "the",
+    "we",
+    "not",
+    "time"
+   ],
+   "order": [],
+   "shorthand": {
+    "tile": "usual",
+    "slots": [
+     "place",
+     "time"
+    ]
+   },
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "football",
+    "Saturday",
+    "usual",
+    "park",
+    "4pm",
+    "water",
+    "bottle",
+    "Sunday",
+    "5pm",
+    "field",
+    "bring",
+    "own",
+    "meet",
+    "back",
+    "the",
+    "we",
+    "not",
+    "time"
+   ],
+   "ideal": [
+    "football",
+    "Saturday",
+    "usual",
+    "water"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "A-04",
+   "pool": "real",
+   "form": "A",
+   "slot": 4,
+   "tier": "M",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, welcome! We're meeting at the Castle (that's our name for the big sandpit) on Wednesday. Bring a snack to share.",
+   "slots": [
+    {
+     "id": "action",
+     "accept": [
+      "meet"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Wednesday"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "sandpit"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "snack"
+     ]
+    }
+   ],
+   "breakers": [
+    "Thursday",
+    "lunch",
+    "park"
+   ],
+   "fillers": [
+    "castle",
+    "bring",
+    "share",
+    "welcome",
+    "our",
+    "the",
+    "big",
+    "a",
+    "to",
+    "not",
+    "we"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "castle",
+    "type": "nickname",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "meet",
+    "Wednesday",
+    "sandpit",
+    "snack",
+    "Thursday",
+    "lunch",
+    "park",
+    "castle",
+    "bring",
+    "share",
+    "welcome",
+    "our",
+    "the",
+    "big",
+    "a",
+    "to",
+    "not",
+    "we"
+   ],
+   "ideal": [
+    "meet",
+    "Wednesday",
+    "sandpit",
+    "snack"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "A-05",
+   "pool": "real",
+   "form": "A",
+   "slot": 5,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, swimming lessons start next Tuesday at the pool. Mum forgot to tell me the time.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "swimming"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Tuesday"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "pool"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "2pm"
+     ]
+    }
+   ],
+   "breakers": [
+    "1pm",
+    "3pm",
+    "Thursday"
+   ],
+   "fillers": [
+    "lessons",
+    "start",
+    "next",
+    "the",
+    "at",
+    "on",
+    "go",
+    "we",
+    "hi",
+    "not",
+    "please"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": {
+    "slot": "time",
+    "question": "when",
+    "answerTile": "2pm",
+    "reply": "Mum says 2pm."
+   },
+   "mixup": null,
+   "tiles": [
+    "swimming",
+    "Tuesday",
+    "pool",
+    "1pm",
+    "3pm",
+    "Thursday",
+    "lessons",
+    "start",
+    "next",
+    "the",
+    "at",
+    "on",
+    "go",
+    "we",
+    "hi",
+    "not",
+    "please"
+   ],
+   "ideal": [
+    "swimming",
+    "Tuesday",
+    "pool",
+    "2pm"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "A-06",
+   "pool": "real",
+   "form": "A",
+   "slot": 6,
+   "tier": "M",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, movie night is at my house on Friday at 7pm. Bring a blanket and your pillow.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "movie"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Friday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "7pm"
+     ]
+    },
+    {
+     "id": "item1",
+     "accept": [
+      "blanket"
+     ]
+    },
+    {
+     "id": "item2",
+     "accept": [
+      "pillow"
+     ]
+    }
+   ],
+   "breakers": [
+    "8pm",
+    "Saturday",
+    "popcorn"
+   ],
+   "fillers": [
+    "night",
+    "bring",
+    "your",
+    "a",
+    "and",
+    "house",
+    "at",
+    "my",
+    "not",
+    "the"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": {
+    "echo": "8pm",
+    "fixSlot": "time"
+   },
+   "tiles": [
+    "movie",
+    "Friday",
+    "7pm",
+    "blanket",
+    "pillow",
+    "8pm",
+    "Saturday",
+    "popcorn",
+    "night",
+    "bring",
+    "your",
+    "a",
+    "and",
+    "house",
+    "at",
+    "my",
+    "not",
+    "the"
+   ],
+   "ideal": [
+    "movie",
+    "Friday",
+    "7pm",
+    "blanket",
+    "pillow"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "A-07",
+   "pool": "real",
+   "form": "A",
+   "slot": 7,
+   "tier": "H",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, the kite contest is this Sunday at the usual time and place (the park at 4pm). Kites must be homemade, so bring paper and tape. Prizes too!",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "kite"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Sunday"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "park"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "4pm"
+     ]
+    },
+    {
+     "id": "item1",
+     "accept": [
+      "paper"
+     ]
+    },
+    {
+     "id": "item2",
+     "accept": [
+      "tape"
+     ]
+    }
+   ],
+   "breakers": [
+    "Saturday",
+    "5pm",
+    "glue"
+   ],
+   "fillers": [
+    "usual",
+    "contest",
+    "homemade",
+    "bring",
+    "prizes",
+    "and",
+    "the",
+    "not",
+    "at"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "usual",
+    "type": "shorthand",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "kite",
+    "Sunday",
+    "park",
+    "4pm",
+    "paper",
+    "tape",
+    "Saturday",
+    "5pm",
+    "glue",
+    "usual",
+    "contest",
+    "homemade",
+    "bring",
+    "prizes",
+    "and",
+    "the",
+    "not",
+    "at"
+   ],
+   "ideal": [
+    "kite",
+    "Sunday",
+    "park",
+    "4pm",
+    "paper",
+    "tape"
+   ],
+   "cap": 10
+  },
+  {
+   "id": "A-08",
+   "pool": "real",
+   "form": "A",
+   "slot": 8,
+   "tier": "H",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, the cookie class is not at the hall any more. It's now in the Lab, which is what we call Mia's kitchen. Same day, Thursday at 3pm.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "cookie"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "kitchen"
+     ]
+    },
+    {
+     "id": "owner",
+     "accept": [
+      "Mia's"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Thursday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "3pm"
+     ]
+    }
+   ],
+   "breakers": [
+    "hall",
+    "Friday",
+    "4pm",
+    "school"
+   ],
+   "fillers": [
+    "lab",
+    "class",
+    "now",
+    "same",
+    "day",
+    "the",
+    "in",
+    "not",
+    "moved"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "lab",
+    "type": "nickname",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "cookie",
+    "kitchen",
+    "Mia's",
+    "Thursday",
+    "3pm",
+    "hall",
+    "Friday",
+    "4pm",
+    "school",
+    "lab",
+    "class",
+    "now",
+    "same",
+    "day",
+    "the",
+    "in",
+    "not",
+    "moved"
+   ],
+   "ideal": [
+    "cookie",
+    "kitchen",
+    "Mia's",
+    "Thursday",
+    "3pm"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "A-09",
+   "pool": "real",
+   "form": "A",
+   "slot": 9,
+   "tier": "M",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, the treasure hunt is on Monday at 11am. Bring a torch. Liam is choosing the place and will tell us soon.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "treasure",
+      "hunt"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Monday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "11am"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "torch"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "beach"
+     ]
+    }
+   ],
+   "breakers": [
+    "park",
+    "garden",
+    "Tuesday"
+   ],
+   "fillers": [
+    "bring",
+    "a",
+    "the",
+    "on",
+    "soon",
+    "at",
+    "we",
+    "go",
+    "not"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": {
+    "slot": "place",
+    "question": "where",
+    "answerTile": "beach",
+    "reply": "Liam says the beach!"
+   },
+   "mixup": null,
+   "tiles": [
+    "treasure",
+    "hunt",
+    "Monday",
+    "11am",
+    "torch",
+    "park",
+    "garden",
+    "Tuesday",
+    "bring",
+    "a",
+    "the",
+    "on",
+    "soon",
+    "at",
+    "we",
+    "go",
+    "not"
+   ],
+   "ideal": [
+    "treasure",
+    "Monday",
+    "11am",
+    "torch",
+    "beach"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "A-10",
+   "pool": "real",
+   "form": "A",
+   "slot": 10,
+   "tier": "H",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, change of plan for Saturday. First we help Grandpa wash his car at 9am, then we all go to the beach. We're not going to the zoo.",
+   "slots": [
+    {
+     "id": "day",
+     "accept": [
+      "Saturday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "9am"
+     ]
+    },
+    {
+     "id": "task",
+     "accept": [
+      "wash"
+     ]
+    },
+    {
+     "id": "object",
+     "accept": [
+      "car"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "beach"
+     ]
+    }
+   ],
+   "breakers": [
+    "zoo",
+    "Sunday",
+    "10am",
+    "park"
+   ],
+   "fillers": [
+    "first",
+    "then",
+    "Grandpa",
+    "help",
+    "all",
+    "go",
+    "not",
+    "plan",
+    "change"
+   ],
+   "order": [
+    [
+     "task",
+     "place"
+    ],
+    [
+     "object",
+     "place"
+    ]
+   ],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "Saturday",
+    "9am",
+    "wash",
+    "car",
+    "beach",
+    "zoo",
+    "Sunday",
+    "10am",
+    "park",
+    "first",
+    "then",
+    "Grandpa",
+    "help",
+    "all",
+    "go",
+    "not",
+    "plan",
+    "change"
+   ],
+   "ideal": [
+    "Saturday",
+    "9am",
+    "wash",
+    "car",
+    "beach"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "B-01",
+   "pool": "real",
+   "form": "B",
+   "slot": 1,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, the library book swap is on Thursday after school. Bring two old books.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "swap"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Thursday"
+     ]
+    },
+    {
+     "id": "count",
+     "accept": [
+      "two"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "books"
+     ]
+    }
+   ],
+   "breakers": [
+    "Friday",
+    "three"
+   ],
+   "fillers": [
+    "library",
+    "book",
+    "old",
+    "after",
+    "school",
+    "bring",
+    "the",
+    "on",
+    "not",
+    "please",
+    "hi",
+    "we"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "swap",
+    "Thursday",
+    "two",
+    "books",
+    "Friday",
+    "three",
+    "library",
+    "book",
+    "old",
+    "after",
+    "school",
+    "bring",
+    "the",
+    "on",
+    "not",
+    "please",
+    "hi",
+    "we"
+   ],
+   "ideal": [
+    "swap",
+    "Thursday",
+    "two",
+    "books"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "B-02",
+   "pool": "real",
+   "form": "B",
+   "slot": 2,
+   "tier": "E",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, the dance show is tonight at 6pm in the school hall. Wear your tap shoes.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "dance",
+      "show"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "6pm"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "hall"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "shoes"
+     ]
+    }
+   ],
+   "breakers": [
+    "7pm",
+    "gym",
+    "trainers"
+   ],
+   "fillers": [
+    "tonight",
+    "school",
+    "wear",
+    "tap",
+    "your",
+    "the",
+    "in",
+    "at",
+    "not",
+    "please"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "dance",
+    "show",
+    "6pm",
+    "hall",
+    "shoes",
+    "7pm",
+    "gym",
+    "trainers",
+    "tonight",
+    "school",
+    "wear",
+    "tap",
+    "your",
+    "the",
+    "in",
+    "at",
+    "not",
+    "please"
+   ],
+   "ideal": [
+    "dance",
+    "6pm",
+    "hall",
+    "shoes"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "B-03",
+   "pool": "real",
+   "form": "B",
+   "slot": 3,
+   "tier": "M",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, chess is at the meetup (the library on Friday), like every week. This week it starts at 5pm, not 4pm.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "chess"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "meetup",
+      "library"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "meetup",
+      "Friday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "5pm"
+     ]
+    }
+   ],
+   "breakers": [
+    "4pm",
+    "Saturday",
+    "park"
+   ],
+   "fillers": [
+    "every",
+    "week",
+    "starts",
+    "this",
+    "the",
+    "on",
+    "at",
+    "like",
+    "not",
+    "game"
+   ],
+   "order": [],
+   "shorthand": {
+    "tile": "meetup",
+    "slots": [
+     "place",
+     "day"
+    ]
+   },
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "chess",
+    "meetup",
+    "library",
+    "Friday",
+    "5pm",
+    "4pm",
+    "Saturday",
+    "park",
+    "every",
+    "week",
+    "starts",
+    "this",
+    "the",
+    "on",
+    "at",
+    "like",
+    "not",
+    "game"
+   ],
+   "ideal": [
+    "chess",
+    "meetup",
+    "5pm"
+   ],
+   "cap": 7
+  },
+  {
+   "id": "B-04",
+   "pool": "real",
+   "form": "B",
+   "slot": 4,
+   "tier": "M",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, the art club meets in the Shack, our name for Noah's garden shed. It's on Tuesday. Please bring old clothes.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "art"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "shed"
+     ]
+    },
+    {
+     "id": "owner",
+     "accept": [
+      "Noah's"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Tuesday"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "clothes"
+     ]
+    }
+   ],
+   "breakers": [
+    "Wednesday",
+    "paint",
+    "garage"
+   ],
+   "fillers": [
+    "shack",
+    "club",
+    "meets",
+    "garden",
+    "old",
+    "please",
+    "bring",
+    "the",
+    "in",
+    "not"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "shack",
+    "type": "nickname",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "art",
+    "shed",
+    "Noah's",
+    "Tuesday",
+    "clothes",
+    "Wednesday",
+    "paint",
+    "garage",
+    "shack",
+    "club",
+    "meets",
+    "garden",
+    "old",
+    "please",
+    "bring",
+    "the",
+    "in",
+    "not"
+   ],
+   "ideal": [
+    "art",
+    "shed",
+    "Noah's",
+    "Tuesday",
+    "clothes"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "B-05",
+   "pool": "real",
+   "form": "B",
+   "slot": 5,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, the puppet show is on Sunday at 2pm. Mum is still booking the place.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "puppet"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Sunday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "2pm"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "theatre"
+     ]
+    }
+   ],
+   "breakers": [
+    "library",
+    "school",
+    "Monday"
+   ],
+   "fillers": [
+    "show",
+    "the",
+    "on",
+    "at",
+    "still",
+    "mum",
+    "go",
+    "we",
+    "not",
+    "please",
+    "hi"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": {
+    "slot": "place",
+    "question": "where",
+    "answerTile": "theatre",
+    "reply": "Mum says the theatre."
+   },
+   "mixup": null,
+   "tiles": [
+    "puppet",
+    "Sunday",
+    "2pm",
+    "library",
+    "school",
+    "Monday",
+    "show",
+    "the",
+    "on",
+    "at",
+    "still",
+    "mum",
+    "go",
+    "we",
+    "not",
+    "please",
+    "hi"
+   ],
+   "ideal": [
+    "puppet",
+    "Sunday",
+    "2pm",
+    "theatre"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "B-06",
+   "pool": "real",
+   "form": "B",
+   "slot": 6,
+   "tier": "M",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, Zoey's birthday party is on Saturday at 1pm in her garden. Bring your swimsuit for the paddling pool.",
+   "slots": [
+    {
+     "id": "owner",
+     "accept": [
+      "Zoey's"
+     ]
+    },
+    {
+     "id": "event",
+     "accept": [
+      "party"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Saturday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "1pm"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "swimsuit"
+     ]
+    }
+   ],
+   "breakers": [
+    "Sunday",
+    "2pm",
+    "beach"
+   ],
+   "fillers": [
+    "birthday",
+    "garden",
+    "her",
+    "paddling",
+    "bring",
+    "your",
+    "the",
+    "for",
+    "not",
+    "at"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": {
+    "echo": "Sunday",
+    "fixSlot": "day"
+   },
+   "tiles": [
+    "Zoey's",
+    "party",
+    "Saturday",
+    "1pm",
+    "swimsuit",
+    "Sunday",
+    "2pm",
+    "beach",
+    "birthday",
+    "garden",
+    "her",
+    "paddling",
+    "bring",
+    "your",
+    "the",
+    "for",
+    "not",
+    "at"
+   ],
+   "ideal": [
+    "Zoey's",
+    "party",
+    "Saturday",
+    "1pm",
+    "swimsuit"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "B-07",
+   "pool": "real",
+   "form": "B",
+   "slot": 7,
+   "tier": "H",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, come to the meetup (the library on Friday) at 4pm. It's a comic-making day. Please bring pens and your own snack.",
+   "slots": [
+    {
+     "id": "place",
+     "accept": [
+      "library"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Friday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "4pm"
+     ]
+    },
+    {
+     "id": "event",
+     "accept": [
+      "comic"
+     ]
+    },
+    {
+     "id": "item1",
+     "accept": [
+      "pens"
+     ]
+    },
+    {
+     "id": "item2",
+     "accept": [
+      "snack"
+     ]
+    }
+   ],
+   "breakers": [
+    "Thursday",
+    "3pm",
+    "paint",
+    "lunch"
+   ],
+   "fillers": [
+    "meetup",
+    "come",
+    "making",
+    "day",
+    "bring",
+    "please",
+    "own",
+    "not"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "meetup",
+    "type": "shorthand",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "library",
+    "Friday",
+    "4pm",
+    "comic",
+    "pens",
+    "snack",
+    "Thursday",
+    "3pm",
+    "paint",
+    "lunch",
+    "meetup",
+    "come",
+    "making",
+    "day",
+    "bring",
+    "please",
+    "own",
+    "not"
+   ],
+   "ideal": [
+    "library",
+    "Friday",
+    "4pm",
+    "comic",
+    "pens",
+    "snack"
+   ],
+   "cap": 10
+  },
+  {
+   "id": "B-08",
+   "pool": "real",
+   "form": "B",
+   "slot": 8,
+   "tier": "H",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, the water fight has moved from the field to the Lagoon, our name for Liam's paddling pool. It's still Saturday, but now at 3pm.",
+   "slots": [
+    {
+     "id": "event1",
+     "accept": [
+      "water"
+     ]
+    },
+    {
+     "id": "event2",
+     "accept": [
+      "fight"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "pool"
+     ]
+    },
+    {
+     "id": "owner",
+     "accept": [
+      "Liam's"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Saturday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "3pm"
+     ]
+    }
+   ],
+   "breakers": [
+    "field",
+    "2pm",
+    "Sunday",
+    "beach"
+   ],
+   "fillers": [
+    "lagoon",
+    "paddling",
+    "moved",
+    "still",
+    "now",
+    "the",
+    "not",
+    "to"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "lagoon",
+    "type": "nickname",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "water",
+    "fight",
+    "pool",
+    "Liam's",
+    "Saturday",
+    "3pm",
+    "field",
+    "2pm",
+    "Sunday",
+    "beach",
+    "lagoon",
+    "paddling",
+    "moved",
+    "still",
+    "now",
+    "the",
+    "not",
+    "to"
+   ],
+   "ideal": [
+    "water",
+    "fight",
+    "pool",
+    "Liam's",
+    "Saturday",
+    "3pm"
+   ],
+   "cap": 10
+  },
+  {
+   "id": "B-09",
+   "pool": "real",
+   "form": "B",
+   "slot": 9,
+   "tier": "M",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, the garden camp-out is on Friday night at my house. It starts at 8pm. Mum will say what to bring.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "camp"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Friday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "8pm"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "tent"
+     ]
+    }
+   ],
+   "breakers": [
+    "pillow",
+    "torch",
+    "Saturday"
+   ],
+   "fillers": [
+    "garden",
+    "night",
+    "house",
+    "my",
+    "starts",
+    "at",
+    "the",
+    "on",
+    "bring",
+    "not",
+    "we"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": {
+    "slot": "item",
+    "question": "bring",
+    "answerTile": "tent",
+    "reply": "Mum says bring a tent."
+   },
+   "mixup": null,
+   "tiles": [
+    "camp",
+    "Friday",
+    "8pm",
+    "pillow",
+    "torch",
+    "Saturday",
+    "garden",
+    "night",
+    "house",
+    "my",
+    "starts",
+    "at",
+    "the",
+    "on",
+    "bring",
+    "not",
+    "we"
+   ],
+   "ideal": [
+    "camp",
+    "Friday",
+    "8pm",
+    "tent"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "B-10",
+   "pool": "real",
+   "form": "B",
+   "slot": 10,
+   "tier": "H",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, on Sunday we go to the market at 10am to buy seeds, then we plant them in the school garden. Don't go to the shop, it's closed.",
+   "slots": [
+    {
+     "id": "day",
+     "accept": [
+      "Sunday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "10am"
+     ]
+    },
+    {
+     "id": "place1",
+     "accept": [
+      "market"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "seeds"
+     ]
+    },
+    {
+     "id": "task",
+     "accept": [
+      "plant"
+     ]
+    },
+    {
+     "id": "place2",
+     "accept": [
+      "garden",
+      "school"
+     ]
+    }
+   ],
+   "breakers": [
+    "shop",
+    "11am",
+    "Saturday",
+    "flowers"
+   ],
+   "fillers": [
+    "buy",
+    "then",
+    "go",
+    "to",
+    "the",
+    "not",
+    "we"
+   ],
+   "order": [
+    [
+     "place1",
+     "task"
+    ],
+    [
+     "place1",
+     "place2"
+    ]
+   ],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "Sunday",
+    "10am",
+    "market",
+    "seeds",
+    "plant",
+    "garden",
+    "school",
+    "shop",
+    "11am",
+    "Saturday",
+    "flowers",
+    "buy",
+    "then",
+    "go",
+    "to",
+    "the",
+    "not",
+    "we"
+   ],
+   "ideal": [
+    "Sunday",
+    "10am",
+    "market",
+    "seeds",
+    "plant",
+    "garden"
+   ],
+   "cap": 10
+  },
+  {
+   "id": "C-01",
+   "pool": "real",
+   "form": "C",
+   "slot": 1,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, the fun run is on Sunday at 8am. Wear your trainers.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "run"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Sunday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "8am"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "trainers"
+     ]
+    }
+   ],
+   "breakers": [
+    "9am",
+    "Monday",
+    "sandals"
+   ],
+   "fillers": [
+    "fun",
+    "wear",
+    "your",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "run",
+    "Sunday",
+    "8am",
+    "trainers",
+    "9am",
+    "Monday",
+    "sandals",
+    "fun",
+    "wear",
+    "your",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go"
+   ],
+   "ideal": [
+    "run",
+    "Sunday",
+    "8am",
+    "trainers"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "C-02",
+   "pool": "real",
+   "form": "C",
+   "slot": 2,
+   "tier": "E",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, we're washing cars for the school trip on Saturday. Meet at the school gate and bring a sponge.",
+   "slots": [
+    {
+     "id": "task",
+     "accept": [
+      "wash"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Saturday"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "school",
+      "gate"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "sponge"
+     ]
+    }
+   ],
+   "breakers": [
+    "Sunday",
+    "bucket",
+    "hall"
+   ],
+   "fillers": [
+    "cars",
+    "trip",
+    "meet",
+    "bring",
+    "the",
+    "a",
+    "for",
+    "and",
+    "not",
+    "at"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "wash",
+    "Saturday",
+    "school",
+    "gate",
+    "sponge",
+    "Sunday",
+    "bucket",
+    "hall",
+    "cars",
+    "trip",
+    "meet",
+    "bring",
+    "the",
+    "a",
+    "for",
+    "and",
+    "not",
+    "at"
+   ],
+   "ideal": [
+    "wash",
+    "Saturday",
+    "school",
+    "sponge"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "C-03",
+   "pool": "real",
+   "form": "C",
+   "slot": 3,
+   "tier": "M",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, spy club is at HQ, same as always (the treehouse at 10am). This time it's on Tuesday. Bring your secret notebook.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "spy"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "HQ",
+      "treehouse"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "HQ",
+      "10am"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Tuesday"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "notebook"
+     ]
+    }
+   ],
+   "breakers": [
+    "Wednesday",
+    "11am",
+    "pencil"
+   ],
+   "fillers": [
+    "club",
+    "same",
+    "always",
+    "secret",
+    "bring",
+    "your",
+    "the",
+    "on",
+    "not"
+   ],
+   "order": [],
+   "shorthand": {
+    "tile": "HQ",
+    "slots": [
+     "place",
+     "time"
+    ]
+   },
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "spy",
+    "HQ",
+    "treehouse",
+    "10am",
+    "Tuesday",
+    "notebook",
+    "Wednesday",
+    "11am",
+    "pencil",
+    "club",
+    "same",
+    "always",
+    "secret",
+    "bring",
+    "your",
+    "the",
+    "on",
+    "not"
+   ],
+   "ideal": [
+    "spy",
+    "HQ",
+    "Tuesday",
+    "notebook"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "C-04",
+   "pool": "real",
+   "form": "C",
+   "slot": 4,
+   "tier": "M",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, after football on Thursday we all go to Nana's. That's what we call the bakery on the corner. Bring some money for a bun.",
+   "slots": [
+    {
+     "id": "day",
+     "accept": [
+      "Thursday"
+     ]
+    },
+    {
+     "id": "after",
+     "accept": [
+      "football"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "bakery"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "money"
+     ]
+    }
+   ],
+   "breakers": [
+    "Friday",
+    "café",
+    "lunch"
+   ],
+   "fillers": [
+    "Nana's",
+    "after",
+    "corner",
+    "bun",
+    "bring",
+    "all",
+    "go",
+    "the",
+    "some",
+    "not",
+    "we"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "Nana's",
+    "type": "nickname",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "Thursday",
+    "football",
+    "bakery",
+    "money",
+    "Friday",
+    "café",
+    "lunch",
+    "Nana's",
+    "after",
+    "corner",
+    "bun",
+    "bring",
+    "all",
+    "go",
+    "the",
+    "some",
+    "not",
+    "we"
+   ],
+   "ideal": [
+    "Thursday",
+    "football",
+    "bakery",
+    "money"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "C-05",
+   "pool": "real",
+   "form": "C",
+   "slot": 5,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, the class zoo trip is on Wednesday. We leave at 9am. The teacher will tell us what to bring.",
+   "slots": [
+    {
+     "id": "place",
+     "accept": [
+      "zoo"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Wednesday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "9am"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "lunch"
+     ]
+    }
+   ],
+   "breakers": [
+    "camera",
+    "money",
+    "Thursday"
+   ],
+   "fillers": [
+    "trip",
+    "class",
+    "we",
+    "school",
+    "leave",
+    "the",
+    "to",
+    "on",
+    "at",
+    "not",
+    "bring"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": {
+    "slot": "item",
+    "question": "bring",
+    "answerTile": "lunch",
+    "reply": "Teacher says a packed lunch."
+   },
+   "mixup": null,
+   "tiles": [
+    "zoo",
+    "Wednesday",
+    "9am",
+    "camera",
+    "money",
+    "Thursday",
+    "trip",
+    "class",
+    "we",
+    "school",
+    "leave",
+    "the",
+    "to",
+    "on",
+    "at",
+    "not",
+    "bring"
+   ],
+   "ideal": [
+    "zoo",
+    "Wednesday",
+    "9am",
+    "lunch"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "C-06",
+   "pool": "real",
+   "form": "C",
+   "slot": 6,
+   "tier": "M",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, talent show practice is on Monday at 4pm in the library, not the gym. Bring your guitar.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "practice"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Monday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "4pm"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "library"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "guitar"
+     ]
+    }
+   ],
+   "breakers": [
+    "gym",
+    "5pm",
+    "Tuesday"
+   ],
+   "fillers": [
+    "talent",
+    "show",
+    "bring",
+    "your",
+    "the",
+    "in",
+    "on",
+    "at",
+    "not",
+    "please"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": {
+    "echo": "gym",
+    "fixSlot": "place"
+   },
+   "tiles": [
+    "practice",
+    "Monday",
+    "4pm",
+    "library",
+    "guitar",
+    "gym",
+    "5pm",
+    "Tuesday",
+    "talent",
+    "show",
+    "bring",
+    "your",
+    "the",
+    "in",
+    "on",
+    "at",
+    "not",
+    "please"
+   ],
+   "ideal": [
+    "practice",
+    "Monday",
+    "4pm",
+    "library",
+    "guitar"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "C-07",
+   "pool": "real",
+   "form": "C",
+   "slot": 7,
+   "tier": "H",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, bird watching is at HQ, same as always (the treehouse at 10am). It's this Saturday. Bring a hat and a snack, but no phones.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "bird"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "treehouse"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "10am"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Saturday"
+     ]
+    },
+    {
+     "id": "item1",
+     "accept": [
+      "hat"
+     ]
+    },
+    {
+     "id": "item2",
+     "accept": [
+      "snack"
+     ]
+    }
+   ],
+   "breakers": [
+    "phones",
+    "Sunday",
+    "11am",
+    "garden"
+   ],
+   "fillers": [
+    "HQ",
+    "watching",
+    "same",
+    "always",
+    "bring",
+    "the",
+    "and",
+    "not"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "HQ",
+    "type": "shorthand",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "bird",
+    "treehouse",
+    "10am",
+    "Saturday",
+    "hat",
+    "snack",
+    "phones",
+    "Sunday",
+    "11am",
+    "garden",
+    "HQ",
+    "watching",
+    "same",
+    "always",
+    "bring",
+    "the",
+    "and",
+    "not"
+   ],
+   "ideal": [
+    "bird",
+    "treehouse",
+    "10am",
+    "Saturday",
+    "hat",
+    "snack"
+   ],
+   "cap": 10
+  },
+  {
+   "id": "C-08",
+   "pool": "real",
+   "form": "C",
+   "slot": 8,
+   "tier": "H",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, fruit picking is no longer on Sunday. We're going on Friday instead, still at 9am, to the Jungle. That's our name for Gran's orchard.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "fruit",
+      "picking"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Friday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "9am"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "orchard"
+     ]
+    },
+    {
+     "id": "owner",
+     "accept": [
+      "Gran's"
+     ]
+    }
+   ],
+   "breakers": [
+    "Sunday",
+    "10am",
+    "farm"
+   ],
+   "fillers": [
+    "jungle",
+    "instead",
+    "still",
+    "going",
+    "we",
+    "the",
+    "to",
+    "on",
+    "not"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": {
+    "tile": "jungle",
+    "type": "nickname",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "fruit",
+    "picking",
+    "Friday",
+    "9am",
+    "orchard",
+    "Gran's",
+    "Sunday",
+    "10am",
+    "farm",
+    "jungle",
+    "instead",
+    "still",
+    "going",
+    "we",
+    "the",
+    "to",
+    "on",
+    "not"
+   ],
+   "ideal": [
+    "fruit",
+    "Friday",
+    "9am",
+    "orchard",
+    "Gran's"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "C-09",
+   "pool": "real",
+   "form": "C",
+   "slot": 9,
+   "tier": "M",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, recycling day is on Thursday at the town square. Bring your empty bottles. Liam is checking the time.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "recycling"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Thursday"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "square"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "bottles"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "10am"
+     ]
+    }
+   ],
+   "breakers": [
+    "9am",
+    "11am",
+    "Friday",
+    "cans"
+   ],
+   "fillers": [
+    "town",
+    "empty",
+    "bring",
+    "your",
+    "the",
+    "at",
+    "on",
+    "day",
+    "not"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": {
+    "slot": "time",
+    "question": "when",
+    "answerTile": "10am",
+    "reply": "Liam says 10am."
+   },
+   "mixup": null,
+   "tiles": [
+    "recycling",
+    "Thursday",
+    "square",
+    "bottles",
+    "9am",
+    "11am",
+    "Friday",
+    "cans",
+    "town",
+    "empty",
+    "bring",
+    "your",
+    "the",
+    "at",
+    "on",
+    "day",
+    "not"
+   ],
+   "ideal": [
+    "recycling",
+    "Thursday",
+    "square",
+    "bottles",
+    "10am"
+   ],
+   "cap": 9
+  },
+  {
+   "id": "C-10",
+   "pool": "real",
+   "form": "C",
+   "slot": 10,
+   "tier": "H",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, on Friday we pick up the new tent from Zoey's house at 5pm, then take it to the campsite. We are not using the old tent.",
+   "slots": [
+    {
+     "id": "day",
+     "accept": [
+      "Friday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "5pm"
+     ]
+    },
+    {
+     "id": "new",
+     "accept": [
+      "new"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "tent"
+     ]
+    },
+    {
+     "id": "place1",
+     "accept": [
+      "Zoey's"
+     ]
+    },
+    {
+     "id": "place2",
+     "accept": [
+      "campsite"
+     ]
+    }
+   ],
+   "breakers": [
+    "old",
+    "6pm",
+    "Saturday",
+    "beach"
+   ],
+   "fillers": [
+    "pick",
+    "house",
+    "then",
+    "take",
+    "the",
+    "to",
+    "we",
+    "not"
+   ],
+   "order": [
+    [
+     "place1",
+     "place2"
+    ]
+   ],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "Friday",
+    "5pm",
+    "new",
+    "tent",
+    "Zoey's",
+    "campsite",
+    "old",
+    "6pm",
+    "Saturday",
+    "beach",
+    "pick",
+    "house",
+    "then",
+    "take",
+    "the",
+    "to",
+    "we",
+    "not"
+   ],
+   "ideal": [
+    "Friday",
+    "5pm",
+    "new",
+    "tent",
+    "Zoey's",
+    "campsite"
+   ],
+   "cap": 10
+  },
+  {
+   "id": "P-01",
+   "pool": "practice",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, the ice-cream van comes at 3pm today. Bring some coins.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "ice-cream"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "3pm"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "coins"
+     ]
+    }
+   ],
+   "breakers": [
+    "4pm",
+    "card"
+   ],
+   "fillers": [
+    "van",
+    "comes",
+    "today",
+    "some",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "ice-cream",
+    "3pm",
+    "coins",
+    "4pm",
+    "card",
+    "van",
+    "comes",
+    "today",
+    "some",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go"
+   ],
+   "ideal": [
+    "ice-cream",
+    "3pm",
+    "coins"
+   ],
+   "cap": 7
+  },
+  {
+   "id": "P-02",
+   "pool": "practice",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, art class is on Monday at 5pm. Bring an apron.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "art"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Monday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "5pm"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "apron"
+     ]
+    }
+   ],
+   "breakers": [
+    "Tuesday",
+    "6pm"
+   ],
+   "fillers": [
+    "class",
+    "an",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "art",
+    "Monday",
+    "5pm",
+    "apron",
+    "Tuesday",
+    "6pm",
+    "class",
+    "an",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our"
+   ],
+   "ideal": [
+    "art",
+    "Monday",
+    "5pm",
+    "apron"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "P-03",
+   "pool": "practice",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, the swim race is on Friday at the pool. Bring goggles.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "swim"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Friday"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "pool"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "goggles"
+     ]
+    }
+   ],
+   "breakers": [
+    "Saturday",
+    "beach"
+   ],
+   "fillers": [
+    "race",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our",
+    "all"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "swim",
+    "Friday",
+    "pool",
+    "goggles",
+    "Saturday",
+    "beach",
+    "race",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our",
+    "all"
+   ],
+   "ideal": [
+    "swim",
+    "Friday",
+    "pool",
+    "goggles"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "P-04",
+   "pool": "practice",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, the picnic is on Sunday at the beach. Bring a frisbee.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "picnic"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Sunday"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "beach"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "frisbee"
+     ]
+    }
+   ],
+   "breakers": [
+    "Saturday",
+    "park"
+   ],
+   "fillers": [
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our",
+    "all",
+    "a"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "picnic",
+    "Sunday",
+    "beach",
+    "frisbee",
+    "Saturday",
+    "park",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our",
+    "all",
+    "a"
+   ],
+   "ideal": [
+    "picnic",
+    "Sunday",
+    "beach",
+    "frisbee"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "P-05",
+   "pool": "practice",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, the magic show is at 2pm in the hall. Bring your cape.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "magic"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "2pm"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "hall"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "cape"
+     ]
+    }
+   ],
+   "breakers": [
+    "3pm",
+    "hat"
+   ],
+   "fillers": [
+    "show",
+    "in",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "magic",
+    "2pm",
+    "hall",
+    "cape",
+    "3pm",
+    "hat",
+    "show",
+    "in",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our"
+   ],
+   "ideal": [
+    "magic",
+    "2pm",
+    "hall",
+    "cape"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "P-06",
+   "pool": "practice",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "zoey",
+   "knowsContext": false,
+   "note": "Zoey, gardening club is on Tuesday after school. Bring gloves.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "gardening"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Tuesday"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "gloves"
+     ]
+    }
+   ],
+   "breakers": [
+    "Wednesday",
+    "spade"
+   ],
+   "fillers": [
+    "club",
+    "after",
+    "school",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "gardening",
+    "Tuesday",
+    "gloves",
+    "Wednesday",
+    "spade",
+    "club",
+    "after",
+    "school",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our"
+   ],
+   "ideal": [
+    "gardening",
+    "Tuesday",
+    "gloves"
+   ],
+   "cap": 7
+  },
+  {
+   "id": "P-07",
+   "pool": "practice",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "liam",
+   "knowsContext": true,
+   "note": "Liam, tennis is on Saturday at 11am. Wear your cap.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "tennis"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Saturday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "11am"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "cap"
+     ]
+    }
+   ],
+   "breakers": [
+    "12pm",
+    "Sunday"
+   ],
+   "fillers": [
+    "wear",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our",
+    "all"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "tennis",
+    "Saturday",
+    "11am",
+    "cap",
+    "12pm",
+    "Sunday",
+    "wear",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our",
+    "all"
+   ],
+   "ideal": [
+    "tennis",
+    "Saturday",
+    "11am",
+    "cap"
+   ],
+   "cap": 8
+  },
+  {
+   "id": "P-08",
+   "pool": "practice",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "mia",
+   "knowsContext": true,
+   "note": "Mia, the scooter race is at 10am on the field. Bring your helmet.",
+   "slots": [
+    {
+     "id": "event",
+     "accept": [
+      "scooter"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "10am"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "field"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "helmet"
+     ]
+    }
+   ],
+   "breakers": [
+    "11am",
+    "bike"
+   ],
+   "fillers": [
+    "race",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our",
+    "all"
+   ],
+   "order": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "tiles": [
+    "scooter",
+    "10am",
+    "field",
+    "helmet",
+    "11am",
+    "bike",
+    "race",
+    "bring",
+    "the",
+    "on",
+    "at",
+    "please",
+    "not",
+    "hi",
+    "we",
+    "go",
+    "our",
+    "all"
+   ],
+   "ideal": [
+    "scooter",
+    "10am",
+    "field",
+    "helmet"
+   ],
+   "cap": 8
+  }
+ ]
+}

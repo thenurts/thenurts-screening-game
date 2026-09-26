@@ -30,7 +30,8 @@ async function backend(page) {
   return { raw: d, interactions: d.interactions, users: Object.values(d.users), rounds: d.rounds.filter((r) => !r.key.startsWith('fake')), traces: Object.values(d.traces) };
 }
 
-// Plays the current Lucky Dip round with a bot strategy ('keep' | 'dip' | 't3' = dip while k < 3).
+// Plays the current round with a bot. Lucky Dip: 'keep' | 'dip' | 't3' (dip while k < 3).
+// Torch Talk: 'ideal' (asks the gap question, sends the ideal message, sends a targeted fix on T6).
 async function playRound(page, strategy = 't3') {
   await page.waitForFunction(() => window.__tnGame?.scene.getScenes(true).some((x) => x.scene.key.startsWith('mod:')), null, { timeout: 30_000 });
   for (;;) {
@@ -38,6 +39,17 @@ async function playRound(page, strategy = 't3') {
       const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
       if (!s) return 'gone';
       if (s.ended) return 'ending';
+      if (s.manifest.id === 'torch-talk') {
+        if (!s.running || !s.item) return 'wait';
+        const it = s.item;
+        if (s.phase === 'compose') {
+          if (it.gap && !s.answerShown && strat !== 'noask') { s.ask(it.gap.question); return 'chose'; }
+          s.msg = strat === 'cap' ? [...it.ideal, ...it.fillers.filter((f) => f !== 'not')].slice(0, it.cap) : [...it.ideal];
+          s.send(); return 'chose';
+        }
+        if (s.phase === 'fix') { s.msg = [it.slots.find((x) => x.id === it.mixup.fixSlot).accept[0]]; s.send(); return 'chose'; }
+        return 'wait';
+      }
       if (s.running && !s.locked && s.cur) {
         const k = s.cur.k;
         const dip = strat === 'dip' ? true : strat === 'keep' ? false : s.cur.type === 'free' ? k < 3 : k < 3;
@@ -48,6 +60,19 @@ async function playRound(page, strategy = 't3') {
     }, strategy);
     if (state === 'gone' || state === 'ending') break;
     await page.waitForTimeout(state === 'chose' ? 60 : 120);
+  }
+}
+const botFor = async (page) => ((await page.textContent('h1')).includes('Torch') ? 'ideal' : 't3');
+// From the post-game screen: play every remaining game for real, then land on the report.
+async function playRest(page) {
+  for (;;) {
+    await page.click('#btn-continue');
+    await expect(page.locator('#btn-start, #btn-restart, #btn-casual-apply').first()).toBeVisible({ timeout: 20_000 });
+    if (!(await page.locator('#btn-start').count())) return;
+    const bot = await botFor(page);
+    await page.click('#btn-start');
+    await playRound(page, bot);
+    await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
   }
 }
 
@@ -90,20 +115,19 @@ test('applicant: register → how to → practice → real round → report → 
   await expect(page.locator('.tn-modal')).toHaveCount(0);
 
   // Practice round (10 s)
+  const bot1 = await botFor(page);
   await page.click('#btn-practice');
-  await playRound(page);
+  await playRound(page, bot1);
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-4-gameplay.png` });
   await expect(page.locator('#btn-start')).toBeVisible({ timeout: 20_000 });
 
-  // Real round (20 s)
+  // Real round
   await page.click('#btn-start');
-  await playRound(page);
+  await playRound(page, bot1);
   await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(1000);
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-5-postgame.png`, fullPage: true });
-  await page.click('#btn-continue');
-
-  // Only one module → report
+  await playRest(page); // the other game(s), in this run's shuffled order
   await expect(page.locator('#btn-restart')).toBeVisible();
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-6-report.png`, fullPage: true });
 
@@ -117,7 +141,7 @@ test('applicant: register → how to → practice → real round → report → 
   // Event policy v1.8: no navigation or round-lifecycle rows (rounds live in Rounds / RoundTraces)
   for (const ev of ['home_view', 'howto_page', 'pregame_view', 'round_start', 'round_complete', 'practice_start', 'postgame_view']) expect(rows).not.toContain(ev);
   expect(dbj.rounds.filter((r) => r.mode === 'practice')).toHaveLength(1);
-  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(1);
+  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(2);
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
   expect(dbj.traces.some((t) => t.items.length > 0 && t.partial)).toBeTruthy();
@@ -151,11 +175,12 @@ test('casual: play for fun → straight to games, logged as Casual User with no 
   await reset(page);
   await page.click('#btn-casual');
   await expect(page.locator('#btn-start')).toBeVisible();
+  const bot = await botFor(page);
   await page.click('#btn-start');
-  await playRound(page);
-  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
+  await playRound(page, bot);
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
   await expect(page.locator('.tn-notice')).toContainText('playing for fun');
-  await page.click('#btn-continue');
+  await playRest(page);
   await expect(page.locator('#btn-casual-apply')).toBeVisible();
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-7-casual-report.png`, fullPage: true });
   await page.waitForTimeout(3500); // let the log batch flush
@@ -169,7 +194,7 @@ test('casual: play for fun → straight to games, logged as Casual User with no 
 });
 
 test('abandon: closing the page mid-round leaves an abandoned round with its live trace', async ({ page }) => {
-  await page.goto('/' + Q + 'speed=10');
+  await page.goto('/' + Q + 'speed=10&first=lucky-dip');
   await reset(page);
   await page.click('#btn-casual');
   await page.click('#btn-start');
@@ -197,11 +222,11 @@ test('abandon: closing the page mid-round leaves an abandoned round with its liv
 
 test('lucky dip bots: always-Keep / always-Dip / threshold-3 score 0 / 100 / 50', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
-  await page.goto('/' + Q + 'speed=10');
-  await reset(page);
-  await page.click('#btn-casual');
+  await page.goto('/' + Q + 'speed=10&first=lucky-dip');
   const want = { keep: 0, dip: 100, t3: 50 };
   for (const strat of ['keep', 'dip', 't3']) {
+    await reset(page); // a fresh casual session each time → run 1 → sequence A
+    await page.click('#btn-casual');
     await page.click('#btn-start');
     await playRound(page, strat);
     await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
@@ -212,10 +237,49 @@ test('lucky dip bots: always-Keep / always-Dip / threshold-3 score 0 / 100 / 50'
       : dbj.rounds.filter((r) => r.status === 'completed' && r.mode === 'real').map((r) => r.metrics);
     const m = done[done.length - 1];
     expect(m.riskScore, strat).toBe(want[strat]);
-    expect(m.sequenceId).toBe(strat === 'keep' ? 'A' : 'A'); // new run each time below → always A
+    expect(m.sequenceId).toBe('A');
     if (strat === 'keep') expect(m.flags).toMatch(/disengaged/); // instant identical choices → disengaged overrides frozen
-    await page.click('#btn-continue');          // → report (only one game)
-    await page.click('#btn-restart');
-    await page.click('#btn-restart-yes');       // new run → sequence A again
   }
+});
+
+test('torch talk: Form A first; ideal bot scores 100, filler bot less; order + position logged', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/' + Q + 'speed=10&first=torch-talk');
+  const got = {};
+  for (const strat of ['ideal', 'cap']) {
+    await reset(page);
+    await page.click('#btn-casual');
+    await page.click('#btn-start');
+    await playRound(page, strat);
+    await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+    await page.waitForTimeout(1500);
+    const dbj = await backend(page);
+    const r = LIVE
+      ? dbj.raw.Rounds.slice(1).filter((x) => x[10] === 'completed' && x[7] === 'real').map((x) => ({ m: JSON.parse(x[12]), pos: x[17], order: x[18] })).at(-1)
+      : dbj.rounds.filter((x) => x.status === 'completed' && x.mode === 'real').map((x) => ({ m: x.metrics, pos: x.positionInRun, order: x.moduleOrder })).at(-1);
+    expect(r.m.form).toBe('A');
+    expect(r.m.itemIds.split(' ')[0]).toBe('A-01');
+    expect(r.m.turnLog).toHaveLength(10);
+    expect(Number(r.pos)).toBe(1);
+    expect(r.order).toMatch(/^torch-talk>/);
+    got[strat] = r.m;
+  }
+  expect(got.ideal.commScore).toBe(100);
+  expect(got.ideal.meaningRate).toBe(1);
+  expect(got.cap.meaningRate).toBe(1);
+  expect(got.cap.commScore).toBeLessThan(got.ideal.commScore);
+  expect(got.cap.messageScore).toBeLessThan(got.ideal.messageScore);
+  expect(errors).toEqual([]);
+});
+
+test('module order: shuffled per run, stable when resumed', async ({ page }) => {
+  await page.goto('/' + Q);
+  const orders = await page.evaluate(async () => {
+    const out = new Set();
+    for (let i = 0; i < 40; i++) out.add((await window.__tnOrder(`key${i}`, 1)).join('>'));
+    return { distinct: [...out], same: (await window.__tnOrder('k', 1)).join() === (await window.__tnOrder('k', 1)).join() };
+  });
+  expect(orders.distinct.length).toBeGreaterThan(1); // both orders occur
+  expect(orders.same).toBeTruthy();
 });

@@ -6,17 +6,17 @@ import { TRAITS } from '../traits.js';
 import { HOSTS } from '../theme.js';
 import { BENCHMARK_MIN_N } from '../config.js';
 
-function progress(current, completed) {
-  return h('div', { class: 'tn-progress', 'aria-label': `Game ${modules.indexOf(current) + 1} of ${modules.length}` },
-    modules.map((m) => h('i', { class: completed.includes(m.id) ? 'done' : m === current ? 'now' : '' })));
+function progress(current, completed, order = modules) {
+  return h('div', { class: 'tn-progress', 'aria-label': `Game ${order.indexOf(current) + 1} of ${order.length}` },
+    order.map((m) => h('i', { class: completed.includes(m.id) ? 'done' : m === current ? 'now' : '' })));
 }
 
 const fmtVal = (m, v) => (v == null || Number.isNaN(v) ? '–' : `${Number(v).toFixed(m.decimals ?? 0)}${m.unit ? (m.unit === '%' ? '%' : ' ' + m.unit) : ''}`);
 
-export function preGameScreen({ manifest, completed, practiceResult, onHowTo, onPractice, onStart }) {
+export function preGameScreen({ manifest, completed, practiceResult, order = modules, onHowTo, onPractice, onStart }) {
   const hid = hostOf(manifest);
   log(manifest.id, 'pregame_view', { practiced: !!practiceResult }, { moduleVersion: manifest.version });
-  const idx = modules.indexOf(manifest) + 1;
+  const idx = order.indexOf(manifest) + 1;
   const primary = manifest.metrics.find((x) => x.primary);
   const bubble = practiceResult
     ? `Nice warm-up! You got ${fmtVal(primary, practiceResult[primary.key])}. Ready for real?`
@@ -25,10 +25,10 @@ export function preGameScreen({ manifest, completed, practiceResult, onHowTo, on
     logo('horizontal-black', 'tn-logo--corner'),
     card(
       host(hid, practiceResult ? 'excited' : 'happy', bubble),
-      h('div', { class: 'tn-modtag' }, `Game ${idx} of ${modules.length}`),
+      h('div', { class: 'tn-modtag' }, `Game ${idx} of ${order.length}`),
       h('h1', {}, manifest.title),
       h('p', {}, manifest.tagline || ''),
-      progress(manifest, completed),
+      progress(manifest, completed, order),
       h('div', { class: 'tn-stack' },
         h('div', { class: 'tn-row' },
           button('How to play', onHowTo, { kind: 'secondary', icon: '📖', id: 'btn-howto' }),
@@ -94,7 +94,7 @@ function compareRow(m, you, bench, loading = false) {
     h('div', { class: 'tn-muted' }, loading ? 'Comparing with other players…' : hasBench ? `Median player: ${fmtVal(m, med)} · based on ${n} players` : 'Benchmark unlocks as more players finish.'));
 }
 
-export function postGameScreen({ manifest, metrics, benchmark, completed, casual, onContinue }) {
+export function postGameScreen({ manifest, metrics, benchmark, completed, casual, order = modules, onContinue }) {
   const hid = hostOf(manifest);
   const primary = manifest.metrics.find((x) => x.primary);
   const num = h('div', { class: 'tn-score__num' }, '0');

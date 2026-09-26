@@ -50,7 +50,7 @@ function ensureRound(w, b) {
   if (r) return r;
   const mode = b.mode === 'practice' ? 'practice' : 'real'; const run = w.row.currentRun;
   const n = db().rounds.filter((x) => x.key === w.key && x.runNo === run && x.module === b.module && x.mode === mode).length + 1;
-  r = { key: w.key, casual: w.casual, runNo: run, module: b.module, moduleVersion: b.moduleVersion, roundNo: mode === 'practice' ? 'P' + n : String(n), mode, startedAt: now(), endedAt: null, status: 'started', metrics: {}, roundUid: b.roundUid, seed: b.seed };
+  r = { key: w.key, casual: w.casual, runNo: run, module: b.module, moduleVersion: b.moduleVersion, roundNo: mode === 'practice' ? 'P' + n : String(n), mode, startedAt: now(), endedAt: null, status: 'started', metrics: {}, roundUid: b.roundUid, seed: b.seed, positionInRun: b.positionInRun || null, moduleOrder: b.moduleOrder || '' };
   db().rounds.push(r);
   const t = db().traces[b.roundUid] ||= { roundUid: b.roundUid, userId: w.casual ? CASUAL_ID : w.row.userId, module: b.module, mode, status: 'started', items: [], partial: null, elapsedMs: 0 };
   t.roundNo = r.roundNo;

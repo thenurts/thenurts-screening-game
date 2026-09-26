@@ -9,6 +9,7 @@ import './core/ui/styles.css';
 import BackdropScene from './core/BackdropScene.js';
 import { initUi, h } from './core/ui/dom.js';
 import { startFlow } from './core/flow.js';
+import { runOrder } from './core/registry.js';
 import { C } from './core/theme.js';
 import { DEBUG, MOCK } from './core/config.js';
 import { onLog } from './core/logger.js';
@@ -37,6 +38,7 @@ async function boot() {
   const resize = () => { const s = size(); game.scale.resize(s.w * dpr(), s.h * dpr()); game.scale.setZoom(1 / dpr()); };
   window.addEventListener('resize', resize);
   window.__tnGame = game;
+  if (MOCK) window.__tnOrder = (key, run) => runOrder(key, run).map((m) => m.id); // test hook
   game.events.once('ready', () => startFlow(game));
   if (DEBUG) debugPanel();
   // Never let a test build pass as the real thing.
