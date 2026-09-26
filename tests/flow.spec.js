@@ -4,6 +4,25 @@ import { test, expect } from '@playwright/test';
 const EMAIL = 'test.player@example.com';
 const PHONE = '+60170000000';
 const DB = 'thenurts_mock_db_v2';
+// LIVE=1 → the build talks to the Apps Script harness (tests/gas-harness) over real HTTP instead of the mock.
+const LIVE = process.env.LIVE === '1';
+const GAS = 'http://localhost:8787';
+const Q = LIVE ? '?' : '?mock=1&';
+
+async function reset(page) {
+  if (LIVE) await fetch(GAS + '/__reset', { method: 'POST' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+}
+// Normalised view of the backend tables: { interactions: [13-col rows], users: [{currentRun}] }
+async function backend(page) {
+  if (LIVE) {
+    const { sheets } = await (await fetch(GAS + '/__dump')).json();
+    return { raw: sheets, interactions: sheets.Interactions.slice(1), users: sheets.Users.slice(1).map((r) => ({ currentRun: r[5], phone: r[2] })) };
+  }
+  const d = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), DB));
+  return { raw: d, interactions: d.interactions, users: Object.values(d.users) };
+}
 const shots = process.env.SHOTS === '1';
 
 async function playRound(page) {
@@ -22,9 +41,8 @@ async function playRound(page) {
 test('applicant: register → how to → practice → real round → report → restart → login resumes', async ({ page }, info) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/?mock=1&seedbench=1&debug=1');
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
+  await page.goto('/' + Q + 'seedbench=1&debug=1');
+  await reset(page);
 
   await expect(page.locator('#btn-apply')).toBeVisible();
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-1-home.png` });
@@ -78,8 +96,9 @@ test('applicant: register → how to → practice → real round → report → 
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-6-report.png`, fullPage: true });
 
   // Log integrity: standard events present, raw NRIC never stored
-  const dbj = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), DB));
-  expect(JSON.stringify(dbj).toLowerCase()).not.toContain('nric');
+  await page.waitForTimeout(3500); // let the log batch flush
+  const dbj = await backend(page);
+  expect(JSON.stringify(dbj.raw).toLowerCase()).not.toContain('nric');
   expect(dbj.interactions.every((r) => r[1] === `${EMAIL}|${PHONE}` && r[2] === EMAIL && r[3] === PHONE)).toBeTruthy();
   const rows = dbj.interactions.map((r) => r[6]);
   for (const ev of ['register', 'howto_open', 'howto_page', 'howto_close', 'practice_start', 'practice_end', 'round_start', 'round_complete', 'postgame_view']) expect(rows).toContain(ev);
@@ -99,8 +118,9 @@ test('applicant: register → how to → practice → real round → report → 
   await page.fill('#l-phone', PHONE);
   await page.click('#btn-login');
   await expect(page.locator('#btn-start')).toBeVisible();
-  const users = await page.evaluate((k) => Object.values(JSON.parse(localStorage.getItem(k)).users), DB);
+  const users = (await backend(page)).users;
   expect(users[0].currentRun).toBe(2);
+  expect(users[0].phone).toBe(PHONE); // stays text in Sheets, '+' kept
 
   expect(errors).toEqual([]);
 });
@@ -108,9 +128,8 @@ test('applicant: register → how to → practice → real round → report → 
 test('casual: play for fun → straight to games, logged as Casual User with no PII', async ({ page }, info) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/?mock=1&seedbench=1');
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
+  await page.goto('/' + Q + 'seedbench=1');
+  await reset(page);
   await page.click('#btn-casual');
   await expect(page.locator('#btn-start')).toBeVisible();
   await page.click('#btn-start');
@@ -121,8 +140,8 @@ test('casual: play for fun → straight to games, logged as Casual User with no 
   await expect(page.locator('#btn-casual-apply')).toBeVisible();
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-7-casual-report.png`, fullPage: true });
   await page.waitForTimeout(3500); // let the log batch flush
-  const dbj = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), DB));
-  expect(Object.keys(dbj.users)).toHaveLength(0);
+  const dbj = await backend(page);
+  expect(dbj.users).toHaveLength(0);
   expect(dbj.interactions.length).toBeGreaterThan(5);
   expect(dbj.interactions.every((r) => r[1] === 'Casual User' && r[2] === '' && r[3] === '')).toBeTruthy();
   expect(dbj.interactions.map((r) => r[6])).toEqual(expect.arrayContaining(['home_view', 'choose_casual', 'round_start', 'round_complete']));

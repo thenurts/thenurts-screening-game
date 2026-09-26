@@ -3,7 +3,7 @@
 export const CONSENT = {
   en: `
 <h3>Before you play: how we use your information</h3>
-<p>The Nurts [legal entity name, UEN/SSM no.] ("we") invites you to play a short series of games as part of our recruitment process.</p>
+<p>The Nurts Sdn Bhd (202501009352 | 1610766-H) ("we") invites you to play a short series of games as part of our recruitment process.</p>
 <h3>What we collect</h3>
 <ul>
 <li>The details you enter: name, email, mobile number, the type of role and function you're interested in, and your CV if you choose to upload one (optional).</li>
@@ -27,7 +27,7 @@ export const CONSENT = {
 `,
   ms: `
 <h3>Sebelum anda bermain: cara kami menggunakan maklumat anda</h3>
-<p>The Nurts [nama entiti sah, no. UEN/SSM] ("kami") menjemput anda bermain satu siri permainan ringkas sebagai sebahagian daripada proses pengambilan pekerja kami.</p>
+<p>The Nurts Sdn Bhd (202501009352 | 1610766-H) ("kami") menjemput anda bermain satu siri permainan ringkas sebagai sebahagian daripada proses pengambilan pekerja kami.</p>
 <h3>Apa yang kami kumpulkan</h3>
 <ul>
 <li>Butiran yang anda masukkan: nama, e-mel, nombor telefon bimbit, jenis jawatan dan fungsi yang anda minati, serta CV anda jika anda memilih untuk memuat naiknya (pilihan).</li>

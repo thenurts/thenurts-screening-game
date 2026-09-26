@@ -59,9 +59,9 @@ function chips(id, options) {
   return wrap;
 }
 const EMAIL_MSG = 'Please enter a valid email, e.g. name@example.com.';
-const PHONE_MSG = 'Use + and your country code, digits only, no spaces, e.g. +60178720118.';
+const PHONE_MSG = 'Use + and your country code, digits only, no spaces, e.g. +60129876543.';
 function phoneInput(id, attrs = {}) {
-  const el = input(id, 'tel', { autocomplete: 'tel', inputmode: 'tel', placeholder: '+60178720118', maxlength: 16, ...attrs });
+  const el = input(id, 'tel', { autocomplete: 'tel', inputmode: 'tel', placeholder: '+60129876543', maxlength: 16, ...attrs });
   // Strip spaces, dashes and brackets as they type, keeping one leading +.
   el.addEventListener('input', () => { const v = el.value.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, ''); if (v !== el.value) el.value = v; });
   return el;
@@ -97,7 +97,7 @@ export function registerScreen({ onSubmit, onBack }) {
 
   const F = {
     name: field('Full name', name),
-    email: field('Email', email), phone: field('Mobile number', phone, 'With country code, no spaces, e.g. +60178720118.'),
+    email: field('Email', email), phone: field('Mobile number', phone, 'With country code, no spaces, e.g. +60129876543.'),
     type: field('Type of role', type), dept: field('Desired function', dept),
   };
   const consentErr = h('div', { class: 'tn-err' });
@@ -121,7 +121,7 @@ export function registerScreen({ onSubmit, onBack }) {
     try {
       await onSubmit({
         profile: { name: name.value.trim(), email: normEmail(email.value), phone: normPhone(phone.value), employmentType: type.value, desiredFunction: dept.value, cvName: cv?.name || '' },
-        cv, consent: agree.checked, consentVersion: CONSENT_VERSION, consentLang: lang,
+        cv, consent: agree.checked, consentVersion: CONSENT_VERSION, consentLang: lang, userAgent: navigator.userAgent.slice(0, 300),
       });
     } finally { busy(submit, false); }
   } },
@@ -142,7 +142,7 @@ export function loginScreen({ onSubmit, onBack, email: prefill = '' }) {
   log('core', 'login_view');
   const email = input('l-email', 'email', { autocomplete: 'email', inputmode: 'email', value: prefill, autofocus: true, placeholder: 'name@example.com' });
   const phone = phoneInput('l-phone');
-  const F = { email: field('Email you registered with', email), phone: field('Mobile number you registered with', phone, 'With country code, no spaces, e.g. +60178720118.') };
+  const F = { email: field('Email you registered with', email), phone: field('Mobile number you registered with', phone, 'With country code, no spaces, e.g. +60129876543.') };
   const submit = button('Continue', () => {}, { type: 'submit', icon: '▶', id: 'btn-login' });
   const form = h('form', { class: 'tn-stack', novalidate: true, onsubmit: async (e) => {
     e.preventDefault();
