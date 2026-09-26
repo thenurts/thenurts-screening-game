@@ -63,10 +63,9 @@ function login(email = '') {
 async function enter(data, how) {
   session.set(data);
   claimAnonymous();
-  log('core', how, { runNo: session.runNo, completed: session.completed.length });
-  log('core', 'session_start', { ua: navigator.userAgent.slice(0, 160), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio });
   const next = nextModule(session.completed);
-  if (how === 'login_ok') log('core', 'resume', next ? next.id : 'report');
+  log('core', how, { runNo: session.runNo, completed: session.completed.length, resumeAt: next ? next.id : 'report' });
+  log('core', 'session_start', { ua: navigator.userAgent.slice(0, 160), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio, touch: navigator.maxTouchPoints > 0 });
   if (how === 'casual_start') { next ? preGame(next) : report(); return; }
   next ? preGame(next) : report();
 }
@@ -83,6 +82,7 @@ function preGame(manifest, practiceResult = null) {
   manifest.load().catch(() => {});
 }
 
+const attempts = {}; // "<run>:<module>" → real attempts started on this device (repeat-attempt handling)
 const seed32 = () => crypto.getRandomValues(new Uint32Array(1))[0];
 
 // The round starts instantly: the server is told in the background during the 3-2-1 countdown.
@@ -110,8 +110,11 @@ async function play(manifest, mode) {
   hideUi();
   if (game.scene.getScene(key)) game.scene.remove(key);
   game.scene.sleep('backdrop'); // modules draw their own full-bleed world; skip the backdrop's overdraw
+  const attemptKey = `${session.runNo}:${manifest.id}`;
+  if (mode === 'real') attempts[attemptKey] = (attempts[attemptKey] || 0) + 1;
   game.scene.add(key, SceneClass, true, {
     manifest, mode, roundUid, roundNo: null, runNo: session.runNo, seed,
+    playerKey: session.casual ? session.sessionId : session.userId, attemptNo: attempts[attemptKey] || 0,
     onDone: (res) => roundDone(manifest, mode, base, res, key),
   });
   scene = game.scene.getScene(key);
@@ -124,6 +127,8 @@ function roundDone(manifest, mode, base, res, key) {
   game.scene.remove(key);
   game.scene.wake('backdrop');
   const payload = { ...base, status: res.status, metrics: res.metrics || null, primary: res.metrics?.[manifest.metrics.find((m) => m.primary).key] ?? null, trace: takeTrace(base.roundUid) };
+  // Staff-facing values for the Candidate Summary (manifest.summaryKeys), e.g. riskScore / riskBand / flags
+  if (res.metrics && manifest.summaryKeys) payload.summary = Object.fromEntries(manifest.summaryKeys.map((k) => [k, res.metrics[k] ?? '']));
   const ended = api.roundEnd(payload).then((out) => { flush(); return out; }).catch(() => { queueEnd(payload); return null; });
   if (mode === 'practice' || res.status !== 'completed') return preGame(manifest, mode === 'practice' && res.status === 'completed' ? res.metrics : null);
   session.completed = [...new Set([...session.completed, manifest.id])];

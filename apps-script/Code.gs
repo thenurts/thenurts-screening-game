@@ -1,6 +1,6 @@
 /**
  * The Nurts – candidate screening game backend (Google Apps Script web app bound to the results Sheet).
- * Spec: claude/01-architecture-spec.md §6–7 (v1.7). Reference behaviour: src/core/mockServer.js.
+ * Spec: claude/01-architecture-spec.md §6–7 (v1.8). Reference behaviour: src/core/mockServer.js.
  *
  * Identity: registered user_id = "<email>|<phone>" (no NRIC anywhere). Casual players = "Casual User",
  * no PII, kept apart by session_id. All requests are POST bodies of JSON sent as text/plain.
@@ -28,7 +28,7 @@ var TABS = {
   Registrations: ['timestamp', 'user_id', 'name', 'email', 'phone', 'employment_type', 'desired_function', 'cv_link', 'consent_version', 'consent_lang', 'user_agent'],
   Users: ['user_id', 'email', 'phone', 'name', 'created_at', 'current_run', 'runs_completed', 'last_seen'],
   Casual: ['session_id', 'created_at', 'current_run', 'last_seen'],
-  Rounds: ['user_id', 'session_id', 'is_casual', 'run_no', 'module', 'module_version', 'round_no', 'mode', 'started_at', 'ended_at', 'status', 'primary_score', 'metrics_json', 'player_key', 'round_uid', 'seed'],
+  Rounds: ['user_id', 'session_id', 'is_casual', 'run_no', 'module', 'module_version', 'round_no', 'mode', 'started_at', 'ended_at', 'status', 'primary_score', 'metrics_json', 'player_key', 'round_uid', 'seed', 'summary_json'],
   RoundTraces: ['round_uid', 'user_id', 'session_id', 'run_no', 'module', 'module_version', 'round_no', 'mode', 'status', 'started_at', 'updated_at', 'elapsed_ms', 'event_count', 'partial_metrics', 'trace', 'trace_overflow', 'truncated_events'],
 };
 // Columns stored as plain text so Sheets never turns "+60129876543" or round "1" into numbers.
@@ -328,7 +328,8 @@ var ACTIONS = {
     var uid = uid_(b.roundUid);
     var r = ensureRound_(w, b);
     var status = ['completed', 'quit', 'abandoned'].indexOf(b.status) >= 0 ? b.status : 'quit';
-    setRoundStatus_(uid, status, b.primary, b.metrics);
+    var rowNo = setRoundStatus_(uid, status, b.primary, b.metrics);
+    if (rowNo && b.summary) sh_('Rounds').getRange(rowNo, RC.summary_json + 1).setValue(str_(b.summary, 4000));
     if (b.trace) appendTrace_(w, b.trace);
     if (cache_().get('open:' + w.key) === uid) cache_().remove('open:' + w.key);
     var version = sh_('Rounds').getRange(r.row, RC.module_version + 1).getValue();
@@ -386,25 +387,38 @@ var ACTIONS = {
 
 /**
  * One row per registered candidate, per module: official score (current run), real attempts, unfinished
- * attempts (quit/abandoned), practice rounds, whether they read How to play / practised BEFORE their first real
- * attempt, and total seconds spent on How to play. Rebuilt hourly and from the "The Nurts" menu.
+ * attempts (quit/abandoned), practice rounds, read How to play BEFORE the first real attempt, how-to views
+ * (more than 1 = re-read) and seconds, practised first, and times they left the game mid-round.
+ * Rebuilt hourly and from the "The Nurts" menu.
  */
 function refreshSummary() {
   var users = rows_('Users'), regs = rows_('Registrations'), rounds = rows_('Rounds');
   var reg = {}; regs.forEach(function (r) { reg[r[1]] = r; });
   var modules = []; rounds.forEach(function (r) { if (modules.indexOf(r[RC.module]) < 0) modules.push(r[RC.module]); });
-  var how = {}; // key user|module → { first: ms, secs }
+  var how = {}; // key user|module → { first: ms, secs, views }
   var ic = idx_('Interactions');
   rows_('Interactions').forEach(function (r) {
-    var it = r[ic.interaction]; if (it !== 'howto_open' && it !== 'howto_close') return;
-    var k = r[ic.user_id] + '|' + r[ic.module]; var h = how[k] || (how[k] = { first: null, secs: 0 });
+    var it = r[ic.interaction]; // 'howto' = one row per viewing (v1.8); howto_open/close = older rows
+    if (it !== 'howto' && it !== 'howto_open' && it !== 'howto_close') return;
+    var k = r[ic.user_id] + '|' + r[ic.module]; var h = how[k] || (how[k] = { first: null, secs: 0, views: 0 });
     var t = new Date(r[ic.timestamp]).getTime();
-    if (it === 'howto_open' && (h.first === null || t < h.first)) h.first = t;
-    if (it === 'howto_close') { try { h.secs += Math.round((JSON.parse(r[ic.value]).dwellMs || 0) / 1000); } catch (x) { /* ignore */ } }
+    if (it !== 'howto_close') { h.views++; if (h.first === null || t < h.first) h.first = t; }
+    if (it !== 'howto_open') { try { h.secs += Math.round((JSON.parse(r[ic.value]).dwellMs || 0) / 1000); } catch (x) { /* ignore */ } }
+  });
+  var away = {}; // key user|module → times the player left the game mid-round (tab switch / app switch)
+  rows_('RoundTraces').forEach(function (r) {
+    if (r[TC.mode] !== 'real') return;
+    var n = (String(r[TC.trace]) + String(r[TC.trace_overflow])).split('"app_hidden"').length - 1;
+    if (n) { var k = r[TC.user_id] + '|' + r[TC.module]; away[k] = (away[k] || 0) + n; }
+  });
+  var sumKeys = {}; // module → ordered staff-facing keys (from each game's manifest.summaryKeys)
+  rounds.forEach(function (r) {
+    if (!r[RC.summary_json]) return;
+    try { Object.keys(JSON.parse(r[RC.summary_json])).forEach(function (k) { var a = sumKeys[r[RC.module]] || (sumKeys[r[RC.module]] = []); if (a.indexOf(k) < 0) a.push(k); }); } catch (x) { /* ignore */ }
   });
   var per = {}; // user|module → stats
   rounds.forEach(function (r) {
-    var k = r[RC.user_id] + '|' + r[RC.module]; var s = per[k] || (per[k] = { attempts: 0, unfinished: 0, practice: 0, firstReal: null, firstPractice: null, score: '' });
+    var k = r[RC.user_id] + '|' + r[RC.module]; var s = per[k] || (per[k] = { attempts: 0, unfinished: 0, practice: 0, firstReal: null, firstPractice: null, score: '', summary: null });
     var t = new Date(r[RC.started_at]).getTime();
     if (r[RC.mode] === 'practice') { s.practice++; if (s.firstPractice === null || t < s.firstPractice) s.firstPractice = t; return; }
     s.attempts++;
@@ -414,21 +428,24 @@ function refreshSummary() {
   users.forEach(function (u) { // official score = completed real round in the current run
     rounds.forEach(function (r) {
       if (r[RC.user_id] === u[UC.user_id] && Number(r[RC.run_no]) === Number(u[UC.current_run]) && r[RC.mode] === 'real' && r[RC.status] === 'completed') {
-        var s = per[u[UC.user_id] + '|' + r[RC.module]]; if (s && s.score === '') s.score = r[RC.primary_score];
+        var s = per[u[UC.user_id] + '|' + r[RC.module]];
+        if (s && s.score === '') { s.score = r[RC.primary_score]; try { s.summary = r[RC.summary_json] ? JSON.parse(r[RC.summary_json]) : null; } catch (x) { s.summary = null; } }
       }
     });
   });
   var head = ['user_id', 'name', 'email', 'phone', 'employment_type', 'desired_function', 'cv_link', 'registered_at', 'last_seen', 'current_run', 'runs_completed'];
-  modules.forEach(function (m) { head.push(m + ': score', m + ': real attempts', m + ': unfinished', m + ': practice rounds', m + ': read how-to first', m + ': practised first', m + ': how-to secs'); });
+  modules.forEach(function (m) { head.push(m + ': score', m + ': real attempts', m + ': unfinished', m + ': practice rounds', m + ': read how-to first', m + ': how-to views', m + ': how-to secs', m + ': practised first', m + ': left mid-round'); (sumKeys[m] || []).forEach(function (k) { head.push(m + ': ' + k); }); });
   var out = [head];
   users.forEach(function (u) {
     var g = reg[u[UC.user_id]] || [];
     var row = [u[UC.user_id], u[UC.name], u[UC.email], u[UC.phone], g[5] || '', g[6] || '', g[7] || '', u[UC.created_at], u[UC.last_seen], u[UC.current_run], u[UC.runs_completed]];
     modules.forEach(function (m) {
-      var s = per[u[UC.user_id] + '|' + m]; var h = how[u[UC.user_id] + '|' + m];
-      if (!s) { row.push('', 0, 0, 0, '', '', h ? h.secs : 0); return; }
+      var k = u[UC.user_id] + '|' + m; var s = per[k]; var h = how[k];
+      var extra = (sumKeys[m] || []).map(function (sk) { return s && s.summary && s.summary[sk] != null ? s.summary[sk] : ''; });
+      if (!s) { row.push('', 0, 0, 0, '', h ? h.views : 0, h ? h.secs : 0, '', 0); row.push.apply(row, extra); return; }
       var before = function (t) { return t !== null && (s.firstReal === null || t < s.firstReal); };
-      row.push(s.score, s.attempts, s.unfinished, s.practice, before(h ? h.first : null) ? 'Y' : 'N', before(s.firstPractice) ? 'Y' : 'N', h ? h.secs : 0);
+      row.push(s.score, s.attempts, s.unfinished, s.practice, before(h ? h.first : null) ? 'Y' : 'N', h ? h.views : 0, h ? h.secs : 0, before(s.firstPractice) ? 'Y' : 'N', away[k] || 0);
+      row.push.apply(row, extra);
     });
     out.push(row);
   });

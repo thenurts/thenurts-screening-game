@@ -38,7 +38,14 @@ function schedule(now = false) {
   if (!timer) timer = setTimeout(flush, LOG_FLUSH_MS);
 }
 
-/** log('core', 'howto_open', value, { roundNo, roundUid, moduleVersion }) */
+// Interactions rows are reserved for evaluation signals (spec §6 event policy, v1.8). Everything about rounds
+// already lives in Rounds / RoundTraces, and screen navigation carries no candidate signal.
+//   core: who/when/which device + each How-to-play viewing (count = re-reads, dwell = actually read it)
+//   modules: tier B decision events ("g:*") whitelisted in the module manifest's logEvents
+export const ROW_EVENTS = new Set(['session_start', 'register', 'login_ok', 'casual_start', 'howto']);
+const isRowEvent = (interaction) => interaction.startsWith('g:') || ROW_EVENTS.has(interaction);
+
+/** log('core', 'register', value, { roundNo, roundUid, moduleVersion }). Non-policy events go to the debug panel only. */
 export function log(module, interaction, value = '', ctx = {}) {
   const e = {
     event_id: session.uuid(),
@@ -52,9 +59,10 @@ export function log(module, interaction, value = '', ctx = {}) {
     interaction,
     value: stringify(value),
   };
+  listeners.forEach((fn) => fn(isRowEvent(interaction) ? e : { ...e, interaction: `(not stored) ${interaction}` }));
+  if (!isRowEvent(interaction)) return e;
   queue.push(e);
   persist();
-  listeners.forEach((fn) => fn(e));
   if (DEBUG) console.debug('[log]', module, interaction, e.round_no, e.value);
   schedule(queue.length >= LOG_BATCH);
   return e;

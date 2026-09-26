@@ -41,11 +41,14 @@ const BANK = {
   coin: () => { tone({ f: 988, t: 0.07, type: 'square', vol: 0.07 }); tone({ f: 1319, t: 0.2, type: 'square', vol: 0.07, delay: 0.07 }); },
   count: () => tone({ f: 520, t: 0.12, type: 'triangle', vol: 0.15 }),
   go: () => tone({ f: 780, f2: 1040, t: 0.3, type: 'triangle', vol: 0.2 }),
+  dip: (o = {}) => tone({ f: 520 + (o.step || 0) * 110, f2: 700 + (o.step || 0) * 130, t: 0.12, type: 'triangle', vol: 0.14 }),
+  fizz: () => { tone({ f: 1200, t: 0.35, noise: true, vol: 0.18 }); tone({ f: 260, f2: 120, t: 0.3, type: 'sine', vol: 0.12 }); },
+  clunk: () => { tone({ f: 180, f2: 90, t: 0.12, type: 'square', vol: 0.08 }); tone({ f: 988, t: 0.08, type: 'triangle', vol: 0.1, delay: 0.05 }); },
   fanfare: () => [523, 659, 784, 1047].forEach((f, i) => tone({ f, t: 0.22, type: 'triangle', vol: 0.14, delay: i * 0.11 })),
 };
 
 export const sfx = {
-  play(name) { try { BANK[name]?.(); } catch { /* audio is best-effort */ } },
+  play(name, opt) { try { BANK[name]?.(opt); } catch { /* audio is best-effort */ } },
   get muted() { return muted; },
   toggle() { muted = !muted; try { localStorage.setItem('thenurts_muted', muted ? '1' : '0'); } catch {} ; if (!muted) BANK.click(); return muted; },
   unlock() { ac(); },

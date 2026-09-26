@@ -124,7 +124,7 @@ const handlers = {
   roundEnd({ auth, ...b }) {
     const w = who(auth);
     const r = ensureRound(w, b);
-    if (r.status === 'started') Object.assign(r, { status: b.status, endedAt: now(), metrics: b.metrics || {} });
+    if (r.status === 'started') Object.assign(r, { status: b.status, endedAt: now(), metrics: b.metrics || {}, summary: b.summary || null });
     const t = db().traces[b.roundUid]; if (t && t.status === 'started') t.status = b.status;
     if (b.trace) addTrace(w, b.trace);
     if (db().open[w.key] === b.roundUid) delete db().open[w.key];

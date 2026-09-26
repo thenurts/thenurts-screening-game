@@ -27,26 +27,34 @@ async function backend(page) {
     };
   }
   const d = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), DB));
-  return { raw: d, interactions: d.interactions, users: Object.values(d.users), rounds: d.rounds, traces: Object.values(d.traces) };
+  return { raw: d, interactions: d.interactions, users: Object.values(d.users), rounds: d.rounds.filter((r) => !r.key.startsWith('fake')), traces: Object.values(d.traces) };
 }
 
-async function playRound(page) {
-  // Wait out the countdown, then tap a few suns via Phaser's scene graph, plus one deliberate miss.
-  await page.waitForTimeout(2800);
-  for (let i = 0; i < 12; i++) {
-    await page.evaluate(() => {
-      const g = window.__tnGame; const s = g.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
-      const sun = s?.children.list.find((o) => o.type === 'Container' && o.input?.enabled && o.scale > 0.3);
-      if (sun) sun.emit('pointerdown');
-    });
-    await page.waitForTimeout(450);
+// Plays the current Lucky Dip round with a bot strategy ('keep' | 'dip' | 't3' = dip while k < 3).
+async function playRound(page, strategy = 't3') {
+  await page.waitForFunction(() => window.__tnGame?.scene.getScenes(true).some((x) => x.scene.key.startsWith('mod:')), null, { timeout: 30_000 });
+  for (;;) {
+    const state = await page.evaluate((strat) => {
+      const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
+      if (!s) return 'gone';
+      if (s.ended) return 'ending';
+      if (s.running && !s.locked && s.cur) {
+        const k = s.cur.k;
+        const dip = strat === 'dip' ? true : strat === 'keep' ? false : s.cur.type === 'free' ? k < 3 : k < 3;
+        s.choose(dip ? 'dip' : 'keep');
+        return 'chose';
+      }
+      return 'wait';
+    }, strategy);
+    if (state === 'gone' || state === 'ending') break;
+    await page.waitForTimeout(state === 'chose' ? 60 : 120);
   }
 }
 
 test('applicant: register → how to → practice → real round → report → restart → login resumes', async ({ page }, info) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + Q + 'seedbench=1&debug=1');
+  await page.goto('/' + Q + 'seedbench=1&debug=1&speed=10');
   await reset(page);
 
   await expect(page.locator('#btn-apply')).toBeVisible();
@@ -78,8 +86,7 @@ test('applicant: register → how to → practice → real round → report → 
 
   // How to play: page through and close
   await page.click('#btn-howto');
-  await page.click('#btn-howto-next');
-  await page.click('#btn-howto-next');
+  while (await page.locator('.tn-modal').count()) await page.click('#btn-howto-next');
   await expect(page.locator('.tn-modal')).toHaveCount(0);
 
   // Practice round (10 s)
@@ -106,7 +113,11 @@ test('applicant: register → how to → practice → real round → report → 
   expect(JSON.stringify(dbj.raw).toLowerCase()).not.toContain('nric');
   expect(dbj.interactions.every((r) => r[1] === `${EMAIL}|${PHONE}` && r[2] === EMAIL && r[3] === PHONE)).toBeTruthy();
   const rows = dbj.interactions.map((r) => r[6]);
-  for (const ev of ['register', 'howto_open', 'howto_page', 'howto_close', 'practice_start', 'practice_end', 'round_start', 'round_complete', 'postgame_view']) expect(rows).toContain(ev);
+  for (const ev of ['register', 'session_start', 'howto']) expect(rows).toContain(ev);
+  // Event policy v1.8: no navigation or round-lifecycle rows (rounds live in Rounds / RoundTraces)
+  for (const ev of ['home_view', 'howto_page', 'pregame_view', 'round_start', 'round_complete', 'practice_start', 'postgame_view']) expect(rows).not.toContain(ev);
+  expect(dbj.rounds.filter((r) => r.mode === 'practice')).toHaveLength(1);
+  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(1);
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
   expect(dbj.traces.some((t) => t.items.length > 0 && t.partial)).toBeTruthy();
@@ -136,7 +147,7 @@ test('applicant: register → how to → practice → real round → report → 
 test('casual: play for fun → straight to games, logged as Casual User with no PII', async ({ page }, info) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + Q + 'seedbench=1');
+  await page.goto('/' + Q + 'seedbench=1&speed=10');
   await reset(page);
   await page.click('#btn-casual');
   await expect(page.locator('#btn-start')).toBeVisible();
@@ -150,25 +161,26 @@ test('casual: play for fun → straight to games, logged as Casual User with no 
   await page.waitForTimeout(3500); // let the log batch flush
   const dbj = await backend(page);
   expect(dbj.users).toHaveLength(0);
-  expect(dbj.interactions.length).toBeGreaterThan(5);
+  expect(dbj.interactions.length).toBeGreaterThanOrEqual(2);
   expect(dbj.interactions.every((r) => r[1] === 'Casual User' && r[2] === '' && r[3] === '')).toBeTruthy();
-  expect(dbj.interactions.map((r) => r[6])).toEqual(expect.arrayContaining(['home_view', 'choose_casual', 'round_start', 'round_complete']));
+  expect(dbj.interactions.map((r) => r[6])).toEqual(expect.arrayContaining(['casual_start', 'session_start']));
+  expect(dbj.rounds.some((r) => r.status === 'completed')).toBeTruthy();
   expect(errors).toEqual([]);
 });
 
 test('abandon: closing the page mid-round leaves an abandoned round with its live trace', async ({ page }) => {
-  await page.goto('/' + Q);
+  await page.goto('/' + Q + 'speed=10');
   await reset(page);
   await page.click('#btn-casual');
   await page.click('#btn-start');
-  await page.waitForTimeout(2800); // countdown
-  for (let i = 0; i < 6; i++) {
-    await page.evaluate(() => {
+  let n = 0;
+  while (n < 6) { // make a few choices, then leave mid-round
+    const chose = await page.evaluate(() => {
       const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
-      const sun = s?.children.list.find((o) => o.type === 'Container' && o.input?.enabled && o.scale > 0.3);
-      if (sun) sun.emit('pointerdown');
+      if (s && s.running && !s.locked) { s.choose('dip'); return true; } return false;
     });
-    await page.waitForTimeout(700);
+    if (chose) n++;
+    await page.waitForTimeout(150);
   }
   await page.goto('about:blank'); // player closes the tab mid-round
   await page.waitForTimeout(1500);
@@ -181,4 +193,29 @@ test('abandon: closing the page mid-round leaves an abandoned round with its liv
   expect(t).toBeTruthy();
   expect(t.partial).toBeTruthy(); // score-so-far at the moment they left
   expect(t.items.length).toBeGreaterThan(0);
+});
+
+test('lucky dip bots: always-Keep / always-Dip / threshold-3 score 0 / 100 / 50', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
+  await page.goto('/' + Q + 'speed=10');
+  await reset(page);
+  await page.click('#btn-casual');
+  const want = { keep: 0, dip: 100, t3: 50 };
+  for (const strat of ['keep', 'dip', 't3']) {
+    await page.click('#btn-start');
+    await playRound(page, strat);
+    await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
+    await page.waitForTimeout(1500);
+    const dbj = await backend(page);
+    const done = LIVE
+      ? dbj.raw.Rounds.slice(1).filter((r) => r[10] === 'completed' && r[7] === 'real').map((r) => JSON.parse(r[12]))
+      : dbj.rounds.filter((r) => r.status === 'completed' && r.mode === 'real').map((r) => r.metrics);
+    const m = done[done.length - 1];
+    expect(m.riskScore, strat).toBe(want[strat]);
+    expect(m.sequenceId).toBe(strat === 'keep' ? 'A' : 'A'); // new run each time below → always A
+    if (strat === 'keep') expect(m.flags).toMatch(/disengaged/); // instant identical choices → disengaged overrides frozen
+    await page.click('#btn-continue');          // → report (only one game)
+    await page.click('#btn-restart');
+    await page.click('#btn-restart-yes');       // new run → sequence A again
+  }
 });

@@ -19,6 +19,9 @@ export class ModuleScene extends Phaser.Scene {
     this.mode = data.mode; // 'practice' | 'real'
     this.roundNo = data.roundNo; // null until the server numbers it (the round starts without waiting)
     this.roundUid = data.roundUid;
+    this.playerKey = data.playerKey || ''; // stable per player (for counterbalancing, e.g. button side)
+    this.attemptNo = data.attemptNo || 1;  // real attempts at this game in this run, counted on this device
+    this.showTimer = (this.mode === 'practice' ? this.manifest.practice : this.manifest.round).showTimer !== false;
     this.runNo = data.runNo;
     this.seed = data.seed >>> 0;
     this.onDone = data.onDone;
@@ -100,10 +103,12 @@ export class ModuleScene extends Phaser.Scene {
   makeHud() {
     const d = 1000;
     this.hud = this.add.container(0, 0).setDepth(d);
-    const pill = this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(W / 2 - 110, 26, 220, 76, 38).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(W / 2 - 110, 26, 220, 76, 38);
-    this.timerText = this.txt(W / 2, 64, this.fmt(this.duration), { fontSize: '40px' });
-    this.timerBar = this.add.graphics();
-    this.hud.add([pill, this.timerText, this.timerBar]);
+    if (this.showTimer) { // games without a visible clock (decision budget) still have a hidden time cap
+      const pill = this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(W / 2 - 110, 26, 220, 76, 38).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(W / 2 - 110, 26, 220, 76, 38);
+      this.timerText = this.txt(W / 2, 64, this.fmt(this.duration), { fontSize: '40px' });
+      this.timerBar = this.add.graphics();
+      this.hud.add([pill, this.timerText, this.timerBar]);
+    }
     if (this.mode === 'practice') {
       const b = this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(W / 2 - 90, 112, 180, 40, 20);
       this.hud.add([b, this.txt(W / 2, 132, 'PRACTICE', { fontSize: '22px', color: C.sun })]);
@@ -143,13 +148,13 @@ export class ModuleScene extends Phaser.Scene {
   update(time, dt) {
     if (!this.running || this.ended) return;
     this.elapsed = performance.now() - this.startedAt - this.pausedMs;
-    this.timerText.setText(this.fmt(this.remainingMs));
+    if (this.showTimer) this.timerText.setText(this.fmt(this.remainingMs));
     const k = this.remainingMs / this.duration;
-    this.timerBar.clear().fillStyle(hex(k < 0.2 ? C.red : C.sun), 1).fillRoundedRect(W / 2 - 80, 88, 160 * k, 8, 4);
-    if (k < 0.2 && Math.ceil(this.remainingMs / 1000) !== this._lastTick) { this._lastTick = Math.ceil(this.remainingMs / 1000); sfx.play('tick'); this.pop(this.timerText, 1.2); }
+    if (this.showTimer) this.timerBar.clear().fillStyle(hex(k < 0.2 ? C.red : C.sun), 1).fillRoundedRect(W / 2 - 80, 88, 160 * k, 8, 4);
+    if (this.showTimer && k < 0.2 && Math.ceil(this.remainingMs / 1000) !== this._lastTick) { this._lastTick = Math.ceil(this.remainingMs / 1000); sfx.play('tick'); this.pop(this.timerText, 1.2); }
     this.tick?.(dt);
     if (!this._snapAt || performance.now() - this._snapAt > 3000) { this._snapAt = performance.now(); this.snapshot(); }
-    if (this.remainingMs <= 0) this.finish(this.metrics());
+    if (this.remainingMs <= 0) { if (this.onTimeUp) this.onTimeUp(); else this.finish(this.metrics()); }
   }
 
   /** End the round. Shows the end beat, then hands metrics to core. */
@@ -182,11 +187,11 @@ export class ModuleScene extends Phaser.Scene {
     if (this.ended) return;
     if (document.visibilityState === 'hidden') {
       this.hiddenAt = performance.now(); this.pauseClock();
-      log(this.manifest.id, 'app_hidden', { elapsedMs: Math.round(this.elapsed) }, this.ctx());
+      this.trace('app_hidden');
       this.snapshot(); flushBeacon(); // they may never come back: save the round as it stands
       this.scene.pause();
     } else if (this.hiddenAt) {
-      log(this.manifest.id, 'app_visible', { awayMs: Math.round(performance.now() - this.hiddenAt) }, this.ctx());
+      this.trace('app_visible', { awayMs: Math.round(performance.now() - this.hiddenAt) });
       this.hiddenAt = null; this.resumeClock();
       this.scene.resume();
     }
@@ -195,7 +200,7 @@ export class ModuleScene extends Phaser.Scene {
   pageHide() {
     if (this.ended) return;
     this.snapshot();
-    log(this.manifest.id, 'round_abandon_pending', { elapsedMs: Math.round(this.elapsed), mode: this.mode }, this.ctx());
+    this.trace('page_closed');
     flushBeacon();
     api.beacon('roundEnd', { roundUid: this.roundUid, module: this.manifest.id, mode: this.mode, moduleVersion: this.manifest.version, seed: this.seed, status: 'abandoned', metrics: null });
   }

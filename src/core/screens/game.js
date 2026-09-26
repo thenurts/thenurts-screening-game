@@ -1,6 +1,6 @@
 // Pre-game (how to play / practice / start), post-game results and the end-of-run report.
 import { h, show, button, host, card, logo, countUp, charImg } from '../ui/dom.js';
-import { log } from '../logger.js';
+import { log, flushBeacon } from '../logger.js';
 import { modules, hostOf } from '../registry.js';
 import { TRAITS } from '../traits.js';
 import { HOSTS } from '../theme.js';
@@ -38,19 +38,26 @@ export function preGameScreen({ manifest, completed, practiceResult, onHowTo, on
     )));
 }
 
+const howtoViews = {}; // module id → views this page load
+
 export function howToModal(manifest, parent) {
   const pages = manifest.howTo;
-  let i = 0; const opened = performance.now(); let pageAt = opened; const seen = new Set([0]);
+  let i = 0; const opened = performance.now(); const seen = new Set([0]);
   const ctx = { moduleVersion: manifest.version };
-  log(manifest.id, 'howto_open', '', ctx);
+  const view = (howtoViews[manifest.id] = (howtoViews[manifest.id] || 0) + 1);
   const art = h('div', { class: 'tn-howto__art' }); const title = h('h2'); const body = h('p');
   const count = h('div', { class: 'tn-muted', style: { textAlign: 'center', marginBottom: '10px' } });
   const prev = button('Back', () => go(-1), { kind: 'secondary' });
   const next = button('Next', () => go(1), { id: 'btn-howto-next' });
-  const close = () => {
-    log(manifest.id, 'howto_close', { dwellMs: Math.round(performance.now() - opened), pagesSeen: seen.size, pages: pages.length }, ctx);
-    modal.remove();
+  let logged = false;
+  // One row per viewing: which view this is (re-reads), time spent, and whether every page was seen.
+  const record = (how) => {
+    if (logged) return; logged = true;
+    log(manifest.id, 'howto', { view, dwellMs: Math.round(performance.now() - opened), pagesSeen: seen.size, pages: pages.length, closedBy: how }, ctx);
   };
+  const onLeave = () => { record('left_page'); flushBeacon(); };
+  window.addEventListener('pagehide', onLeave);
+  const close = () => { record('closed'); window.removeEventListener('pagehide', onLeave); modal.remove(); };
   function render() {
     const p = pages[i];
     art.innerHTML = '';
@@ -60,8 +67,6 @@ export function howToModal(manifest, parent) {
     next.lastChild.textContent = i === pages.length - 1 ? 'Got it!' : 'Next';
   }
   function go(d) {
-    log(manifest.id, 'howto_page', { from: i, dwellMs: Math.round(performance.now() - pageAt) }, ctx);
-    pageAt = performance.now();
     if (i + d >= pages.length) return close();
     i = Math.max(0, i + d); seen.add(i); render();
   }
@@ -147,19 +152,33 @@ function traitBars(axes) {
 
 export function reportScreen({ report, runNo, casual, onRestart, onApply }) {
   log('core', 'report_view', { runNo });
-  const done = modules.filter((m) => report.results[m.id]);
-  const axes = done.map((m) => {
+  // Scale types (framework v0.2): 'mib' → radar/bars, 'style' → spectrum between two poles, 'gate' → never shown.
+  const done = modules.filter((m) => report.results[m.id] && TRAITS[m.trait].scale !== 'gate');
+  const clamp = (v) => Math.max(0, Math.min(100, v));
+  const all = done.map((m) => {
     const r = report.results[m.id];
-    const medMetrics = {}; let medOk = true;
-    m.metrics.forEach((x) => { const b = r.benchmark?.[x.key]; if (!b || b.n < BENCHMARK_MIN_N || b.median == null) medOk = false; else medMetrics[x.key] = b.median; });
-    const clamp = (v) => Math.max(0, Math.min(100, v));
-    return { id: m.id, label: TRAITS[m.trait].label.replace(' & ', ' & '), you: clamp(m.traitScore(r.metrics)), median: medOk ? clamp(m.traitScore(medMetrics)) : null, m, r };
+    const medMetrics = {};
+    Object.entries(r.benchmark || {}).forEach(([k, b]) => { if (b && b.n >= BENCHMARK_MIN_N && b.median != null) medMetrics[k] = b.median; });
+    const med = Object.keys(medMetrics).length ? Number(m.traitScore(medMetrics)) : NaN;
+    return { id: m.id, label: TRAITS[m.trait].label, scale: TRAITS[m.trait].scale, poles: TRAITS[m.trait].poles, you: clamp(Number(m.traitScore(r.metrics)) || 0), median: Number.isFinite(med) ? clamp(med) : null, m, r };
   });
+  const axes = all.filter((a) => a.scale !== 'style');
+  const styles = all.filter((a) => a.scale === 'style');
   const chart = h('div', {});
-  if (axes.length >= 3) chart.innerHTML = radarSvg(axes); else chart.append(traitBars(axes));
+  if (axes.length >= 3) chart.innerHTML = radarSvg(axes); else if (axes.length) chart.append(traitBars(axes));
+  // Style traits: where you sit between two poles. Neither end is better.
+  styles.forEach((a) => {
+    const lean = a.you < 35 ? `Leans ${a.poles[0].toLowerCase()}` : a.you >= 65 ? `Leans ${a.poles[1].toLowerCase()}` : 'Balanced';
+    chart.append(h('div', { class: 'tn-metric' },
+      h('div', { class: 'tn-metric__top' }, h('span', {}, a.label), h('b', {}, lean)),
+      h('div', { style: { position: 'relative', height: '14px', borderRadius: '7px', background: 'linear-gradient(90deg, var(--sky), var(--butter) 50%, var(--peach))', border: '2px solid var(--ink)' } },
+        a.median != null ? h('div', { title: `Median player: ${Math.round(a.median)}`, style: { position: 'absolute', top: '-6px', left: `${a.median}%`, width: '0', height: '22px', borderLeft: '2px dashed var(--charcoal)' } }) : null,
+        h('div', { title: `You: ${Math.round(a.you)}`, style: { position: 'absolute', top: '50%', left: `${a.you}%`, width: '18px', height: '18px', margin: '-9px 0 0 -9px', borderRadius: '50%', background: 'var(--ink)', border: '3px solid var(--white)' } })),
+      h('div', { class: 'tn-muted', style: { display: 'flex', justifyContent: 'space-between' } }, h('span', {}, a.poles[0]), h('span', {}, a.poles[1]))));
+  });
   const legend = h('div', { class: 'tn-muted', style: { display: 'flex', gap: '14px', justifyContent: 'center', margin: '6px 0 12px' } },
     h('span', {}, h('b', { style: { display: 'inline-block', width: '14px', height: '14px', background: 'var(--sun)', border: '2px solid var(--ink)', borderRadius: '4px', verticalAlign: '-2px', marginRight: '6px' } }), 'You'),
-    axes.some((a) => a.median != null) ? h('span', {}, h('b', { style: { display: 'inline-block', width: '18px', borderTop: '2px dashed var(--charcoal)', verticalAlign: '4px', marginRight: '6px' } }), 'Median player') : null);
+    all.some((a) => a.median != null) ? h('span', {}, h('b', { style: { display: 'inline-block', width: '18px', borderTop: '2px dashed var(--charcoal)', verticalAlign: '4px', marginRight: '6px' } }), 'Median player') : null);
   const confirmBox = h('div', { class: 'tn-notice', style: { display: 'none' } },
     h('p', { style: { margin: '0 0 10px' } }, 'Start a brand-new run from Game 1? Your previous results stay saved.'),
     h('div', { class: 'tn-row' }, button('Cancel', () => { confirmBox.style.display = 'none'; log('core', 'run_restart_cancel'); }, { kind: 'secondary' }),
@@ -172,7 +191,7 @@ export function reportScreen({ report, runNo, casual, onRestart, onApply }) {
       h('h1', {}, 'Your play profile'),
       h('p', { class: 'tn-muted' }, 'Each score is 0–100 on the trait that game looks at. The dashed line is the median player.'),
       chart, legend,
-      h('div', { class: 'tn-report-grid' }, axes.map((a) => {
+      h('div', { class: 'tn-report-grid' }, all.map((a) => {
         const pm = a.m.metrics.find((x) => x.primary);
         return h('div', { class: 'tn-modcard' }, h('img', { src: charImg(hostOf(a.m), 'happy'), alt: '' }),
           h('div', {}, h('b', {}, a.m.title), h('span', {}, `${pm.label}: ${fmtVal(pm, a.r.metrics[pm.key])}${a.r.benchmark?.[pm.key]?.n >= BENCHMARK_MIN_N ? ` · median ${fmtVal(pm, a.r.benchmark[pm.key].median)}` : ''}`)));
