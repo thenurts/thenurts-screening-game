@@ -8,6 +8,8 @@ export default {
   host: 'liam',
   hostLine: 'Warm-up time! Tap every sun you see.',
   estMinutes: 1,
+  // Tier B row events (each needs a purpose in the brief). Test module: none, so hit/miss/expired go to the round trace.
+  logEvents: [],
   howTo: [
     { title: 'Tap the suns', body: 'Suns pop up around the screen. Tap each one before it shrinks away.', img: 'char:liam-excited' },
     { title: 'Be quick and careful', body: 'Faster taps score more. Tapping empty space counts as a miss.', icon: '☀️' },

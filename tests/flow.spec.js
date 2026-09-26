@@ -3,10 +3,11 @@ import { test, expect } from '@playwright/test';
 
 const EMAIL = 'test.player@example.com';
 const PHONE = '+60170000000';
-const DB = 'thenurts_mock_db_v2';
+const DB = 'thenurts_mock_db_v3';
 // LIVE=1 → the build talks to the Apps Script harness (tests/gas-harness) over real HTTP instead of the mock.
 const LIVE = process.env.LIVE === '1';
 const GAS = 'http://localhost:8787';
+const shots = process.env.SHOTS === '1';
 const Q = LIVE ? '?' : '?mock=1&';
 
 async function reset(page) {
@@ -18,12 +19,16 @@ async function reset(page) {
 async function backend(page) {
   if (LIVE) {
     const { sheets } = await (await fetch(GAS + '/__dump')).json();
-    return { raw: sheets, interactions: sheets.Interactions.slice(1), users: sheets.Users.slice(1).map((r) => ({ currentRun: r[5], phone: r[2] })) };
+    return {
+      raw: sheets, interactions: sheets.Interactions.slice(1),
+      users: sheets.Users.slice(1).map((r) => ({ currentRun: r[5], phone: r[2] })),
+      rounds: sheets.Rounds.slice(1).map((r) => ({ status: r[10], mode: r[7], roundNo: r[6] })),
+      traces: sheets.RoundTraces.slice(1).map((r) => ({ status: r[8], roundNo: r[6], partial: r[13] ? JSON.parse(r[13]) : null, items: r[14] ? String(r[14]).split('\n') : [] })),
+    };
   }
   const d = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), DB));
-  return { raw: d, interactions: d.interactions, users: Object.values(d.users) };
+  return { raw: d, interactions: d.interactions, users: Object.values(d.users), rounds: d.rounds, traces: Object.values(d.traces) };
 }
-const shots = process.env.SHOTS === '1';
 
 async function playRound(page) {
   // Wait out the countdown, then tap a few suns via Phaser's scene graph, plus one deliberate miss.
@@ -102,7 +107,10 @@ test('applicant: register → how to → practice → real round → report → 
   expect(dbj.interactions.every((r) => r[1] === `${EMAIL}|${PHONE}` && r[2] === EMAIL && r[3] === PHONE)).toBeTruthy();
   const rows = dbj.interactions.map((r) => r[6]);
   for (const ev of ['register', 'howto_open', 'howto_page', 'howto_close', 'practice_start', 'practice_end', 'round_start', 'round_complete', 'postgame_view']) expect(rows).toContain(ev);
-  expect(rows.some((r) => r.startsWith('g:'))).toBeTruthy();
+  // Tier C: fine detail lives in one trace record per round, not in Interactions rows
+  expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
+  expect(dbj.traces.some((t) => t.items.length > 0 && t.partial)).toBeTruthy();
+  console.log(`[${info.project.name}] Interactions rows for register→practice→round→report: ${dbj.interactions.length}`);
 
   // New run, then log in fresh and resume at module 1 of run 2
   await page.click('#btn-restart');
@@ -146,4 +154,31 @@ test('casual: play for fun → straight to games, logged as Casual User with no 
   expect(dbj.interactions.every((r) => r[1] === 'Casual User' && r[2] === '' && r[3] === '')).toBeTruthy();
   expect(dbj.interactions.map((r) => r[6])).toEqual(expect.arrayContaining(['home_view', 'choose_casual', 'round_start', 'round_complete']));
   expect(errors).toEqual([]);
+});
+
+test('abandon: closing the page mid-round leaves an abandoned round with its live trace', async ({ page }) => {
+  await page.goto('/' + Q);
+  await reset(page);
+  await page.click('#btn-casual');
+  await page.click('#btn-start');
+  await page.waitForTimeout(2800); // countdown
+  for (let i = 0; i < 6; i++) {
+    await page.evaluate(() => {
+      const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
+      const sun = s?.children.list.find((o) => o.type === 'Container' && o.input?.enabled && o.scale > 0.3);
+      if (sun) sun.emit('pointerdown');
+    });
+    await page.waitForTimeout(700);
+  }
+  await page.goto('about:blank'); // player closes the tab mid-round
+  await page.waitForTimeout(1500);
+  if (!LIVE) await page.goto('/' + Q);
+  const dbj = await backend(page);
+  const real = dbj.rounds.filter((r) => r.mode === 'real');
+  expect(real).toHaveLength(1);
+  expect(real[0].status).toBe('abandoned');
+  const t = dbj.traces.find((x) => x.status === 'abandoned');
+  expect(t).toBeTruthy();
+  expect(t.partial).toBeTruthy(); // score-so-far at the moment they left
+  expect(t.items.length).toBeGreaterThan(0);
 });

@@ -5,7 +5,7 @@
 // and may call this.finish(metrics) early. Core owns timers, HUD, logging, quit and hand-off.
 import Phaser from 'phaser';
 import { C, hex, FONT, W, H } from './theme.js';
-import { log } from './logger.js';
+import { log, trace, setPartial, flushBeacon } from './logger.js';
 import { sfx } from './sfx.js';
 import { api } from './api.js';
 
@@ -17,7 +17,8 @@ export class ModuleScene extends Phaser.Scene {
   init(data) {
     this.manifest = data.manifest;
     this.mode = data.mode; // 'practice' | 'real'
-    this.roundNo = data.roundNo;
+    this.roundNo = data.roundNo; // null until the server numbers it (the round starts without waiting)
+    this.roundUid = data.roundUid;
     this.runNo = data.runNo;
     this.seed = data.seed >>> 0;
     this.onDone = data.onDone;
@@ -30,8 +31,18 @@ export class ModuleScene extends Phaser.Scene {
   // ---- helpers for modules ----
   randInt(a, b) { return a + Math.floor(this.rand() * (b - a + 1)); }
   pick(arr) { return arr[Math.floor(this.rand() * arr.length)]; }
-  log(name, value) { log(this.manifest.id, 'g:' + name, value, this.ctx()); }
-  ctx() { return { roundNo: this.roundNo, moduleVersion: this.manifest.version }; }
+  /**
+   * Tier B: a decision event that gets its own Interactions row, but ONLY if listed in manifest.logEvents
+   * (each with a stated purpose in the module brief). Anything else is downgraded to the round trace.
+   */
+  log(name, value) {
+    if ((this.manifest.logEvents || []).includes(name)) log(this.manifest.id, 'g:' + name, value, this.ctx());
+    else this.trace(name, value);
+  }
+  /** Tier C: fine detail, appended to the round's single live RoundTraces row as [ms, name, value]. */
+  trace(name, value) { trace(this.roundUid, value === undefined ? [Math.round(this.elapsed), name] : [Math.round(this.elapsed), name, value]); }
+  ctx() { return { roundNo: this.roundNo, roundUid: this.roundUid, moduleVersion: this.manifest.version }; }
+  snapshot() { try { setPartial(this.roundUid, this.metrics?.() ?? null, this.elapsed); } catch { /* module not ready */ } }
   get remainingMs() { return Math.max(0, this.duration - this.elapsed); }
 
   txt(x, y, str, style = {}) {
@@ -137,6 +148,7 @@ export class ModuleScene extends Phaser.Scene {
     this.timerBar.clear().fillStyle(hex(k < 0.2 ? C.red : C.sun), 1).fillRoundedRect(W / 2 - 80, 88, 160 * k, 8, 4);
     if (k < 0.2 && Math.ceil(this.remainingMs / 1000) !== this._lastTick) { this._lastTick = Math.ceil(this.remainingMs / 1000); sfx.play('tick'); this.pop(this.timerText, 1.2); }
     this.tick?.(dt);
+    if (!this._snapAt || performance.now() - this._snapAt > 3000) { this._snapAt = performance.now(); this.snapshot(); }
     if (this.remainingMs <= 0) this.finish(this.metrics());
   }
 
@@ -145,6 +157,7 @@ export class ModuleScene extends Phaser.Scene {
     if (this.ended) return;
     this.ended = true; this.running = false;
     this.input.enabled = false;
+    setPartial(this.roundUid, metrics, this.elapsed);
     const banner = this.txt(W / 2, H / 2, this.remainingMs <= 0 ? "TIME!" : 'DONE!', { fontSize: '150px', stroke: C.white, strokeThickness: 18 }).setDepth(1100).setScale(0.2);
     sfx.play('fanfare');
     this.tweens.add({ targets: banner, scale: 1, duration: 420, ease: 'Back.easeOut' });
@@ -170,6 +183,7 @@ export class ModuleScene extends Phaser.Scene {
     if (document.visibilityState === 'hidden') {
       this.hiddenAt = performance.now(); this.pauseClock();
       log(this.manifest.id, 'app_hidden', { elapsedMs: Math.round(this.elapsed) }, this.ctx());
+      this.snapshot(); flushBeacon(); // they may never come back: save the round as it stands
       this.scene.pause();
     } else if (this.hiddenAt) {
       log(this.manifest.id, 'app_visible', { awayMs: Math.round(performance.now() - this.hiddenAt) }, this.ctx());
@@ -180,8 +194,10 @@ export class ModuleScene extends Phaser.Scene {
 
   pageHide() {
     if (this.ended) return;
+    this.snapshot();
     log(this.manifest.id, 'round_abandon_pending', { elapsedMs: Math.round(this.elapsed), mode: this.mode }, this.ctx());
-    api.beacon('roundEnd', { module: this.manifest.id, roundNo: this.roundNo, status: 'abandoned', metrics: null });
+    flushBeacon();
+    api.beacon('roundEnd', { roundUid: this.roundUid, module: this.manifest.id, mode: this.mode, moduleVersion: this.manifest.version, seed: this.seed, status: 'abandoned', metrics: null });
   }
 
   cleanup() {

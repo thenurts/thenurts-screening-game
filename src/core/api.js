@@ -2,7 +2,7 @@
 // Bodies are sent as text/plain JSON so the browser skips the CORS preflight Apps Script can't answer.
 import { API_URL, MOCK } from './config.js';
 import { session } from './session.js';
-import { mockCall } from './mockServer.js';
+import { mockCall, mockBeacon } from './mockServer.js';
 
 export class ApiError extends Error {
   constructor(code, message, ref) { super(message || code); this.code = code; this.ref = ref; }
@@ -32,7 +32,7 @@ async function call(action, payload = {}, { retries = 2 } = {}) {
 // Fire-and-forget for page unload. Returns false if the browser refused to queue it.
 function beacon(action, payload = {}) {
   const body = JSON.stringify({ action, auth: session.auth(), ...payload });
-  if (MOCK) { mockCall(JSON.parse(body)); return true; }
+  if (MOCK) { mockBeacon(JSON.parse(body)); return true; }
   try { return navigator.sendBeacon(API_URL, new Blob([body], { type: 'text/plain;charset=utf-8' })); } catch { return false; }
 }
 
@@ -42,7 +42,7 @@ export const api = {
   casualStart: () => call('casualStart'),
   roundStart: (p) => call('roundStart', p),
   roundEnd: (p) => call('roundEnd', p),
-  log: (events, auth) => call('log', auth ? { events, auth } : { events }),
+  sync: (events, traces, auth) => call('sync', auth ? { events, traces, auth } : { events, traces }),
   benchmarks: (modules) => call('benchmarks', { modules }),
   report: (runNo) => call('report', { runNo }),
   newRun: () => call('newRun'),

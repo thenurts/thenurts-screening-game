@@ -1,7 +1,7 @@
 // Player flow controller (spec §2): Home → Register/Login → [PreGame → Round → PostGame]* → Report.
 import { api } from './api.js';
 import { session } from './session.js';
-import { log, claimAnonymous, flush } from './logger.js';
+import { log, claimAnonymous, flush, openTrace, takeTrace, resolveRound, queueEnd } from './logger.js';
 import { modules, nextModule } from './registry.js';
 import { hideUi, show, h, toast } from './ui/dom.js';
 import { friendly } from './errors.js';
@@ -27,9 +27,8 @@ function applicant() {
 
 // "Just play for fun": straight to the games. No PII; recorded as "Casual User" per session.
 async function casual() {
-  session.userId = session.CASUAL_ID; session.casual = true; // provisional so the request carries casual auth
-  try { await enter(await api.casualStart(), 'casual_start'); }
-  catch (e) { session.userId = null; session.casual = false; toast(friendly(e, 'start the game'), 'bad'); }
+  // No server round trip needed: the casual record is created on the first sync.
+  await enter({ identity: { userId: session.CASUAL_ID, casual: true }, runNo: 1, completed: [] }, 'casual_start');
 }
 
 function register() {
@@ -84,49 +83,66 @@ function preGame(manifest, practiceResult = null) {
   manifest.load().catch(() => {});
 }
 
+const seed32 = () => crypto.getRandomValues(new Uint32Array(1))[0];
+
+// The round starts instantly: the server is told in the background during the 3-2-1 countdown.
+// The attempt is recorded even if that call is slow or fails (roundEnd, and the abandon beacon, create it too).
 async function play(manifest, mode) {
-  let start;
-  try {
-    start = await api.roundStart({ module: manifest.id, mode, moduleVersion: manifest.version });
-  } catch (e) { toast(friendly(e, 'start this round'), 'bad'); return; }
-  const ctx = { roundNo: start.roundNo, moduleVersion: manifest.version };
-  log(manifest.id, mode === 'practice' ? 'practice_start' : 'round_start', { seed: start.seed }, ctx);
-  flush();
+  const roundUid = session.uuid();
+  const seed = seed32();
+  const ctx = { roundUid, moduleVersion: manifest.version };
+  const base = { roundUid, module: manifest.id, mode, moduleVersion: manifest.version, seed };
+  openTrace(roundUid, { module: manifest.id, moduleVersion: manifest.version, mode });
+  log(manifest.id, mode === 'practice' ? 'practice_start' : 'round_start', { seed }, ctx);
+  const key = `mod:${manifest.id}`;
+  let scene = null;
+  (async () => {
+    for (let i = 0; i < 4; i++) {
+      try {
+        const r = await api.roundStart(base);
+        resolveRound(roundUid, r.roundNo);
+        if (scene && !scene.ended) scene.roundNo = r.roundNo;
+        return;
+      } catch { await new Promise((res) => setTimeout(res, 1500 * (i + 1))); }
+    }
+  })();
   const { default: SceneClass } = await manifest.load();
   hideUi();
-  const key = `mod:${manifest.id}`;
   if (game.scene.getScene(key)) game.scene.remove(key);
   game.scene.sleep('backdrop'); // modules draw their own full-bleed world; skip the backdrop's overdraw
   game.scene.add(key, SceneClass, true, {
-    manifest, mode, roundNo: start.roundNo, runNo: session.runNo, seed: start.seed,
-    onDone: (res) => roundDone(manifest, mode, start.roundNo, res, key),
+    manifest, mode, roundUid, roundNo: null, runNo: session.runNo, seed,
+    onDone: (res) => roundDone(manifest, mode, base, res, key),
   });
+  scene = game.scene.getScene(key);
 }
 
-async function roundDone(manifest, mode, roundNo, res, key) {
-  const ctx = { roundNo, moduleVersion: manifest.version };
+function roundDone(manifest, mode, base, res, key) {
+  const ctx = { roundUid: base.roundUid, moduleVersion: manifest.version };
   const ev = mode === 'practice' ? (res.status === 'completed' ? 'practice_end' : 'practice_quit') : res.status === 'completed' ? 'round_complete' : 'round_quit';
   log(manifest.id, ev, res.status === 'completed' ? res.metrics : { elapsedMs: res.elapsedMs }, ctx);
   game.scene.remove(key);
   game.scene.wake('backdrop');
-  let out = { benchmark: {} };
-  try { out = await api.roundEnd({ module: manifest.id, roundNo, status: res.status, metrics: res.metrics || null, primary: res.metrics?.[manifest.metrics.find((m) => m.primary).key] ?? null }); }
-  catch { toast('Saved offline – we’ll sync when you’re back online.'); }
-  flush();
+  const payload = { ...base, status: res.status, metrics: res.metrics || null, primary: res.metrics?.[manifest.metrics.find((m) => m.primary).key] ?? null, trace: takeTrace(base.roundUid) };
+  const ended = api.roundEnd(payload).then((out) => { flush(); return out; }).catch(() => { queueEnd(payload); return null; });
   if (mode === 'practice' || res.status !== 'completed') return preGame(manifest, mode === 'practice' && res.status === 'completed' ? res.metrics : null);
   session.completed = [...new Set([...session.completed, manifest.id])];
   backdrop()?.celebrate();
-  postGameScreen({
-    manifest, metrics: res.metrics, benchmark: out.benchmark, completed: session.completed, casual: session.casual,
+  const scr = postGameScreen({
+    manifest, metrics: res.metrics, benchmark: null, completed: session.completed, casual: session.casual,
     onContinue: () => {
       log(manifest.id, 'continue', '', ctx);
       const next = nextModule(session.completed);
       next ? preGame(next) : report();
     },
   });
+  // Results show immediately; the "vs median" comparison fills in when the server answers.
+  ended.then((out) => scr.setBenchmark?.(out ? out.benchmark : {}));
 }
 
 async function report() {
+  show(h('div', { class: 'tn-screen' }, h('div', { class: 'tn-card' }, h('h2', {}, 'Putting your play profile together…'), h('p', { class: 'tn-muted' }, 'This takes a few seconds.'))));
+  await flush();
   let data;
   try { data = await api.report(session.runNo); } catch (e) { toast(friendly(e, 'load your report'), 'bad'); return; }
   backdrop()?.celebrate();

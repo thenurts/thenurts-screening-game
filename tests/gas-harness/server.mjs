@@ -26,6 +26,8 @@ class Sheet {
   getLastColumn() { return this.data.reduce((m, r) => Math.max(m, r.length), 0); }
   getMaxRows() { return 1000; }
   setFrozenRows() { return this; }
+  setFrozenColumns() { return this; }
+  clear() { this.data = []; this.fmt = {}; return this; }
   getRange(r, c, nr = 1, nc = 1) { return new Range(this, r, c, nr, nc); }
 }
 class Range {
@@ -56,7 +58,7 @@ function fresh() {
   const props = {}; const cache = new Map(); const files = [];
   const ss = {
     getSheetByName: (n) => sheets.find((s) => s.name === n) || null,
-    insertSheet: (n) => { const s = new Sheet(n); sheets.push(s); return s; },
+    insertSheet: (n, i) => { const s = new Sheet(n); if (i === 0) sheets.unshift(s); else sheets.push(s); return s; },
     getSheets: () => sheets.slice(),
     deleteSheet: (s) => sheets.splice(sheets.indexOf(s), 1),
     setSpreadsheetTimeZone() {},
@@ -66,9 +68,9 @@ function fresh() {
     SpreadsheetApp: { getActiveSpreadsheet: () => ss },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     CacheService: { getScriptCache: () => ({
-      get: (k) => cache.get(k) ?? null, put: (k, v) => cache.set(k, v),
+      get: (k) => cache.get(k) ?? null, put: (k, v) => cache.set(k, String(v)), remove: (k) => cache.delete(k),
       getAll: (ks) => Object.fromEntries(ks.filter((k) => cache.has(k)).map((k) => [k, cache.get(k)])),
-      putAll: (o) => Object.entries(o).forEach(([k, v]) => cache.set(k, v)),
+      putAll: (o) => Object.entries(o).forEach(([k, v]) => cache.set(k, String(v))),
     }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] ?? null, setProperty: (k, v) => { props[k] = v; } }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s) => ({ content: s, setMimeType() { return this; } }) },
@@ -100,6 +102,7 @@ http.createServer((req, res) => {
     if (req.method === 'OPTIONS') { res.statusCode = 405; return res.end(); } // Apps Script can't answer preflights either
     if (req.url.startsWith('/__dump')) return res.end(JSON.stringify({ sheets: dump(), files: state.files }));
     if (req.url.startsWith('/__reset')) { fresh(); return res.end('{"ok":true}'); }
+    if (req.url.startsWith('/__run/')) { state.ctx[req.url.slice(7)](); return res.end('{"ok":true}'); } // e.g. /__run/refreshSummary
     if (req.method === 'GET') return res.end(state.ctx.doGet().content);
     if (!/^text\/plain/.test(req.headers['content-type'] || '')) { res.statusCode = 415; return res.end('{"ok":false,"error":"client must send text/plain"}'); }
     try { res.end(state.ctx.doPost({ postData: { contents: body } }).content); }

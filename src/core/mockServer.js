@@ -3,7 +3,7 @@
 // rounds numbered server-side, Users/Registrations/Rounds/Interactions tables.
 import { CASUAL_ID, emailOk, phoneOk, normEmail, normPhone, userIdOf } from './identity.js';
 
-const KEY = 'thenurts_mock_db_v2';
+const KEY = 'thenurts_mock_db_v3';
 const q = new URLSearchParams(location.search);
 const SEED_BENCH = q.get('seedbench') === '1';
 const BENCH_INCLUDE_CASUAL = false; // spec §7: benchmarks use registered candidates only
@@ -12,7 +12,7 @@ let mem = null;
 function db() {
   if (mem) return mem;
   try { mem = JSON.parse(localStorage.getItem(KEY)) || null; } catch { mem = null; }
-  mem ||= { users: {}, casual: {}, registrations: [], rounds: [], interactions: [], seen: {} };
+  mem ||= { users: {}, casual: {}, registrations: [], rounds: [], traces: {}, interactions: [], seen: {}, open: {} };
   return mem;
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch { /* private mode: memory only */ } }
@@ -37,8 +37,28 @@ function identity(w) {
   const id = w.casual ? { userId: CASUAL_ID, casual: true } : { userId: r.userId, email: r.email, phone: r.phone, name: r.name };
   return { identity: id, runNo: r.currentRun, completed: completedIn(w.key, r.currentRun) };
 }
-function markAbandoned(key) {
-  db().rounds.forEach((r) => { if (r.key === key && r.status === 'started') { r.status = 'abandoned'; r.endedAt = now(); } });
+function closeOpen(key, exceptUid) {
+  const uid = db().open[key]; if (!uid || uid === exceptUid) return;
+  const r = db().rounds.find((x) => x.roundUid === uid);
+  if (r && r.status === 'started') Object.assign(r, { status: 'abandoned', endedAt: now() });
+  const t = db().traces[uid]; if (t && t.status === 'started') t.status = 'abandoned';
+  delete db().open[key];
+}
+/** Create the round (idempotent on roundUid) plus its live trace record. */
+function ensureRound(w, b) {
+  let r = db().rounds.find((x) => x.roundUid === b.roundUid);
+  if (r) return r;
+  const mode = b.mode === 'practice' ? 'practice' : 'real'; const run = w.row.currentRun;
+  const n = db().rounds.filter((x) => x.key === w.key && x.runNo === run && x.module === b.module && x.mode === mode).length + 1;
+  r = { key: w.key, casual: w.casual, runNo: run, module: b.module, moduleVersion: b.moduleVersion, roundNo: mode === 'practice' ? 'P' + n : String(n), mode, startedAt: now(), endedAt: null, status: 'started', metrics: {}, roundUid: b.roundUid, seed: b.seed };
+  db().rounds.push(r);
+  const t = db().traces[b.roundUid] ||= { roundUid: b.roundUid, userId: w.casual ? CASUAL_ID : w.row.userId, module: b.module, mode, status: 'started', items: [], partial: null, elapsedMs: 0 };
+  t.roundNo = r.roundNo;
+  return r;
+}
+function addTrace(w, tr) {
+  const t = db().traces[tr.roundUid] ||= { roundUid: tr.roundUid, userId: w.casual ? CASUAL_ID : w.row.userId, module: tr.module, mode: tr.mode, status: 'started', items: [], partial: null, elapsedMs: 0 };
+  t.items.push(...(tr.items || [])); if (tr.partial != null) t.partial = tr.partial; if (tr.elapsedMs != null) t.elapsedMs = tr.elapsedMs; t.updatedAt = now();
 }
 const median = (a) => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
@@ -87,43 +107,35 @@ const handlers = {
   login({ email, phone }) {
     const u = db().users[userIdOf(email, phone)];
     if (!u) err('login_fail');
-    markAbandoned(u.userId);
+    closeOpen(u.userId, null);
     return identity({ key: u.userId, row: u, casual: false });
   },
   casualStart({ auth }) {
     const w = who(auth);
     return identity(w);
   },
-  roundStart({ auth, module, mode, moduleVersion }) {
+  roundStart({ auth, ...b }) {
     const w = who(auth);
-    markAbandoned(w.key);
-    const run = w.row.currentRun;
-    const n = db().rounds.filter((r) => r.key === w.key && r.runNo === run && r.module === module && r.mode === mode).length + 1;
-    const roundNo = mode === 'practice' ? 'P' + n : String(n);
-    db().rounds.push({ key: w.key, casual: w.casual, runNo: run, module, moduleVersion, roundNo, mode, startedAt: now(), endedAt: null, status: 'started', metrics: {} });
-    let h = 2166136261; for (const ch of w.key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-    return { roundNo, runNo: run, seed: (h ^ (run * 7919) ^ (n * 104729) ^ (mode === 'practice' ? 0x5eed : 0)) >>> 0 };
+    closeOpen(w.key, b.roundUid);
+    const r = ensureRound(w, b);
+    db().open[w.key] = b.roundUid;
+    return { roundNo: r.roundNo, runNo: w.row.currentRun };
   },
-  roundEnd({ auth, module, roundNo, status, metrics }) {
+  roundEnd({ auth, ...b }) {
     const w = who(auth);
-    const r = db().rounds.find((x) => x.key === w.key && x.runNo === w.row.currentRun && x.module === module && x.roundNo === roundNo);
-    if (r && r.status === 'started') Object.assign(r, { status, endedAt: now(), metrics: metrics || {} });
-    if (r && status === 'completed' && r.mode === 'real') seedFakes(module, r.moduleVersion, metrics);
-    return { benchmark: r ? benchmarkFor(module, r.moduleVersion) : {} };
+    const r = ensureRound(w, b);
+    if (r.status === 'started') Object.assign(r, { status: b.status, endedAt: now(), metrics: b.metrics || {} });
+    const t = db().traces[b.roundUid]; if (t && t.status === 'started') t.status = b.status;
+    if (b.trace) addTrace(w, b.trace);
+    if (db().open[w.key] === b.roundUid) delete db().open[w.key];
+    if (b.status === 'completed' && r.mode === 'real') seedFakes(r.module, r.moduleVersion, b.metrics);
+    return { roundNo: r.roundNo, benchmark: benchmarkFor(r.module, r.moduleVersion) };
   },
-  log({ auth, events }) {
+  sync({ auth, events, traces }) {
     const w = who(auth);
-    const ack = [];
-    events.forEach((e) => {
-      if (db().seen[e.event_id]) return;
-      db().seen[e.event_id] = 1;
-      // Interactions columns (spec §6): timestamp, user_id, email, phone, module, round_no, interaction, value,
-      // run_no, session_id, client_ts, event_id, module_version
-      db().interactions.push([now(), w.casual ? CASUAL_ID : w.row.userId, w.casual ? '' : w.row.email, w.casual ? '' : w.row.phone,
-        e.module, e.round_no, e.interaction, e.value, w.row.currentRun, e.session_id, e.client_ts, e.event_id, e.module_version]);
-      ack.push(e.event_id);
-    });
-    return { ack };
+    logEvents(w, events || []);
+    (traces || []).forEach((t) => addTrace(w, t));
+    return { ok: true };
   },
   benchmarks({ modules }) {
     const out = {};
@@ -139,12 +151,24 @@ const handlers = {
   },
   newRun({ auth }) {
     const w = who(auth);
-    markAbandoned(w.key);
+    closeOpen(w.key, null);
     w.row.runsCompleted = (w.row.runsCompleted || 0) + 1;
     w.row.currentRun += 1;
     return identity(w);
   },
 };
+
+// Interactions columns (spec §6): timestamp, user_id, email, phone, module, round_no, interaction, value,
+// run_no, session_id, client_ts, event_id, module_version, round_uid
+function logEvents(w, events) {
+  events.forEach((e) => {
+    if (db().seen[e.event_id]) return;
+    db().seen[e.event_id] = 1;
+    const rno = e.round_no || (e.round_uid && db().rounds.find((r) => r.roundUid === e.round_uid)?.roundNo) || '';
+    db().interactions.push([now(), w.casual ? CASUAL_ID : w.row.userId, w.casual ? '' : w.row.email, w.casual ? '' : w.row.phone,
+      e.module, rno, e.interaction, e.value, w.row.currentRun, e.session_id, e.client_ts, e.event_id, e.module_version, e.round_uid || '']);
+  });
+}
 
 export async function mockCall(body) {
   await new Promise((r) => setTimeout(r, 120)); // feel like a network
@@ -153,6 +177,11 @@ export async function mockCall(body) {
   const out = await h(body);
   save();
   return JSON.parse(JSON.stringify(out));
+}
+
+/** Synchronous path for sendBeacon (the page may be gone before an async call finishes). */
+export function mockBeacon(body) {
+  try { const h = handlers[body.action]; if (h) { h(body); save(); } } catch { /* ignore */ }
 }
 
 // Debug helpers (only used with ?debug=1)

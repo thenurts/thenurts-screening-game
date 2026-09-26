@@ -73,7 +73,7 @@ export function howToModal(manifest, parent) {
 }
 
 /** Median bar: a single track with "You" (filled) and "Median" (outlined) markers. */
-function compareRow(m, you, bench) {
+function compareRow(m, you, bench, loading = false) {
   const med = bench?.median; const n = bench?.n || 0;
   const hasBench = n >= BENCHMARK_MIN_N && med != null;
   const max = Math.max(you || 0, hasBench ? med : 0, 1) * 1.2;
@@ -86,32 +86,39 @@ function compareRow(m, you, bench) {
   return h('div', { class: 'tn-metric' },
     h('div', { class: 'tn-metric__top' }, h('span', {}, m.label), h('b', {}, fmtVal(m, you))),
     track,
-    h('div', { class: 'tn-muted' }, hasBench ? `Median player: ${fmtVal(m, med)} · based on ${n} players` : 'Benchmark unlocks as more players finish.'));
+    h('div', { class: 'tn-muted' }, loading ? 'Comparing with other players…' : hasBench ? `Median player: ${fmtVal(m, med)} · based on ${n} players` : 'Benchmark unlocks as more players finish.'));
 }
 
 export function postGameScreen({ manifest, metrics, benchmark, completed, casual, onContinue }) {
   const hid = hostOf(manifest);
   const primary = manifest.metrics.find((x) => x.primary);
-  const others = manifest.metrics.filter((x) => !x.primary);
   const num = h('div', { class: 'tn-score__num' }, '0');
-  const pb = benchmark?.[primary.key];
-  const above = pb?.n >= BENCHMARK_MIN_N ? (metrics[primary.key] >= pb.median) === (primary.higherIsBetter !== false) : null;
   const isLast = modules.every((m) => completed.includes(m.id));
   log(manifest.id, 'postgame_view', '', { moduleVersion: manifest.version });
+  const rows = h('div', {});
+  const hostBox = h('div', {});
+  // benchmark === null → still loading (results are shown before the server answers)
+  const render = (bm) => {
+    const pb = bm?.[primary.key];
+    const above = pb?.n >= BENCHMARK_MIN_N ? (metrics[primary.key] >= pb.median) === (primary.higherIsBetter !== false) : null;
+    hostBox.replaceChildren(host(hid, above === false ? 'happy' : 'excited', above == null ? 'All done! Here’s how it went.' : above ? 'Great round!' : 'Nice work, that one’s tricky!'));
+    rows.replaceChildren(...manifest.metrics.map((m) => compareRow(m, metrics[m.key], bm?.[m.key], bm === null)));
+  };
+  render(benchmark);
   const scr = show(h('div', { class: 'tn-screen' },
     logo('horizontal-black', 'tn-logo--corner'),
     card(
-      host(hid, above === false ? 'happy' : 'excited', above == null ? 'All done! Here’s how it went.' : above ? 'Great round!' : 'Nice work, that one’s tricky!'),
+      hostBox,
       h('div', { class: 'tn-modtag' }, `${manifest.title} · results`),
       h('div', { class: 'tn-score' }, num, h('div', { class: 'tn-score__label' }, primary.label)),
-      compareRow(primary, metrics[primary.key], pb),
-      others.map((m) => compareRow(m, metrics[m.key], benchmark?.[m.key])),
+      rows,
       h('p', { class: 'tn-notice' }, casual
         ? 'You’re playing for fun, so your progress isn’t saved if you leave. Carry on whenever you’re ready!'
         : 'You can stop here. Come back any time, choose “I’m a returning candidate” and enter your email and mobile number to pick up where you left off.'),
       button(isLast ? 'See my report' : 'Continue', onContinue, { icon: '▶', id: 'btn-continue' }),
     )));
   countUp(num, Number(metrics[primary.key]) || 0, { decimals: primary.decimals ?? 0 });
+  scr.setBenchmark = (bm) => { if (scr.isConnected) render(bm || {}); };
   return scr;
 }
 

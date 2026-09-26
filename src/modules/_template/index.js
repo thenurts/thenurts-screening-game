@@ -9,6 +9,7 @@ export default {
   host: 'mia',                 // optional; defaults to the trait's host
   hostLine: 'Optional host speech bubble on the pre-game card.',
   estMinutes: 2,
+  logEvents: [],               // tier B: decision events that get their own Interactions row; everything else from this.log() goes to the round trace
   howTo: [ { title: 'Page title', body: 'What to do.', img: 'char:mia-excited' } ], // or icon: '🎈'
   practice: { durationSec: 30, scored: false },
   round: { durationSec: 90 },
