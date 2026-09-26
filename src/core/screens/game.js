@@ -89,7 +89,7 @@ function compareRow(m, you, bench) {
     h('div', { class: 'tn-muted' }, hasBench ? `Median player: ${fmtVal(m, med)} · based on ${n} players` : 'Benchmark unlocks as more players finish.'));
 }
 
-export function postGameScreen({ manifest, metrics, benchmark, completed, onContinue }) {
+export function postGameScreen({ manifest, metrics, benchmark, completed, casual, onContinue }) {
   const hid = hostOf(manifest);
   const primary = manifest.metrics.find((x) => x.primary);
   const others = manifest.metrics.filter((x) => !x.primary);
@@ -106,7 +106,9 @@ export function postGameScreen({ manifest, metrics, benchmark, completed, onCont
       h('div', { class: 'tn-score' }, num, h('div', { class: 'tn-score__label' }, primary.label)),
       compareRow(primary, metrics[primary.key], pb),
       others.map((m) => compareRow(m, metrics[m.key], benchmark?.[m.key])),
-      h('p', { class: 'tn-notice' }, 'You can stop here. Come back any time and log in with your NRIC and email to pick up where you left off.'),
+      h('p', { class: 'tn-notice' }, casual
+        ? 'You’re playing for fun, so your progress isn’t saved if you leave. Carry on whenever you’re ready!'
+        : 'You can stop here. Come back any time, choose “I’m a returning candidate” and enter your email and mobile number to pick up where you left off.'),
       button(isLast ? 'See my report' : 'Continue', onContinue, { icon: '▶', id: 'btn-continue' }),
     )));
   countUp(num, Number(metrics[primary.key]) || 0, { decimals: primary.decimals ?? 0 });
@@ -136,7 +138,7 @@ function traitBars(axes) {
       ax.median != null ? h('div', { title: `Median: ${Math.round(ax.median)}`, style: { position: 'absolute', top: '-4px', left: `${ax.median}%`, width: '4px', height: '20px', background: 'var(--charcoal)', borderRadius: '2px' } }) : null))));
 }
 
-export function reportScreen({ report, runNo, onRestart }) {
+export function reportScreen({ report, runNo, casual, onRestart, onApply }) {
   log('core', 'report_view', { runNo });
   const done = modules.filter((m) => report.results[m.id]);
   const axes = done.map((m) => {
@@ -168,7 +170,8 @@ export function reportScreen({ report, runNo, onRestart }) {
         return h('div', { class: 'tn-modcard' }, h('img', { src: charImg(hostOf(a.m), 'happy'), alt: '' }),
           h('div', {}, h('b', {}, a.m.title), h('span', {}, `${pm.label}: ${fmtVal(pm, a.r.metrics[pm.key])}${a.r.benchmark?.[pm.key]?.n >= BENCHMARK_MIN_N ? ` · median ${fmtVal(pm, a.r.benchmark[pm.key].median)}` : ''}`)));
       })),
-      h('p', { class: 'tn-notice' }, 'Thanks for playing! The Nurts team will be in touch about next steps.'),
+      h('p', { class: 'tn-notice' }, casual ? 'Thanks for playing! Fancy joining us? You can apply and play as a candidate.' : 'Thanks for playing! The Nurts team will be in touch about next steps.'),
+      casual ? button('Apply to join The Nurts', () => { log('core', 'casual_apply_cta'); onApply(); }, { icon: '💼', id: 'btn-casual-apply' }) : null,
       button('Start a new run', () => { confirmBox.style.display = 'block'; log('core', 'run_restart_prompt'); }, { kind: 'secondary', icon: '↻', id: 'btn-restart' }),
       confirmBox,
     )));

@@ -13,7 +13,7 @@ export const DEBUG = q.get('debug') === '1';
 // Base URL for files in /public (differs when embedded via loader.js on another host).
 export const ASSET_BASE = window.__NURTS_BASE__ || new URL('./', document.baseURI).href;
 
-export const CONSENT_VERSION = 'consent_v0.2';
+export const CONSENT_VERSION = 'consent_v0.3';
 export const BENCHMARK_MIN_N = 5;
 export const LOG_FLUSH_MS = 3000;
 export const LOG_BATCH = 20;

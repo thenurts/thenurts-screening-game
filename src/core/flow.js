@@ -4,7 +4,7 @@ import { session } from './session.js';
 import { log, claimAnonymous, flush } from './logger.js';
 import { modules, nextModule } from './registry.js';
 import { hideUi, show, h, toast } from './ui/dom.js';
-import { homeScreen, registerScreen, loginScreen } from './screens/entry.js';
+import { homeScreen, applicantScreen, registerScreen, loginScreen } from './screens/entry.js';
 import { preGameScreen, howToModal, postGameScreen, reportScreen } from './screens/game.js';
 
 let game = null;
@@ -17,18 +17,29 @@ export function startFlow(g) {
 }
 
 function home() {
-  homeScreen({ onNew: register, onReturning: () => login() });
+  homeScreen({ onApply: applicant, onCasual: casual });
+}
+
+function applicant() {
+  applicantScreen({ onNew: register, onReturning: () => login(), onBack: home });
+}
+
+// "Just play for fun": straight to the games. No PII; recorded as "Casual User" per session.
+async function casual() {
+  session.userId = session.CASUAL_ID; session.casual = true; // provisional so the request carries casual auth
+  try { await enter(await api.casualStart(), 'casual_start'); }
+  catch { session.userId = null; session.casual = false; toast('Connection problem. Please try again.', 'bad'); }
 }
 
 function register() {
   registerScreen({
-    onBack: home,
+    onBack: applicant,
     onSubmit: async (payload) => {
       try {
         const data = await api.register(payload);
         await enter(data, 'register');
       } catch (e) {
-        if (e.code === 'already_registered') { toast('You’re already registered. Please log in.'); login(payload.profile.email); }
+        if (e.code === 'already_registered') { toast('That email or mobile number is already registered. Please continue as a returning candidate.'); login(payload.profile.email); }
         else toast(e.code === 'network' ? 'Connection problem. Please try again.' : 'Something went wrong. Please check your details.', 'bad');
       }
     },
@@ -38,7 +49,7 @@ function register() {
 function login(email = '') {
   loginScreen({
     email,
-    onBack: home,
+    onBack: applicant,
     onSubmit: async (p) => {
       try { await enter(await api.login(p), 'login_ok'); }
       catch (e) { toast(e.code === 'network' ? 'Connection problem. Please try again.' : 'We couldn’t find a match for those details.', 'bad'); }
@@ -53,6 +64,7 @@ async function enter(data, how) {
   log('core', 'session_start', { ua: navigator.userAgent.slice(0, 160), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio });
   const next = nextModule(session.completed);
   if (how === 'login_ok') log('core', 'resume', next ? next.id : 'report');
+  if (how === 'casual_start') { next ? preGame(next) : report(); return; }
   next ? preGame(next) : report();
 }
 
@@ -80,6 +92,7 @@ async function play(manifest, mode) {
   hideUi();
   const key = `mod:${manifest.id}`;
   if (game.scene.getScene(key)) game.scene.remove(key);
+  game.scene.sleep('backdrop'); // modules draw their own full-bleed world; skip the backdrop's overdraw
   game.scene.add(key, SceneClass, true, {
     manifest, mode, roundNo: start.roundNo, runNo: session.runNo, seed: start.seed,
     onDone: (res) => roundDone(manifest, mode, start.roundNo, res, key),
@@ -91,6 +104,7 @@ async function roundDone(manifest, mode, roundNo, res, key) {
   const ev = mode === 'practice' ? (res.status === 'completed' ? 'practice_end' : 'practice_quit') : res.status === 'completed' ? 'round_complete' : 'round_quit';
   log(manifest.id, ev, res.status === 'completed' ? res.metrics : { elapsedMs: res.elapsedMs }, ctx);
   game.scene.remove(key);
+  game.scene.wake('backdrop');
   let out = { benchmark: {} };
   try { out = await api.roundEnd({ module: manifest.id, roundNo, status: res.status, metrics: res.metrics || null, primary: res.metrics?.[manifest.metrics.find((m) => m.primary).key] ?? null }); }
   catch { toast('Saved offline – we’ll sync when you’re back online.'); }
@@ -99,7 +113,7 @@ async function roundDone(manifest, mode, roundNo, res, key) {
   session.completed = [...new Set([...session.completed, manifest.id])];
   backdrop()?.celebrate();
   postGameScreen({
-    manifest, metrics: res.metrics, benchmark: out.benchmark, completed: session.completed,
+    manifest, metrics: res.metrics, benchmark: out.benchmark, completed: session.completed, casual: session.casual,
     onContinue: () => {
       log(manifest.id, 'continue', '', ctx);
       const next = nextModule(session.completed);
@@ -113,7 +127,8 @@ async function report() {
   try { data = await api.report(session.runNo); } catch { toast('Couldn’t load your report. Please refresh.', 'bad'); return; }
   backdrop()?.celebrate();
   reportScreen({
-    report: data, runNo: session.runNo,
+    report: data, runNo: session.runNo, casual: session.casual,
+    onApply: () => { Object.assign(session, { userId: null, casual: false, completed: [] }); register(); },
     onRestart: async () => {
       log('core', 'run_restart', { fromRun: session.runNo });
       try {

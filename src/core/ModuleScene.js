@@ -123,11 +123,15 @@ export class ModuleScene extends Phaser.Scene {
     }));
   }
 
-  begin() { this.running = true; this.startedAt = performance.now(); this.onStart?.(); }
+  // Round time is wall-clock (minus pauses), not summed frame deltas: Phaser caps dt on slow frames, which
+  // would make the timer run slow on low-end phones and give those candidates extra time.
+  begin() { this.running = true; this.startedAt = performance.now(); this.pausedMs = 0; this.pauseStart = null; this.onStart?.(); }
+  pauseClock() { if (this.startedAt && this.pauseStart == null) this.pauseStart = performance.now(); }
+  resumeClock() { if (this.pauseStart != null) { this.pausedMs += performance.now() - this.pauseStart; this.pauseStart = null; } }
 
   update(time, dt) {
     if (!this.running || this.ended) return;
-    this.elapsed += dt;
+    this.elapsed = performance.now() - this.startedAt - this.pausedMs;
     this.timerText.setText(this.fmt(this.remainingMs));
     const k = this.remainingMs / this.duration;
     this.timerBar.clear().fillStyle(hex(k < 0.2 ? C.red : C.sun), 1).fillRoundedRect(W / 2 - 80, 88, 160 * k, 8, 4);
@@ -149,14 +153,14 @@ export class ModuleScene extends Phaser.Scene {
 
   askQuit() {
     if (this.ended) return;
-    this.running = false;
+    this.running = false; this.pauseClock();
     const layer = this.add.container(0, 0).setDepth(1200);
     const dim = this.add.rectangle(W / 2, H / 2, W * 4, H * 4, 0x0b0b0b, 0.55).setInteractive();
     const panel = this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(70, 420 + 10, 580, 420, 36)
       .fillStyle(hex(C.white), 1).fillRoundedRect(70, 420, 580, 420, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(70, 420, 580, 420, 36);
     const warn = this.mode === 'real' ? 'This attempt will be recorded\nas not finished.' : 'Your practice will end.';
     layer.add([dim, panel, this.txt(W / 2, 500, 'Leave this round?', { fontSize: '42px' }), this.txt(W / 2, 590, warn, { fontSize: '28px', fontStyle: '600', color: C.charcoal }),
-      this.btn(W / 2, 700, 'Keep playing', () => { layer.destroy(); this.running = true; }, { w: 460 }),
+      this.btn(W / 2, 700, 'Keep playing', () => { layer.destroy(); this.resumeClock(); this.running = !!this.startedAt; }, { w: 460 }),
       this.btn(W / 2, 800, 'Leave', () => { this.ended = true; this.onDone({ status: 'quit', elapsedMs: Math.round(this.elapsed) }); }, { w: 460, fill: C.white, h: 72, size: 28 })]);
     this.tweens.add({ targets: layer, alpha: { from: 0, to: 1 }, duration: 150 });
   }
@@ -164,12 +168,12 @@ export class ModuleScene extends Phaser.Scene {
   visibility() {
     if (this.ended) return;
     if (document.visibilityState === 'hidden') {
-      this.hiddenAt = performance.now();
+      this.hiddenAt = performance.now(); this.pauseClock();
       log(this.manifest.id, 'app_hidden', { elapsedMs: Math.round(this.elapsed) }, this.ctx());
       this.scene.pause();
     } else if (this.hiddenAt) {
       log(this.manifest.id, 'app_visible', { awayMs: Math.round(performance.now() - this.hiddenAt) }, this.ctx());
-      this.hiddenAt = null;
+      this.hiddenAt = null; this.resumeClock();
       this.scene.resume();
     }
   }

@@ -21,7 +21,7 @@ const stringify = (v) => (v == null ? '' : typeof v === 'string' ? v : JSON.stri
 export function log(module, interaction, value = '', ctx = {}) {
   const e = {
     event_id: session.uuid(),
-    cid: session.candidateId, // null until register/login; used only to route queued events
+    cid: session.key, // null until identity is known; routes queued events (never sent)
     session_id: session.sessionId,
     client_ts: Date.now(),
     module,
@@ -42,11 +42,12 @@ export function log(module, interaction, value = '', ctx = {}) {
 
 export async function flush() {
   clearTimeout(timer); timer = null;
+  if (!flushing) flushCasualOrphans();
   if (flushing || !queue.length || !session.known) return;
   flushing = true;
   // Only send events that belong to the current candidate (or were logged earlier in this page load
   // before identity was known). Queued events from another candidate on a shared device wait for them.
-  const mine = (e) => e.cid === session.candidateId || (!e.cid && e.session_id === session.sessionId);
+  const mine = (e) => e.cid === session.key || (!e.cid && e.session_id === session.sessionId);
   const batch = queue.filter(mine).slice(0, 50);
   if (!batch.length) { flushing = false; return; }
   try {
@@ -59,14 +60,34 @@ export async function flush() {
     // keep queue; retry later
   } finally {
     flushing = false;
-    if (queue.some((e) => e.cid === session.candidateId)) timer = setTimeout(flush, LOG_FLUSH_MS * 2);
+    if (queue.some((e) => e.cid === session.key)) timer = setTimeout(flush, LOG_FLUSH_MS * 2);
+  }
+}
+
+// Casual events left over from an earlier page load (e.g. the tab was closed) carry no PII, so they can be
+// sent with their own session id, whoever is playing now.
+async function flushCasualOrphans() {
+  if (orphanBusy) return; orphanBusy = true;
+  try { await sendOrphans(); } finally { orphanBusy = false; }
+}
+let orphanBusy = false;
+async function sendOrphans() {
+  const orphans = queue.filter((e) => e.cid?.startsWith('casual:') && e.cid !== session.key);
+  const bySession = {};
+  orphans.forEach((e) => { (bySession[e.cid.slice(7)] ||= []).push(e); });
+  for (const [sid, evs] of Object.entries(bySession)) {
+    try {
+      await api.log(evs.slice(0, 50).map(({ cid, ...e }) => e), { casual: true, sessionId: sid });
+      const sent = new Set(evs.slice(0, 50).map((e) => e.event_id));
+      queue = queue.filter((e) => !sent.has(e.event_id)); persist();
+    } catch { return; }
   }
 }
 
 // Unload: beacon whatever is queued (plus any final event already pushed by the caller).
 export function flushBeacon() {
   if (!session.known) return;
-  const batch = queue.filter((e) => e.cid === session.candidateId || (!e.cid && e.session_id === session.sessionId)).slice(0, 50);
+  const batch = queue.filter((e) => e.cid === session.key || (!e.cid && e.session_id === session.sessionId)).slice(0, 50);
   if (!batch.length) return;
   if (api.beacon('log', { events: batch.map(({ cid, ...e }) => e) })) {
     const sent = new Set(batch.map((e) => e.event_id));
@@ -76,7 +97,7 @@ export function flushBeacon() {
 
 // Called after register/login: stamp this page load's anonymous events with the new identity.
 export function claimAnonymous() {
-  queue.forEach((e) => { if (!e.cid && e.session_id === session.sessionId) e.cid = session.candidateId; });
+  queue.forEach((e) => { if (!e.cid && e.session_id === session.sessionId) e.cid = session.key; });
   persist(); flush();
 }
 

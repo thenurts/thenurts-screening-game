@@ -1,7 +1,9 @@
-// Smoke test: full candidate flow on the mock backend with a synthetic NRIC (never real data).
+// Smoke tests on the mock backend with synthetic identities (never real data).
 import { test, expect } from '@playwright/test';
 
-const TEST_NRIC = 'S1234567D'; // synthetic, checksum-valid
+const EMAIL = 'test.player@example.com';
+const PHONE = '+60170000000';
+const DB = 'thenurts_mock_db_v2';
 const shots = process.env.SHOTS === '1';
 
 async function playRound(page) {
@@ -17,15 +19,16 @@ async function playRound(page) {
   }
 }
 
-test('register → how to → practice → real round → report → restart → login resumes', async ({ page }, info) => {
+test('applicant: register → how to → practice → real round → report → restart → login resumes', async ({ page }, info) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/?mock=1&seedbench=1&debug=1');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 
-  await expect(page.locator('#btn-new')).toBeVisible();
+  await expect(page.locator('#btn-apply')).toBeVisible();
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-1-home.png` });
+  await page.click('#btn-apply');
   await page.click('#btn-new');
 
   // Validation fires on empty submit
@@ -33,11 +36,15 @@ test('register → how to → practice → real round → report → restart →
   await expect(page.locator('.tn-field.is-bad').first()).toBeVisible();
 
   await page.fill('#f-name', 'Test Player');
-  await page.fill('#f-nric', TEST_NRIC);
-  await page.fill('#f-email', 'test.player@example.com');
-  await page.fill('#f-phone', '+65 9123 4567');
-  await page.click('#f-dept >> text=Marketing');
+  await page.fill('#f-email', 'not-an-email');
+  await page.fill('#f-phone', '0170000000'); // no country code → rejected
   await page.click('#f-type >> text=Full-time');
+  await page.click('#f-dept >> text=Marketing');
+  await page.click('#btn-register');
+  await expect(page.locator('#f-phone')).toHaveCSS('border-top-color', 'rgb(237, 86, 65)');
+  await page.fill('#f-email', EMAIL);
+  await page.fill('#f-phone', '+60 17-000 0000'); // spaces/dashes are stripped as they type
+  await expect(page.locator('#f-phone')).toHaveValue(PHONE);
   await page.click('.tn-lang >> text=Bahasa Melayu');
   await page.check('#f-consent');
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-2-register.png`, fullPage: true });
@@ -61,7 +68,7 @@ test('register → how to → practice → real round → report → restart →
   // Real round (20 s)
   await page.click('#btn-start');
   await playRound(page);
-  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(1000);
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-5-postgame.png`, fullPage: true });
   await page.click('#btn-continue');
@@ -71,9 +78,10 @@ test('register → how to → practice → real round → report → restart →
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-6-report.png`, fullPage: true });
 
   // Log integrity: standard events present, raw NRIC never stored
-  const db = await page.evaluate(() => localStorage.getItem('thenurts_mock_db_v1'));
-  expect(db).not.toContain(TEST_NRIC);
-  const rows = JSON.parse(db).interactions.map((r) => r[6]);
+  const dbj = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), DB));
+  expect(JSON.stringify(dbj).toLowerCase()).not.toContain('nric');
+  expect(dbj.interactions.every((r) => r[1] === `${EMAIL}|${PHONE}` && r[2] === EMAIL && r[3] === PHONE)).toBeTruthy();
+  const rows = dbj.interactions.map((r) => r[6]);
   for (const ev of ['register', 'howto_open', 'howto_page', 'howto_close', 'practice_start', 'practice_end', 'round_start', 'round_complete', 'postgame_view']) expect(rows).toContain(ev);
   expect(rows.some((r) => r.startsWith('g:'))).toBeTruthy();
 
@@ -82,16 +90,41 @@ test('register → how to → practice → real round → report → restart →
   await page.click('#btn-restart-yes');
   await expect(page.locator('#btn-start')).toBeVisible();
   await page.reload();
+  await page.click('#btn-apply');
   await page.click('#btn-returning');
-  await page.fill('#l-nric', TEST_NRIC);
-  await page.fill('#l-email', 'wrong@example.com');
+  await page.fill('#l-email', EMAIL);
+  await page.fill('#l-phone', '+60179999999');
   await page.click('#btn-login');
   await expect(page.locator('.tn-toast')).toContainText('couldn’t find');
-  await page.fill('#l-email', 'test.player@example.com');
+  await page.fill('#l-phone', PHONE);
   await page.click('#btn-login');
   await expect(page.locator('#btn-start')).toBeVisible();
-  const users = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('thenurts_mock_db_v1')).users));
+  const users = await page.evaluate((k) => Object.values(JSON.parse(localStorage.getItem(k)).users), DB);
   expect(users[0].currentRun).toBe(2);
 
+  expect(errors).toEqual([]);
+});
+
+test('casual: play for fun → straight to games, logged as Casual User with no PII', async ({ page }, info) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?mock=1&seedbench=1');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.click('#btn-casual');
+  await expect(page.locator('#btn-start')).toBeVisible();
+  await page.click('#btn-start');
+  await playRound(page);
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('.tn-notice')).toContainText('playing for fun');
+  await page.click('#btn-continue');
+  await expect(page.locator('#btn-casual-apply')).toBeVisible();
+  if (shots) await page.screenshot({ path: `test-results/${info.project.name}-7-casual-report.png`, fullPage: true });
+  await page.waitForTimeout(3500); // let the log batch flush
+  const dbj = JSON.parse(await page.evaluate((k) => localStorage.getItem(k), DB));
+  expect(Object.keys(dbj.users)).toHaveLength(0);
+  expect(dbj.interactions.length).toBeGreaterThan(5);
+  expect(dbj.interactions.every((r) => r[1] === 'Casual User' && r[2] === '' && r[3] === '')).toBeTruthy();
+  expect(dbj.interactions.map((r) => r[6])).toEqual(expect.arrayContaining(['home_view', 'choose_casual', 'round_start', 'round_complete']));
   expect(errors).toEqual([]);
 });

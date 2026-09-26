@@ -1,12 +1,14 @@
-// In-memory identity for this page load (spec §3). Never holds the raw NRIC.
+// In-memory identity for this page load (spec §3).
+import { CASUAL_ID } from './identity.js';
+
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
   const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
 }));
 
 export const session = {
   sessionId: uuid(),
-  candidateId: null,
-  nricMasked: null,
+  userId: null, // "<email>|<phone>" or "Casual User"
+  casual: false,
   email: null,
   phone: null,
   name: null,
@@ -14,17 +16,20 @@ export const session = {
   completed: [], // module ids completed (real round) in the current run
 
   set(data) {
+    const id = data.identity;
     Object.assign(this, {
-      candidateId: data.identity.candidateId,
-      nricMasked: data.identity.nricMasked,
-      email: data.identity.email,
-      phone: data.identity.phone,
-      name: data.identity.name,
-      runNo: data.runNo,
-      completed: data.completed || [],
+      userId: id.userId, casual: !!id.casual,
+      email: id.email || null, phone: id.phone || null, name: id.name || null,
+      runNo: data.runNo, completed: data.completed || [],
     });
   },
-  get known() { return !!this.candidateId; },
-  auth() { return this.candidateId ? { candidateId: this.candidateId, email: this.email } : null; },
+  get known() { return !!this.userId; },
+  /** Routing key for queued log events: unique per registered user, or per casual session. */
+  get key() { return !this.userId ? null : this.casual ? `casual:${this.sessionId}` : this.userId; },
+  auth() {
+    if (!this.userId) return null;
+    return this.casual ? { casual: true, sessionId: this.sessionId } : { userId: this.userId, email: this.email, phone: this.phone };
+  },
   uuid,
+  CASUAL_ID,
 };
