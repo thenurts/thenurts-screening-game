@@ -46,5 +46,6 @@ export const api = {
   benchmarks: (modules) => call('benchmarks', { modules }),
   report: (runNo) => call('report', { runNo }),
   newRun: () => call('newRun'),
+  raw: (action, payload) => call(action, payload, { retries: 0 }), // for extensions registered at boot
   beacon,
 };

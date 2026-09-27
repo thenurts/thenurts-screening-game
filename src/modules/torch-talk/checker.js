@@ -1,4 +1,5 @@
-// Meaning checker v2.1 (build pack §5.2). Must return exactly what tests/torch-talk-validate.py's check() returns
+// Meaning checker v2.2 (build pack §5.2) + per-turn points. Must return exactly what tests/torch-talk-validate.py's
+// check() and points() return
 // for every case: 'pass' | 'negated' | 'breaker' | 'missing' | 'order' | 'bind' | 'between'.
 // Parity is tested against a fixture generated from the Python reference (tests/fixtures/torch-talk-parity.json).
 
@@ -21,6 +22,8 @@ export function check(msg, it) {
     if (msg[i] !== 'not') continue;
     const n = i + 1 < msg.length ? msg[i + 1] : null;
     if (n !== null && it.breakers.includes(n)) { used.add(i); used.add(i + 1); continue; } // "not X" is a true statement
+    const n2 = i + 2 < msg.length ? msg[i + 2] : null; // "not use X" / "not bring X": one harmless word may sit between
+    if (n !== null && it.fillers.includes(n) && n2 !== null && it.breakers.includes(n2)) { used.add(i); used.add(i + 1); used.add(i + 2); continue; }
     if (n && inAccept(n)) return 'negated';
     used.add(i); // stray "not" = filler
   }
@@ -42,6 +45,24 @@ export function check(msg, it) {
     if (!(Math.min(pos[a], pos[b]) < pos[m] && pos[m] < Math.max(pos[a], pos[b]))) return 'between';
   }
   return 'pass';
+}
+
+/** Python's round(): halves go to the even neighbour (7.5 → 8, 8.5 → 8), so JS points match the reference exactly. */
+export function pyRound(x) {
+  const r = Math.round(x);
+  return Math.abs(x % 1) === 0.5 ? 2 * Math.round(x / 2) : r;
+}
+export const CLARIFIER_WEIGHT = 2.5; // tt.clarifierWeight (ScoringConfig later)
+const missingClarifiers = (msg, it) => (it.clarifiers || []).filter((c) => find(msg, c.accept) === null).length;
+/** Unrounded ratio behind the points: idealLen ÷ (wordsUsed + weight × missing clarifiers), capped at 1 (= efficiency). */
+export function ratio(msg, it, cw = CLARIFIER_WEIGHT) {
+  if (check(msg, it) !== 'pass') return 0;
+  return Math.min(1, it.ideal.length / (msg.length + cw * missingClarifiers(msg, it)));
+}
+/** Points for one message, before any Ask costs: 0 if the meaning fails, else min(10, round(10 × ideal ÷ (used + cw × missing))). */
+export function points(msg, it, cw = CLARIFIER_WEIGHT) {
+  if (check(msg, it) !== 'pass') return 0;
+  return Math.min(10, pyRound((10 * it.ideal.length) / (msg.length + cw * missingClarifiers(msg, it))));
 }
 
 /** T6 fix (build pack §7): passes if it names the right value for the mixed-up slot, or says "not <echo>". */

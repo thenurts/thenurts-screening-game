@@ -1,6 +1,6 @@
-# Lucky Dip (`lucky-dip`) · design brief v1.1 · trait `risk` (style: Cautious 0 ↔ Bold 100)
+# Lucky Dip (`lucky-dip`) · design brief v1.2 · trait `risk` (style: Cautious 0 ↔ Bold 100)
 
-Source: Game Ideas build pack v1.1 (`11-game-concepts.md`, R1 · A · Lucky Dip). v1 went live 2026-09-26; v1.1 is a patch (2026-09-27). This brief records only what the build follows and the Builder's deviations.
+Source: Game Ideas build pack v1.1 (`11-game-concepts.md`, R1 · A · Lucky Dip). v1 went live 2026-09-26; v1.1 is a patch (2026-09-27); v1.2 removes the round timer (Game Ideas request #11, Adrian 2026-09-27). This brief records only what the build follows and the Builder's deviations.
 
 **Loop.** A bag holds 5 sweets and 1 chilli. **Mia pops a starter sweet onto the tray** (the chilli is never the first draw), so the peek strip shows 4 sweets + 1 chilli. Then **Keep** (bank the tray) or **Dip** (draw again). The tray grows along the ladder 12 (starter) · 15 · 20 · 30 · 60 (gold ×3). The chilli spoils that bag's tray. After 4 dips only the chilli is left, so the bag auto-banks. **Free bags** hold 3 sweets and no chilli; each dip is +5, and after 3 dips the bag auto-banks. Keep and Dip have equal EV at every state.
 
@@ -8,7 +8,7 @@ Source: Game Ideas build pack v1.1 (`11-game-concepts.md`, R1 · A · Lucky Dip)
 - **Official round** (run 1, first attempt): shared **sequence A** `G2 N5 G5 N1 N5 G4 G3 N2 N2 N3 N4 G1 N3 N4 N1`.
 - **Restart after leaving it, and every later run:** a freshly generated order of the same 15 bags that passes the order rules (`rules.js › orderOk`), flagged `sequenceId: generated` with the order in `sequence`. Config `CONFIG.firstRunRandom` (= `ld.firstRunRandom`) makes the official round generated too.
 - Every order: perfect-play maximum **685**, every fixed-stop strategy **300**. Sequence A's pull-back vs chase bot gap is 6.7% (rule: ≤ 15%).
-- Practice: `N4 G2 N5 Free`. No visible clock; a 180 s cap ends the round (`idle`). Mia's "Still there?" after 15 s idle. Fixed animation budget; buttons lock during animations; Keep/Dip side counterbalanced per player.
+- Practice: `N4 G2 N5 Free`. **No timer (v1.2):** the round always ends after 17 bags, so every candidate's score rests on all their own decisions. Mia's "Still there?" after 15 s idle; time past that point is logged as `idleMs`. Fixed animation budget; buttons lock during animations; Keep/Dip side counterbalanced per player.
 
 **Metrics** (`scoring.js`, from the raw decision list; thresholds in `SCORING`, the future ScoringConfig):
 

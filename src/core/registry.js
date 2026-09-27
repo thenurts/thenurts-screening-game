@@ -23,6 +23,8 @@ export const modules = order.filter((id) => {
 }).map((id) => byId[id]);
 
 export const getModule = (id) => byId[id];
+/** Every valid module folder, including ones not switched on in modules.config.js (for test tools). */
+export const allModules = Object.values(byId);
 
 // Play order is shuffled per run (Adrian, 2026-09-26), seeded by player + run, so a resumed run keeps its
 // order and a new run gets a new one. Reports and the Summary keep the fixed trait order regardless.

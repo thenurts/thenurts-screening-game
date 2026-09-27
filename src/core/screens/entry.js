@@ -5,9 +5,14 @@ import { emailOk, phoneOk, normEmail, normPhone } from '../identity.js';
 import { CONSENT_VERSION } from '../config.js';
 import { CONSENT } from '../consent.js';
 
+/** Extra corner buttons on Home, registered at runtime by extensions: { id, icon, label, onClick }. Home knows nothing else about them. */
+export const homeExtras = [];
+
 export function homeScreen({ onApply, onCasual }) {
   log('core', 'home_view');
+  const extras = homeExtras.map((x) => h('button', { class: 'tn-home-extra', id: x.id, 'aria-label': x.label, title: x.label, onclick: x.onClick }, x.icon));
   return show(h('div', { class: 'tn-screen' },
+    extras.length ? h('div', { class: 'tn-home-extras' }, ...extras) : null,
     h('div', { style: { marginBottom: '8px' } }, logo('vertical-black', 'tn-logo--home')),
     card(
       host('liam', 'excited', 'Hey! Ready for a few quick games?', { side: 'right' }),

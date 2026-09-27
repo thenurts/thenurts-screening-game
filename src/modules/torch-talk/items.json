@@ -1,5 +1,9 @@
 {
- "version": "2.1",
+ "version": "2.2",
+ "scoring": {
+  "clarifierWeight": 2.5,
+  "points": "min(10, round(10*idealLen/(wordsUsed + clarifierWeight*missingClarifiers))); 0 if the meaning fails"
+ },
  "date": "2026-09-27",
  "questions": {
   "when": "When?",
@@ -30,18 +34,6 @@
    "note": "Liam, the paddling pool has a hole! Can you bring some tape on Friday so we can fix it?",
    "slots": [
     {
-     "id": "obj",
-     "accept": [
-      "pool"
-     ]
-    },
-    {
-     "id": "problem",
-     "accept": [
-      "hole"
-     ]
-    },
-    {
      "id": "action",
      "accept": [
       "bring"
@@ -60,6 +52,15 @@
      ]
     }
    ],
+   "clarifiers": [
+    {
+     "id": "why",
+     "accept": [
+      "pool hole",
+      "fix pool"
+     ]
+    }
+   ],
    "breakers": [
     "glue",
     "Saturday",
@@ -68,7 +69,6 @@
    "fillers": [
     "paddling",
     "some",
-    "fix",
     "can",
     "you",
     "not",
@@ -93,17 +93,17 @@
     "Friday"
    ],
    "tiles": [
-    "pool",
-    "hole",
     "bring",
     "tape",
     "Friday",
+    "pool",
+    "hole",
+    "fix",
     "glue",
     "Saturday",
     "fixed",
     "paddling",
     "some",
-    "fix",
     "can",
     "you",
     "not",
@@ -151,6 +151,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "one",
     "three",
@@ -221,6 +222,13 @@
    "note": "Liam, can you take the paint and brushes to the *den* (Mia's garage) by 2pm? We're painting the stall sign.",
    "slots": [
     {
+     "id": "action",
+     "accept": [
+      "take",
+      "bring"
+     ]
+    },
+    {
      "id": "item1",
      "accept": [
       "paint"
@@ -259,19 +267,18 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "glue",
     "3pm",
     "shed"
    ],
    "fillers": [
-    "take",
     "sign",
     "painting",
     "stall",
     "can",
     "you",
-    "by",
     "not"
    ],
    "known": [],
@@ -295,6 +302,7 @@
    "gap": null,
    "mixup": null,
    "ideal": [
+    "take",
     "paint",
     "and",
     "brushes",
@@ -302,6 +310,8 @@
     "2pm"
    ],
    "tiles": [
+    "take",
+    "bring",
     "paint",
     "and",
     "brushes",
@@ -312,16 +322,14 @@
     "glue",
     "3pm",
     "shed",
-    "take",
     "sign",
     "painting",
     "stall",
     "can",
     "you",
-    "by",
     "not"
    ],
-   "cap": 9
+   "cap": 10
   },
   {
    "id": "A-04",
@@ -380,6 +388,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "tables",
     "park",
@@ -468,7 +477,7 @@
     {
      "id": "who",
      "accept": [
-      "Mia"
+      "you"
      ]
     },
     {
@@ -496,15 +505,22 @@
      ]
     }
    ],
+   "clarifiers": [
+    {
+     "id": "from",
+     "accept": [
+      "from"
+     ]
+    }
+   ],
    "breakers": [
     "Zoey",
-    "Noah",
+    "Mia",
     "Thursday"
    ],
    "fillers": [
     "someone",
     "needs",
-    "from",
     "choosing",
     "not",
     "please",
@@ -522,14 +538,15 @@
    "gap": {
     "slot": "who",
     "question": "who",
-    "answerTile": "Mia",
-    "reply": "Mum says Mia."
+    "answerTile": "you",
+    "reply": "Mum says you, Liam!"
    },
    "mixup": null,
    "ideal": [
-    "Mia",
+    "you",
     "collect",
     "chairs",
+    "from",
     "school",
     "Friday"
    ],
@@ -538,12 +555,12 @@
     "chairs",
     "school",
     "Friday",
+    "from",
     "Zoey",
-    "Noah",
+    "Mia",
     "Thursday",
     "someone",
     "needs",
-    "from",
     "choosing",
     "not",
     "please",
@@ -552,7 +569,7 @@
     "we",
     "our"
    ],
-   "cap": 9
+   "cap": 10
   },
   {
    "id": "A-06",
@@ -592,6 +609,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "front",
     "open",
@@ -661,6 +679,12 @@
    "note": "Amira, the stall sign fell apart! Please bring glue and string to the *den* (Mia's garage) by 12pm, so we can fix it before the fair.",
    "slots": [
     {
+     "id": "action",
+     "accept": [
+      "bring"
+     ]
+    },
+    {
      "id": "item1",
      "accept": [
       "glue"
@@ -691,6 +715,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "tape",
     "11am",
@@ -705,7 +730,6 @@
     "fix",
     "fair",
     "before",
-    "bring",
     "not"
    ],
    "known": [],
@@ -721,6 +745,7 @@
    "gap": null,
    "mixup": null,
    "ideal": [
+    "bring",
     "glue",
     "string",
     "Mia's",
@@ -728,6 +753,7 @@
     "noon"
    ],
    "tiles": [
+    "bring",
     "glue",
     "string",
     "Mia's",
@@ -744,10 +770,9 @@
     "fix",
     "fair",
     "before",
-    "bring",
     "not"
    ],
-   "cap": 9
+   "cap": 10
   },
   {
    "id": "A-08",
@@ -798,6 +823,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "school",
     "4pm",
@@ -883,7 +909,8 @@
     {
      "id": "for",
      "accept": [
-      "for"
+      "for",
+      "enough"
      ]
     },
     {
@@ -899,6 +926,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "20",
     "30",
@@ -909,7 +937,6 @@
     "class",
     "kid",
     "every",
-    "enough",
     "counting",
     "not",
     "please",
@@ -949,6 +976,7 @@
     "buy",
     "beads",
     "for",
+    "enough",
     "bracelets",
     "20",
     "30",
@@ -957,7 +985,6 @@
     "class",
     "kid",
     "every",
-    "enough",
     "counting",
     "not",
     "please",
@@ -1021,14 +1048,21 @@
      ]
     }
    ],
+   "clarifiers": [
+    {
+     "id": "where",
+     "accept": [
+      "fair"
+     ]
+    }
+   ],
    "breakers": [
     "cakes",
     "Noah",
-    "prizes"
+    "Raj"
    ],
    "fillers": [
     "jobs",
-    "fair",
     "run",
     "game",
     "sells",
@@ -1062,6 +1096,7 @@
    "gap": null,
    "mixup": null,
    "ideal": [
+    "fair",
     "you",
     "hoops",
     "Zoey",
@@ -1078,11 +1113,11 @@
     "Mia",
     "face",
     "painting",
+    "fair",
     "cakes",
     "Noah",
-    "prizes",
+    "Raj",
     "jobs",
-    "fair",
     "run",
     "game",
     "sells",
@@ -1111,8 +1146,9 @@
      ]
     },
     {
-     "id": "colour",
+     "id": "which",
      "accept": [
+      "my",
       "green"
      ]
     },
@@ -1135,6 +1171,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "blue",
     "coat",
@@ -1149,8 +1186,7 @@
     "can",
     "you",
     "not",
-    "please",
-    "the"
+    "please"
    ],
    "known": [],
    "order": [],
@@ -1162,13 +1198,14 @@
    "mixup": null,
    "ideal": [
     "bring",
-    "green",
+    "my",
     "jumper",
     "school",
     "tomorrow"
    ],
    "tiles": [
     "bring",
+    "my",
     "green",
     "jumper",
     "school",
@@ -1184,8 +1221,7 @@
     "can",
     "you",
     "not",
-    "please",
-    "the"
+    "please"
    ],
    "cap": 9
   },
@@ -1227,6 +1263,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "once",
     "milk",
@@ -1334,6 +1371,14 @@
      ]
     }
    ],
+   "clarifiers": [
+    {
+     "id": "club",
+     "accept": [
+      "club"
+     ]
+    }
+   ],
    "breakers": [
     "Comets",
     "Sunday",
@@ -1341,7 +1386,6 @@
    ],
    "fillers": [
     "voted",
-    "club",
     "paint",
     "sign",
     "not",
@@ -1364,6 +1408,7 @@
    "gap": null,
    "mixup": null,
    "ideal": [
+    "club",
     "name",
     "Rockets",
     "meet",
@@ -1378,11 +1423,11 @@
     "treehouse",
     "10am",
     "Saturday",
+    "club",
     "Comets",
     "Sunday",
     "11am",
     "voted",
-    "club",
     "paint",
     "sign",
     "not",
@@ -1390,7 +1435,7 @@
     "the",
     "hi"
    ],
-   "cap": 9
+   "cap": 10
   },
   {
    "id": "B-04",
@@ -1441,6 +1486,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "crowns",
     "attic",
@@ -1551,6 +1597,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "10",
     "20",
@@ -1658,13 +1705,20 @@
      ]
     }
    ],
+   "clarifiers": [
+    {
+     "id": "event",
+     "accept": [
+      "picnic"
+     ]
+    }
+   ],
    "breakers": [
     "plates",
     "snacks",
     "Zoey"
    ],
    "fillers": [
-    "picnic",
     "make",
     "for",
     "not",
@@ -1703,6 +1757,7 @@
     "fixSlot": "t2"
    },
    "ideal": [
+    "picnic",
     "Liam",
     "brings",
     "drinks",
@@ -1717,10 +1772,10 @@
     "you",
     "bring",
     "cups",
+    "picnic",
     "plates",
     "snacks",
     "Zoey",
-    "picnic",
     "make",
     "for",
     "not",
@@ -1795,6 +1850,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "rainy",
     "garden",
@@ -1899,6 +1955,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "hall",
     "Sunday",
@@ -2002,6 +2059,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "garage",
     "attic",
@@ -2113,6 +2171,14 @@
      ]
     }
    ],
+   "clarifiers": [
+    {
+     "id": "avoid",
+     "accept": [
+      "not hose"
+     ]
+    }
+   ],
    "breakers": [
     "hose",
     "sand",
@@ -2122,9 +2188,9 @@
     "first",
     "then",
     "strong",
-    "use",
     "not",
-    "please"
+    "please",
+    "the"
    ],
    "known": [],
    "order": [
@@ -2150,7 +2216,9 @@
     "soil",
     "plant",
     "seeds",
-    "water"
+    "water",
+    "not",
+    "hose"
    ],
    "tiles": [
     "today",
@@ -2162,15 +2230,15 @@
     "in",
     "seeds",
     "water",
+    "not",
     "hose",
     "sand",
     "tomorrow",
     "first",
     "then",
     "strong",
-    "use",
-    "not",
-    "please"
+    "please",
+    "the"
    ],
    "cap": 10
   },
@@ -2205,6 +2273,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "more",
     "salt"
@@ -2272,6 +2341,12 @@
    "note": "Mia, for the school fair we need 3 folding tables from your garage. As you know, your dad already said yes!",
    "slots": [
     {
+     "id": "dest",
+     "accept": [
+      "fair"
+     ]
+    },
+    {
      "id": "action",
      "accept": [
       "bring"
@@ -2302,6 +2377,14 @@
      ]
     }
    ],
+   "clarifiers": [
+    {
+     "id": "whose",
+     "accept": [
+      "your"
+     ]
+    }
+   ],
    "breakers": [
     "2",
     "chairs",
@@ -2309,10 +2392,8 @@
    ],
    "fillers": [
     "school",
-    "fair",
     "need",
     "folding",
-    "your",
     "already",
     "said",
     "dad",
@@ -2337,33 +2418,35 @@
    "gap": null,
    "mixup": null,
    "ideal": [
+    "fair",
     "bring",
     "3",
     "tables",
     "from",
+    "your",
     "garage"
    ],
    "tiles": [
+    "fair",
     "bring",
     "3",
     "tables",
     "from",
     "garage",
+    "your",
     "2",
     "chairs",
     "shed",
     "school",
-    "fair",
     "need",
     "folding",
-    "your",
     "already",
     "said",
     "dad",
     "yes",
     "not"
    ],
-   "cap": 9
+   "cap": 10
   },
   {
    "id": "C-03",
@@ -2423,6 +2506,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "sunny",
     "gym",
@@ -2530,6 +2614,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "bakery",
     "pie",
@@ -2624,6 +2709,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "sign",
     "till",
@@ -2701,6 +2787,13 @@
      ]
     },
     {
+     "id": "price",
+     "accept": [
+      "price",
+      "coins"
+     ]
+    },
+    {
      "id": "signs",
      "accept": [
       "signs"
@@ -2731,6 +2824,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "3",
     "4",
@@ -2740,12 +2834,10 @@
     "plant",
     "stall",
     "pots",
-    "coins",
     "new",
     "not",
     "please",
-    "the",
-    "hi"
+    "the"
    ],
    "known": [],
    "order": [],
@@ -2769,6 +2861,7 @@
    },
    "ideal": [
     "write",
+    "price",
     "signs",
     "small",
     "2",
@@ -2777,6 +2870,8 @@
    ],
    "tiles": [
     "write",
+    "price",
+    "coins",
     "signs",
     "small",
     "2",
@@ -2788,12 +2883,10 @@
     "plant",
     "stall",
     "pots",
-    "coins",
     "new",
     "not",
     "please",
-    "the",
-    "hi"
+    "the"
    ],
    "cap": 10
   },
@@ -2846,6 +2939,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "Thursday",
     "5pm",
@@ -2953,6 +3047,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "garden",
     "11am",
@@ -3054,6 +3149,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "Monday",
     "Friday",
@@ -3161,12 +3257,19 @@
      ]
     },
     {
+     "id": "meet",
+     "accept": [
+      "meet"
+     ]
+    },
+    {
      "id": "time",
      "accept": [
       "4pm"
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "outside",
     "5pm",
@@ -3176,7 +3279,6 @@
    "fillers": [
     "walk",
     "rain",
-    "meet",
     "there",
     "you",
     "not",
@@ -3202,6 +3304,7 @@
     "wait",
     "inside",
     "library",
+    "meet",
     "4pm"
    ],
    "tiles": [
@@ -3211,6 +3314,7 @@
     "wait",
     "inside",
     "library",
+    "meet",
     "4pm",
     "outside",
     "5pm",
@@ -3218,7 +3322,6 @@
     "early",
     "walk",
     "rain",
-    "meet",
     "there",
     "you",
     "not",
@@ -3269,6 +3372,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "notes",
     "4pm"
@@ -3353,13 +3457,20 @@
      ]
     }
    ],
+   "clarifiers": [
+    {
+     "id": "change",
+     "accept": [
+      "moved"
+     ]
+    }
+   ],
    "breakers": [
     "Monday",
     "6pm"
    ],
    "fillers": [
     "class",
-    "moved",
     "still",
     "5pm",
     "not",
@@ -3385,15 +3496,16 @@
    "mixup": null,
    "ideal": [
     "art",
+    "moved",
     "Tuesday"
    ],
    "tiles": [
     "art",
     "Tuesday",
+    "moved",
     "Monday",
     "6pm",
     "class",
-    "moved",
     "still",
     "5pm",
     "not",
@@ -3407,7 +3519,7 @@
     "at",
     "on"
    ],
-   "cap": 6
+   "cap": 7
   },
   {
    "id": "P-03",
@@ -3446,9 +3558,10 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "front",
-    "cactus"
+    "lawn"
    ],
    "fillers": [
     "jungle",
@@ -3488,7 +3601,7 @@
     "back",
     "garden",
     "front",
-    "cactus",
+    "lawn",
     "jungle",
     "not",
     "please",
@@ -3535,6 +3648,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "5",
     "cups"
@@ -3626,6 +3740,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "1pm",
     "home"
@@ -3721,6 +3836,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "Monday",
     "Friday"
@@ -3817,6 +3933,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "spade",
     "broom"
@@ -3911,6 +4028,7 @@
      ]
     }
    ],
+   "clarifiers": [],
    "breakers": [
     "6",
     "10"

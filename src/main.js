@@ -12,6 +12,7 @@ import { startFlow } from './core/flow.js';
 import { runOrder } from './core/registry.js';
 import { C } from './core/theme.js';
 import { DEBUG, MOCK } from './core/config.js';
+import { DEV_MODE } from './dev.config.js';
 import { onLog } from './core/logger.js';
 
 const root = document.getElementById('nurts-game');
@@ -40,6 +41,7 @@ async function boot() {
   window.__tnGame = game;
   if (MOCK) window.__tnOrder = (key, run) => runOrder(key, run).map((m) => m.id); // test hook
   game.events.once('ready', () => startFlow(game));
+  if (DEV_MODE) import('./dev/devMode.js').then((m) => m.install()); // developer mode: the only core line (see src/dev/README.md)
   if (DEBUG) debugPanel();
   // Never let a test build pass as the real thing.
   if (MOCK) document.getElementById('tn-ui').append(h('div', { style: { position: 'absolute', top: 0, right: 0, background: '#ED5641', color: '#fff', font: '800 11px Montserrat, sans-serif', padding: '4px 10px', borderBottomLeftRadius: '10px', zIndex: 30, letterSpacing: '.08em' } }, 'TEST MODE · data stays on this device'));

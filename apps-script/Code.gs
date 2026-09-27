@@ -15,6 +15,9 @@
  */
 
 var CASUAL_ID = 'Casual User';
+// Developer mode (Game Ideas request #14). Enabled only while Script Property DEV_PIN is set; delete it to switch dev
+// mode off on the server. Dev Test rows are written like casual rows, so benchmarks, Users and the Candidate Summary skip them.
+var DEV_ID = 'Dev Test';
 var BENCHMARK_INCLUDE_CASUAL = false;
 var BENCHMARK_MIN_N = 5;
 var STALE_MINUTES = 30;
@@ -69,7 +72,7 @@ function out_(obj) {
 
 /** Adds a "The Nurts" menu to the Sheet. */
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('The Nurts').addItem('Refresh Candidate Summary', 'refreshSummary').addToUi();
+  SpreadsheetApp.getUi().createMenu('The Nurts').addItem('Refresh Candidate Summary', 'refreshSummary').addItem('Delete Dev Test rows', 'deleteDevRows').addToUi();
 }
 
 // ---------------------------------------------------------------- helpers
@@ -117,6 +120,12 @@ function cachedRow_(tab, col, value) {
 
 /** Resolve the caller. Returns { key, casual, userId, email, phone, run, rowNo, tab }. */
 function who_(auth) {
+  if (auth && auth.dev) { // developer mode: a short-lived token from devAuth
+    if (!devPin_() || !auth.devToken || !cache_().get('devtok:' + String(auth.devToken).slice(0, 64))) fail_('dev_refused');
+    var dsid = String(auth.sessionId || '').slice(0, 64); if (!dsid) fail_('dev_refused');
+    var drun = Number(cache_().get('devrun:' + dsid)) || 1;
+    return { key: 'dev:' + dsid, casual: true, dev: true, userId: DEV_ID, email: '', phone: '', run: drun, rowNo: 0, tab: '', sessionId: dsid };
+  }
   if (auth && auth.casual && auth.sessionId) {
     var sid = String(auth.sessionId).slice(0, 64);
     var r = cachedRow_('Casual', 0, sid);
@@ -141,11 +150,12 @@ function completedIn_(key, run) {
 }
 
 function identity_(w) {
-  var id = w.casual ? { userId: CASUAL_ID, casual: true } : { userId: w.userId, email: w.email, phone: w.phone, name: w.name };
+  var id = w.dev ? { userId: DEV_ID, casual: true, dev: true } : w.casual ? { userId: CASUAL_ID, casual: true } : { userId: w.userId, email: w.email, phone: w.phone, name: w.name };
   return { identity: id, runNo: w.run, completed: completedIn_(w.key, w.run) };
 }
 
 function touch_(w) { // last_seen
+  if (w.dev) return;
   var col = w.tab === 'Users' ? UC.last_seen + 1 : 4;
   sh_(w.tab).getRange(w.rowNo, col).setValue(now_());
 }
@@ -276,6 +286,16 @@ function logRows_(w, events) {
 // ---------------------------------------------------------------- actions (spec §7)
 
 var ACTIONS = {
+  /** Developer mode sign-in: the PIN lives only in Script Property DEV_PIN (never in the public code). */
+  devAuth: function (b) {
+    var pin = devPin_(); if (!pin) fail_('dev_refused');
+    var tries = Number(cache_().get('devfail')) || 0;
+    if (tries >= 10) fail_('dev_locked'); // 10 wrong PINs → locked for 10 minutes
+    if (String(b.pin || '') !== pin) { cache_().put('devfail', String(tries + 1), 600); fail_('dev_pin'); }
+    var token = Utilities.getUuid();
+    cache_().put('devtok:' + token, '1', 21600);
+    return { token: token };
+  },
   register: function (b) {
     var p = b.profile || {};
     var email = normEmail_(p.email), phone = normPhone_(p.phone);
@@ -372,6 +392,7 @@ var ACTIONS = {
   newRun: function (b) {
     var w = who_(b.auth);
     closeOpenRound_(w.key, null);
+    if (w.dev) { cache_().put('devrun:' + w.sessionId, String(w.run + 1), 21600); w.run += 1; return identity_(w); }
     var sh = sh_(w.tab);
     if (w.casual) sh.getRange(w.rowNo, 3).setValue(w.run + 1);
     else {
@@ -513,4 +534,25 @@ function markStaleRounds() {
     });
     refreshSummary();
   } finally { lock.releaseLock(); }
+}
+
+// ---------------------------------------------------------------- developer mode helpers
+function devPin_() { return String(PropertiesService.getScriptProperties().getProperty('DEV_PIN') || '').trim(); }
+
+/** Sheet menu → The Nurts → Delete Dev Test rows: removes every row written in developer mode. */
+function deleteDevRows() {
+  var n = 0;
+  ['Interactions', 'Rounds', 'RoundTraces'].forEach(function (tab) {
+    var sh = sh_(tab); var last = sh.getLastRow(); if (last < 2) return;
+    var col = TABS[tab].indexOf('user_id'); var width = sh.getLastColumn();
+    var vals = sh.getRange(2, 1, last - 1, width).getValues();
+    var keep = vals.filter(function (r) { return r[col] !== DEV_ID; });
+    n += vals.length - keep.length;
+    if (keep.length === vals.length) return;
+    sh.getRange(2, 1, last - 1, width).clearContent();
+    if (keep.length) sh.getRange(2, 1, keep.length, width).setValues(keep);
+  });
+  // cached row lookups re-check the cell they point at, so shifted rows are found again automatically
+  try { SpreadsheetApp.getUi().alert('Deleted ' + n + ' Dev Test rows.'); } catch (x) { /* run from the editor */ }
+  return n;
 }

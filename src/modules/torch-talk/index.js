@@ -3,7 +3,7 @@ import torchPng from './assets/torch.webp';
 
 export default {
   id: 'torch-talk',
-  version: 2, // v2.1 patch: item bank v2.1, Close Friend / Casual Acquaintance, italics (itemBankVersion 2)
+  version: 3, // v2.2 patch: item bank v2.2 with clarifier points, no round cap (itemBankVersion 3)
   title: 'Torch Talk',
   tagline: 'Flash Noah’s messages across the garden. Every word costs a flash!',
   trait: 'communication',
@@ -29,12 +29,13 @@ export default {
     { title: 'Something missing? Ask', body: 'If the note leaves out something they need, tap Ask. Asking when it’s all there costs a point.',
       demo: { note: 'Liam, the kite day is on Saturday at the park. Mum will say what time.', chips: [{ label: '🕒 When?', reply: '“Mum says 4pm.” (it was missing)' }, { label: '📍 Where?', reply: '“It’s in the note!” (−1)' }, { label: '👤 Who?', reply: '“It’s in the note!” (−1)' }, { label: '📦 What?', reply: '“It’s in the note!” (−1)' }, { label: '🔢 How many?', reply: '“It’s in the note!” (−1)' }] } },
   ],
-  practice: { durationSec: 180, showTimer: false, scored: false }, // 3 turns
-  round: { durationSec: 300, showTimer: false }, // 10 turns (~3–3.5 min); 300 s is only an idle cap
+  practice: { durationSec: null, showTimer: false, scored: false }, // 3 turns; no cap
+  round: { durationSec: null, showTimer: false }, // v2.2: no timer at all; the round ends after turn 10 (idleMs is logged)
   metrics: [
     { key: 'messageScore', label: 'Message score', unit: 'pts', primary: true, higherIsBetter: true },
     { key: 'understood', label: 'Messages understood', unit: '', higherIsBetter: true },
   ],
   traitScore: (m) => Number(m.commScore ?? 0),
+  devOptions: { form: ['A', 'B', 'C', 'random'] }, // developer mode only: which form the real round uses
   load: () => import('./GameScene.js'),
 };

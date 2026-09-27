@@ -31,6 +31,7 @@ async function backend(page) {
 }
 
 // Plays the current round with a bot. Lucky Dip: 'keep' | 'dip' | 't3' (dip while k < 3).
+// Fair Board: 'fb' (always right) | 'fb-check' (right, and Checks every flawed claim) | 'agree'.
 // Torch Talk: 'ideal' (asks the gap question, sends the ideal message, sends a targeted fix on T6).
 async function playRound(page, strategy = 't3') {
   await page.waitForFunction(() => window.__tnGame?.scene.getScenes(true).some((x) => x.scene.key.startsWith('mod:')), null, { timeout: 30_000 });
@@ -39,6 +40,15 @@ async function playRound(page, strategy = 't3') {
       const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
       if (!s) return 'gone';
       if (s.ended) return 'ending';
+      if (s.manifest.id === 'fair-board') {
+        if (s.waitingNext) { s.waitingNext(); return 'chose'; } // practice feedback
+        if (s.recapDone) { s.recapDone(); return 'chose'; } // end recap
+        if (!s.running || s.locked || !s.claim) return 'wait';
+        const c = s.claim;
+        if (strat === 'fb-check' && !s.checks && c.truth === 'flawed') s.check();
+        s.answer(strat === 'agree' ? 'agree' : c.truth === 'sound' ? 'agree' : 'doubt');
+        return 'chose';
+      }
       if (s.manifest.id === 'torch-talk') {
         if (!s.running || !s.item) return 'wait';
         const it = s.item;
@@ -65,7 +75,7 @@ async function playRound(page, strategy = 't3') {
   }
   expect(await page.evaluate(() => window.__trayBad || [])).toEqual([]);
 }
-const botFor = async (page) => ((await page.textContent('h1')).includes('Torch') ? 'ideal' : 't3');
+const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : 't3'; };
 // From the post-game screen: play every remaining game for real, then land on the report.
 async function playRest(page) {
   for (;;) {
@@ -148,7 +158,7 @@ test('applicant: register → how to → practice → real round → report → 
   // Event policy v1.8: no navigation or round-lifecycle rows (rounds live in Rounds / RoundTraces)
   for (const ev of ['home_view', 'howto_page', 'pregame_view', 'round_start', 'round_complete', 'practice_start', 'postgame_view']) expect(rows).not.toContain(ev);
   expect(dbj.rounds.filter((r) => r.mode === 'practice')).toHaveLength(1);
-  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(2);
+  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(3);
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
   expect(dbj.traces.some((t) => t.items.length > 0 && t.partial)).toBeTruthy();
@@ -289,4 +299,100 @@ test('module order: shuffled per run, stable when resumed', async ({ page }) => 
   });
   expect(orders.distinct.length).toBeGreaterThan(1); // both orders occur
   expect(orders.same).toBeTruthy();
+});
+
+test('fair board: Form A first; perfect checker = 24 right / 100; Check outlines evidence; the bump moves only timetable rows', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/' + Q + 'speed=10&first=fair-board');
+  const got = {};
+  for (const strat of ['fb-check', 'agree']) {
+    await reset(page);
+    await page.click('#btn-casual');
+    await page.click('#btn-start');
+    await playRound(page, strat);
+    await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+    await page.waitForTimeout(1500);
+    const dbj = await backend(page);
+    got[strat] = LIVE
+      ? dbj.raw.Rounds.slice(1).filter((x) => x[10] === 'completed' && x[7] === 'real').map((x) => JSON.parse(x[12])).at(-1)
+      : dbj.rounds.filter((x) => x.status === 'completed' && x.mode === 'real').map((x) => x.metrics).at(-1);
+    expect(got[strat].form).toBe('A');
+    expect(got[strat].claimLog).toHaveLength(24);
+  }
+  expect(got['fb-check'].correct).toBe(24);
+  expect(got['fb-check'].fbScore).toBe(100);
+  expect(got.agree.correct).toBe(12);
+  expect(got.agree.flags).toMatch(/alwaysAgree/);
+
+  // Check + bump, played by hand
+  await reset(page);
+  await page.click('#btn-casual');
+  await page.click('#btn-start');
+  const step = (fn, arg) => page.evaluate(([f, a]) => { const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:')); return s ? new Function('s', 'a', f)(s, a) : null; }, [fn, arg]);
+  const answerUpTo = async (n) => {
+    for (;;) {
+      const at = await step('return s.running && !s.locked && s.claim ? s.claim.n : 0');
+      if (at === n) return;
+      if (at) await step("s.answer('agree')");
+      await page.waitForTimeout(40);
+    }
+  };
+  await answerUpTo(11); // evidence: time:tug of war,header,note
+  expect(await step('s.check(); return [s.checkShown, s.overlay.list.length > 0]')).toEqual([3, true]);
+  expect(await step('return s.rows.map((r) => r.y)')).toEqual([0, 64, 128, 192, 256]);
+  await answerUpTo(13);
+  // BUMP_ORDER [3,0,4,1,2]: face painting → slot 1, magic show → 3, tug of war → 4, band → 0, prize draw → 2
+  expect(await step('return s.rows.map((r) => Math.round(r.y))')).toEqual([64, 192, 256, 0, 128]);
+  expect(await step("return s.board")).toBe('times');
+  await answerUpTo(17);
+  expect(await step("return [s.board, s.rows]")).toEqual(['map', null]);
+  expect(errors).toEqual([]);
+});
+
+test('developer mode: PIN → Dev Test picker → chosen games + options → rows tagged Dev Test, left out of benchmarks → exit', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'one device is enough');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/' + Q + 'speed=10');
+  await reset(page);
+  await expect(page.locator('#btn-dev')).toBeVisible();
+  await page.click('#btn-dev');
+  await page.fill('#dev-pin', '1111');
+  await page.click('#btn-dev-unlock');
+  await expect(page.locator('.tn-toast')).toContainText('isn’t right');
+  await page.fill('#dev-pin', '2468');
+  await page.click('#btn-dev-unlock');
+  await expect(page.locator('#btn-dev-start')).toBeVisible();
+  await expect(page.locator('#tn-dev-ribbon')).toBeVisible();
+  await page.click('[data-module="fair-board"]');
+  await page.click('[data-module="lucky-dip"]');
+  await page.selectOption('[data-opt="fair-board.form"]', 'B');
+  if (shots) await page.screenshot({ path: `test-results/${info.project.name}-8-dev-picker.png` });
+  await page.click('#btn-dev-start');
+  await playRound(page, 'fb');
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+  await page.click('#btn-continue');
+  await expect(page.locator('h1')).toContainText('Lucky Dip'); // the picked order, not the shuffle
+  await page.click('#btn-start');
+  await page.waitForFunction(() => window.__tnGame.scene.getScenes(true).some((x) => x.scene.key === 'mod:lucky-dip' && x.running && !x.locked), null, { timeout: 30_000 });
+  await page.click('#dev-rb-end'); // End round from the ribbon
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(3500);
+  const dbj = await backend(page);
+  expect(dbj.interactions.length).toBeGreaterThan(0);
+  expect(dbj.interactions.every((r) => r[1] === 'Dev Test' && r[2] === '' && r[3] === '')).toBeTruthy();
+  if (!LIVE) {
+    const real = dbj.rounds.filter((r) => r.mode === 'real');
+    expect(real.map((r) => r.module)).toEqual(['fair-board', 'lucky-dip']);
+    expect(real.every((r) => r.userId === 'Dev Test' && r.casual)).toBeTruthy(); // casual-style rows are excluded from benchmarks
+    expect(real[0].metrics.form).toBe('B');
+  } else {
+    expect(dbj.raw.Rounds.slice(1).every((r) => r.includes('Dev Test'))).toBeTruthy();
+  }
+  await page.click('#btn-continue');
+  await expect(page.locator('#btn-casual-apply, #btn-restart').first()).toBeVisible({ timeout: 20_000 }); // report
+  await page.click('#dev-rb-exit');
+  await expect(page.locator('#btn-apply')).toBeVisible();
+  await expect(page.locator('#tn-dev-ribbon')).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

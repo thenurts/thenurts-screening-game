@@ -5,7 +5,7 @@ export const CONFIG = { firstRunForm: 'A', restartForm: 'B' }; // tt.firstRunFor
 export const ITEMS = DATA.items;
 export const QUESTIONS = DATA.questions;
 export const TAGS = DATA.recipients; // liam/mia/zoey → Close Friend · raj/amira → Casual Acquaintance
-export const ITEM_BANK_VERSION = 2; // bank v2.1 (v1 rounds are itemBankVersion 1)
+export const ITEM_BANK_VERSION = 3; // bank v2.2 (v2.1 rounds = 2, v1 rounds = 1 / absent)
 const REAL = ITEMS.filter((x) => x.pool === 'real');
 const PRACTICE = ITEMS.filter((x) => x.pool === 'practice');
 const bySlot = (form, slot) => REAL.find((x) => x.form === form && x.slot === slot);
@@ -16,13 +16,14 @@ const bySlot = (form, slot) => REAL.find((x) => x.form === form && x.slot === sl
  * real, first run, a restart after leaving the round → Form B, flagged restartedAfterSetback.
  * real, later runs → slot-wise random (T3 and T7 from the same form), from forms other than the first-run form.
  */
-export function buildRound({ mode, runNo = 1, attemptNo = 1, rand = Math.random, cfg = CONFIG }) {
+export function buildRound({ mode, runNo = 1, attemptNo = 1, rand = Math.random, cfg = CONFIG, form = null }) {
   if (mode === 'practice') {
     const pickOf = (list) => list[Math.floor(rand() * list.length)];
     const normal = PRACTICE.filter((x) => !x.gap && !x.context), nick = PRACTICE.filter((x) => x.context), gap = PRACTICE.filter((x) => x.gap);
     return { form: 'P', restartedAfterSetback: false, items: [pickOf(normal), pickOf(nick), pickOf(gap)] };
   }
-  const first = Number(runNo) <= 1;
+  if (['A', 'B', 'C'].includes(form)) return fixed(form, false); // developer-mode override (manifest.devOptions)
+  const first = form === 'random' ? false : Number(runNo) <= 1;
   if (first && attemptNo <= 1) return fixed(cfg.firstRunForm, false);
   if (first) return fixed(cfg.restartForm, true);
   const pool = ['A', 'B', 'C'].filter((f) => f !== cfg.firstRunForm); // everyone saw the first-run form in run 1

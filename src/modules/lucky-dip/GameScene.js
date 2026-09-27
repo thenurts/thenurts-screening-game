@@ -90,6 +90,7 @@ export default class GameScene extends ModuleScene {
     const official = this.mode === 'real' && Number(this.runNo || 1) <= 1 && this.attemptNo <= 1 && !CONFIG.firstRunRandom;
     this.repeatAttempt = this.mode === 'real' && Number(this.runNo || 1) <= 1 && this.attemptNo > 1;
     this.sequenceId = this.mode === 'practice' ? 'P' : official ? 'A' : 'generated';
+    if (this.mode === 'real' && this.options.sequence) this.sequenceId = this.options.sequence; // developer-mode override (manifest.devOptions)
     this.seq = this.sequenceId === 'generated' ? generate(this.rand) : SEQUENCES[this.sequenceId];
     this.sequenceCode = code(this.seq);
     this.trace('round_setup', { sequenceVersion: SEQUENCE_VERSION, sequenceId: this.sequenceId, order: this.sequenceCode, buttonSide: this.buttonSide, attemptNo: this.attemptNo });
@@ -175,6 +176,7 @@ export default class GameScene extends ModuleScene {
     if (this.locked || !this.running) return;
     this.setButtons(false); this.clearIdle();
     const b = this.cur; const t = Math.round(performance.now() - this.choiceAt);
+    this.idleMs = (this.idleMs || 0) + Math.max(0, t - IDLE_MS); // time past the "Still there?" point (no cap: logged only)
     if (this.pendingSetback) { this.trace('setback_next', { msToNextChoice: Math.round(performance.now() - this.pendingSetback), action: 'continue' }); this.pendingSetback = null; }
     if (b.type === 'free') {
       this.trace('free_choice', { bag: b.bag, k: b.k, choice, ms: t });
@@ -296,20 +298,15 @@ export default class GameScene extends ModuleScene {
   }
 
   // ---------------------------------------------------------------- results
-  onTimeUp() { // idle cap: remaining bags are not played; flagged
-    this.clearIdle(); this.setButtons(false); this.timedOut = true;
-    this.trace('time_cap', { bagsPlayed: this.bags.length });
-    this.finish(this.metrics());
-  }
 
   metrics() {
-    const s = score({ decisions: this.decisions || [], bags: this.bags || [], idleNudges: this.idleNudges || 0, timedOut: !!this.timedOut, repeatAttempt: !!this.repeatAttempt });
+    const s = score({ decisions: this.decisions || [], bags: this.bags || [], idleNudges: this.idleNudges || 0, repeatAttempt: !!this.repeatAttempt });
     return {
       points: this.points || 0,
       bagsBanked: (this.bags || []).filter((b) => b.points > 0).length,
       bagsPlayed: (this.bags || []).length,
       ...s,
-      sequenceVersion: SEQUENCE_VERSION, sequenceId: this.sequenceId || '', sequence: this.sequenceCode || '', buttonSide: this.buttonSide, idleNudges: this.idleNudges || 0,
+      sequenceVersion: SEQUENCE_VERSION, sequenceId: this.sequenceId || '', sequence: this.sequenceCode || '', buttonSide: this.buttonSide, idleNudges: this.idleNudges || 0, idleMs: Math.round(this.idleMs || 0),
       // raw decisions for re-scoring later: [bag, stake(N|G), k = player dips so far (0–3), choice(0 keep|1 dip), ms]
       decisions: (this.decisions || []).map((d) => [d.bag, d.stake === 'gold' ? 'G' : 'N', d.k, d.choice === 'dip' ? 1 : 0, d.ms]),
       bagLog: (this.bags || []).map((b) => [b.bag, b.stake[0].toUpperCase(), b.dips, b.endedBy[0], b.points]),

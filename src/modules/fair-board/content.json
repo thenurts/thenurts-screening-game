@@ -1,0 +1,809 @@
+{
+ "version": "1.0",
+ "date": "2026-09-27",
+ "rule": "Agree only if the board shows it. 'Next to' = side by side, not corner to corner.",
+ "sources": {
+  "liam": "bust",
+  "mia": "bust",
+  "noah": "bust",
+  "raj": "bust",
+  "amira": "bust",
+  "teacher": "chalkboard icon"
+ },
+ "forms": {
+  "A": {
+   "boards": {
+    "sales": {
+     "days": [
+      "Fri",
+      "Sat",
+      "Sun"
+     ],
+     "weather": {
+      "Fri": "sun",
+      "Sat": "rain",
+      "Sun": "sun"
+     },
+     "stalls": {
+      "lemonade": [
+       30,
+       10,
+       25
+      ],
+      "cakes": [
+       20,
+       25,
+       20
+      ],
+      "badges": [
+       15,
+       15,
+       30
+      ],
+      "plants": [
+       10,
+       5,
+       15
+      ]
+     },
+     "note": "Sat: plant stall shut early"
+    },
+    "times": {
+     "header": "Sunday (sunny)",
+     "note": "Tug of war: if it rains, in the hall",
+     "events": {
+      "face painting": {
+       "start": "1:00",
+       "end": "3:00",
+       "place": "tent"
+      },
+      "magic show": {
+       "start": "2:00",
+       "end": "2:30",
+       "place": "hall"
+      },
+      "tug of war": {
+       "start": "3:00",
+       "end": "3:30",
+       "place": "field"
+      },
+      "band": {
+       "start": "4:00",
+       "end": "4:45",
+       "place": "stage"
+      },
+      "prize draw": {
+       "start": "5:00",
+       "end": "5:15",
+       "place": "hall"
+      }
+     }
+    },
+    "map": {
+     "grid": [
+      [
+       "gate",
+       "lemonade",
+       "tent"
+      ],
+      [
+       "cakes",
+       "stage",
+       "badges"
+      ],
+      [
+       "hall",
+       "field",
+       "plants"
+      ]
+     ],
+     "key": "next to = side by side (not corner to corner)"
+    }
+   },
+   "claims": [
+    {
+     "n": 1,
+     "id": "A06",
+     "board": "sales",
+     "type": "always",
+     "truth": "flawed",
+     "source": "amira",
+     "cue": "crowd",
+     "difficulty": 2,
+     "text": "Everyone says lemonade sold the most every day.",
+     "evidence": "sales:all"
+    },
+    {
+     "n": 2,
+     "id": "A05",
+     "board": "sales",
+     "type": "always",
+     "truth": "sound",
+     "source": "teacher",
+     "cue": null,
+     "difficulty": 2,
+     "text": "Cakes sold 20 or more every day.",
+     "evidence": "sales:cakes"
+    },
+    {
+     "n": 3,
+     "id": "A01",
+     "board": "sales",
+     "type": "value",
+     "truth": "sound",
+     "source": "mia",
+     "cue": null,
+     "difficulty": 1,
+     "text": "Cakes sold 25 on Saturday.",
+     "evidence": "sales:cakes"
+    },
+    {
+     "n": 4,
+     "id": "A02",
+     "board": "sales",
+     "type": "value",
+     "truth": "flawed",
+     "source": "raj",
+     "cue": null,
+     "difficulty": 1,
+     "text": "Badges sold 20 on Friday.",
+     "evidence": "sales:badges"
+    },
+    {
+     "n": 5,
+     "id": "A08",
+     "board": "sales",
+     "type": "because",
+     "truth": "flawed",
+     "source": "teacher",
+     "cue": null,
+     "difficulty": 3,
+     "text": "Badge sales went up on Sunday because it was sunny.",
+     "evidence": "sales:badges;sales:weather"
+    },
+    {
+     "n": 6,
+     "id": "A07",
+     "board": "sales",
+     "type": "because",
+     "truth": "sound",
+     "source": "liam",
+     "cue": null,
+     "difficulty": 3,
+     "text": "Plant sales fell on Saturday because the stall shut early.",
+     "evidence": "sales:note"
+    },
+    {
+     "n": 7,
+     "id": "A03",
+     "board": "sales",
+     "type": "compare",
+     "truth": "sound",
+     "source": "noah",
+     "cue": "sure",
+     "difficulty": 2,
+     "text": "I'm sure plants sold more on Sunday than on Friday.",
+     "evidence": "sales:plants"
+    },
+    {
+     "n": 8,
+     "id": "A04",
+     "board": "sales",
+     "type": "compare",
+     "truth": "flawed",
+     "source": "liam",
+     "cue": "sure",
+     "difficulty": 2,
+     "text": "I'm sure cakes sold more than lemonade on Friday.",
+     "evidence": "sales:fri"
+    },
+    {
+     "n": 9,
+     "id": "A09",
+     "board": "times",
+     "type": "value",
+     "truth": "sound",
+     "source": "raj",
+     "cue": "sure",
+     "difficulty": 1,
+     "text": "I'm sure the magic show starts at 2:00 today.",
+     "evidence": "time:magic show"
+    },
+    {
+     "n": 10,
+     "id": "A12",
+     "board": "times",
+     "type": "compare",
+     "truth": "sound",
+     "source": "amira",
+     "cue": null,
+     "difficulty": 2,
+     "text": "The prize draw starts after the band finishes.",
+     "evidence": "time:prize draw,band"
+    },
+    {
+     "n": 11,
+     "id": "A14",
+     "board": "times",
+     "type": "cross",
+     "truth": "flawed",
+     "source": "raj",
+     "cue": null,
+     "difficulty": 3,
+     "text": "The tug of war is in the hall today.",
+     "evidence": "time:tug of war,header,note"
+    },
+    {
+     "n": 12,
+     "id": "A13",
+     "board": "times",
+     "type": "value",
+     "truth": "sound",
+     "source": "teacher",
+     "cue": "crowd",
+     "difficulty": 1,
+     "text": "Everyone says the prize draw is in the hall.",
+     "evidence": "time:prize draw"
+    },
+    {
+     "n": 13,
+     "id": "A15",
+     "board": "times",
+     "type": "always",
+     "truth": "sound",
+     "source": "mia",
+     "cue": "crowd",
+     "difficulty": 2,
+     "text": "Everyone says all hall events end by 5:30.",
+     "evidence": "time:all"
+    },
+    {
+     "n": 14,
+     "id": "A11",
+     "board": "times",
+     "type": "compare",
+     "truth": "flawed",
+     "source": "noah",
+     "cue": null,
+     "difficulty": 2,
+     "text": "Face painting ends before the magic show starts.",
+     "evidence": "time:face painting,magic show"
+    },
+    {
+     "n": 15,
+     "id": "A16",
+     "board": "times",
+     "type": "always",
+     "truth": "flawed",
+     "source": "liam",
+     "cue": null,
+     "difficulty": 2,
+     "text": "Every event lasts 30 minutes or more.",
+     "evidence": "time:all"
+    },
+    {
+     "n": 16,
+     "id": "A10",
+     "board": "times",
+     "type": "value",
+     "truth": "flawed",
+     "source": "mia",
+     "cue": "sure",
+     "difficulty": 1,
+     "text": "I'm sure the band starts at 4:45.",
+     "evidence": "time:band"
+    },
+    {
+     "n": 17,
+     "id": "A17",
+     "board": "map",
+     "type": "cross",
+     "truth": "sound",
+     "source": "raj",
+     "cue": null,
+     "difficulty": 3,
+     "text": "Face painting is next to the lemonade stall.",
+     "evidence": "time:face painting;map:tent,lemonade"
+    },
+    {
+     "n": 18,
+     "id": "A23",
+     "board": "map",
+     "type": "cross",
+     "truth": "sound",
+     "source": "noah",
+     "cue": null,
+     "difficulty": 3,
+     "text": "The band plays in the middle of the fair.",
+     "evidence": "time:band;map:stage"
+    },
+    {
+     "n": 19,
+     "id": "A22",
+     "board": "map",
+     "type": "always",
+     "truth": "flawed",
+     "source": "noah",
+     "cue": "crowd",
+     "difficulty": 2,
+     "text": "Everyone says every stall is next to the stage.",
+     "evidence": "map:all"
+    },
+    {
+     "n": 20,
+     "id": "A20",
+     "board": "map",
+     "type": "compare",
+     "truth": "flawed",
+     "source": "teacher",
+     "cue": null,
+     "difficulty": 2,
+     "text": "The tent is nearer the gate than the lemonade stall.",
+     "evidence": "map:tent,lemonade,gate"
+    },
+    {
+     "n": 21,
+     "id": "A21",
+     "board": "map",
+     "type": "always",
+     "truth": "sound",
+     "source": "amira",
+     "cue": null,
+     "difficulty": 2,
+     "text": "The cake and lemonade stalls are both next to the gate.",
+     "evidence": "map:lemonade,cakes,gate"
+    },
+    {
+     "n": 22,
+     "id": "A19",
+     "board": "map",
+     "type": "value",
+     "truth": "sound",
+     "source": "liam",
+     "cue": "sure",
+     "difficulty": 2,
+     "text": "I'm sure the plant stall isn't next to the stage.",
+     "evidence": "map:plants,stage"
+    },
+    {
+     "n": 23,
+     "id": "A24",
+     "board": "map",
+     "type": "cross",
+     "truth": "flawed",
+     "source": "mia",
+     "cue": null,
+     "difficulty": 3,
+     "text": "The magic show is next to the stage.",
+     "evidence": "time:magic show;map:hall,stage"
+    },
+    {
+     "n": 24,
+     "id": "A18",
+     "board": "map",
+     "type": "value",
+     "truth": "flawed",
+     "source": "amira",
+     "cue": "sure",
+     "difficulty": 1,
+     "text": "I'm sure the tent is next to the hall.",
+     "evidence": "map:tent,hall"
+    }
+   ],
+   "setbackAfter": 12,
+   "setback": "Liam bumped the board! The timetable rows get mixed up (same content, new order)."
+  },
+  "B": {
+   "boards": {
+    "sales": {
+     "days": [
+      "Fri",
+      "Sat",
+      "Sun"
+     ],
+     "weather": {
+      "Fri": "sun",
+      "Sat": "rain",
+      "Sun": "sun"
+     },
+     "stalls": {
+      "juice": [
+       35,
+       15,
+       30
+      ],
+      "cookies": [
+       25,
+       30,
+       25
+      ],
+      "stickers": [
+       20,
+       20,
+       35
+      ],
+      "seeds": [
+       15,
+       10,
+       20
+      ]
+     },
+     "note": "Sat: seed stall shut early"
+    },
+    "times": {
+     "header": "Sunday (sunny)",
+     "note": "Sack race: if it rains, in the gym",
+     "events": {
+      "balloon art": {
+       "start": "2:00",
+       "end": "4:00",
+       "place": "hut"
+      },
+      "puppet show": {
+       "start": "3:00",
+       "end": "3:30",
+       "place": "gym"
+      },
+      "sack race": {
+       "start": "4:00",
+       "end": "4:30",
+       "place": "lawn"
+      },
+      "choir": {
+       "start": "5:00",
+       "end": "5:45",
+       "place": "stage"
+      },
+      "lucky draw": {
+       "start": "6:00",
+       "end": "6:15",
+       "place": "gym"
+      }
+     }
+    },
+    "map": {
+     "grid": [
+      [
+       "hut",
+       "juice",
+       "gate"
+      ],
+      [
+       "stickers",
+       "stage",
+       "cookies"
+      ],
+      [
+       "seeds",
+       "lawn",
+       "gym"
+      ]
+     ],
+     "key": "next to = side by side (not corner to corner)"
+    }
+   },
+   "claims": [
+    {
+     "n": 1,
+     "id": "B07",
+     "board": "sales",
+     "type": "because",
+     "truth": "sound",
+     "source": "liam",
+     "cue": null,
+     "difficulty": 3,
+     "text": "Seed sales fell on Saturday because the stall shut early.",
+     "evidence": "sales:note"
+    },
+    {
+     "n": 2,
+     "id": "B03",
+     "board": "sales",
+     "type": "compare",
+     "truth": "sound",
+     "source": "noah",
+     "cue": "sure",
+     "difficulty": 2,
+     "text": "I'm sure seeds sold more on Sunday than on Friday.",
+     "evidence": "sales:seeds"
+    },
+    {
+     "n": 3,
+     "id": "B01",
+     "board": "sales",
+     "type": "value",
+     "truth": "sound",
+     "source": "mia",
+     "cue": null,
+     "difficulty": 1,
+     "text": "Cookies sold 30 on Saturday.",
+     "evidence": "sales:cookies"
+    },
+    {
+     "n": 4,
+     "id": "B06",
+     "board": "sales",
+     "type": "always",
+     "truth": "flawed",
+     "source": "amira",
+     "cue": "crowd",
+     "difficulty": 2,
+     "text": "Everyone says juice sold the most every day.",
+     "evidence": "sales:all"
+    },
+    {
+     "n": 5,
+     "id": "B08",
+     "board": "sales",
+     "type": "because",
+     "truth": "flawed",
+     "source": "teacher",
+     "cue": null,
+     "difficulty": 3,
+     "text": "Sticker sales went up on Sunday because it was sunny.",
+     "evidence": "sales:stickers;sales:weather"
+    },
+    {
+     "n": 6,
+     "id": "B05",
+     "board": "sales",
+     "type": "always",
+     "truth": "sound",
+     "source": "teacher",
+     "cue": null,
+     "difficulty": 2,
+     "text": "Cookies sold 25 or more every day.",
+     "evidence": "sales:cookies"
+    },
+    {
+     "n": 7,
+     "id": "B04",
+     "board": "sales",
+     "type": "compare",
+     "truth": "flawed",
+     "source": "liam",
+     "cue": "sure",
+     "difficulty": 2,
+     "text": "I'm sure cookies sold more than juice on Friday.",
+     "evidence": "sales:fri"
+    },
+    {
+     "n": 8,
+     "id": "B02",
+     "board": "sales",
+     "type": "value",
+     "truth": "flawed",
+     "source": "raj",
+     "cue": null,
+     "difficulty": 1,
+     "text": "Stickers sold 25 on Friday.",
+     "evidence": "sales:stickers"
+    },
+    {
+     "n": 9,
+     "id": "B15",
+     "board": "times",
+     "type": "always",
+     "truth": "sound",
+     "source": "mia",
+     "cue": "crowd",
+     "difficulty": 2,
+     "text": "Everyone says all gym events end by 6:30.",
+     "evidence": "time:all"
+    },
+    {
+     "n": 10,
+     "id": "B13",
+     "board": "times",
+     "type": "value",
+     "truth": "sound",
+     "source": "teacher",
+     "cue": "crowd",
+     "difficulty": 1,
+     "text": "Everyone says the lucky draw is in the gym.",
+     "evidence": "time:lucky draw"
+    },
+    {
+     "n": 11,
+     "id": "B14",
+     "board": "times",
+     "type": "cross",
+     "truth": "flawed",
+     "source": "raj",
+     "cue": null,
+     "difficulty": 3,
+     "text": "The sack race is in the gym today.",
+     "evidence": "time:sack race,header,note"
+    },
+    {
+     "n": 12,
+     "id": "B12",
+     "board": "times",
+     "type": "compare",
+     "truth": "sound",
+     "source": "amira",
+     "cue": null,
+     "difficulty": 2,
+     "text": "The lucky draw starts after the choir finishes.",
+     "evidence": "time:lucky draw,choir"
+    },
+    {
+     "n": 13,
+     "id": "B09",
+     "board": "times",
+     "type": "value",
+     "truth": "sound",
+     "source": "raj",
+     "cue": "sure",
+     "difficulty": 1,
+     "text": "I'm sure the puppet show starts at 3:00 today.",
+     "evidence": "time:puppet show"
+    },
+    {
+     "n": 14,
+     "id": "B11",
+     "board": "times",
+     "type": "compare",
+     "truth": "flawed",
+     "source": "noah",
+     "cue": null,
+     "difficulty": 2,
+     "text": "Balloon art ends before the puppet show starts.",
+     "evidence": "time:balloon art,puppet show"
+    },
+    {
+     "n": 15,
+     "id": "B16",
+     "board": "times",
+     "type": "always",
+     "truth": "flawed",
+     "source": "liam",
+     "cue": null,
+     "difficulty": 2,
+     "text": "Every event lasts 30 minutes or more.",
+     "evidence": "time:all"
+    },
+    {
+     "n": 16,
+     "id": "B10",
+     "board": "times",
+     "type": "value",
+     "truth": "flawed",
+     "source": "mia",
+     "cue": "sure",
+     "difficulty": 1,
+     "text": "I'm sure the choir starts at 5:45.",
+     "evidence": "time:choir"
+    },
+    {
+     "n": 17,
+     "id": "B23",
+     "board": "map",
+     "type": "cross",
+     "truth": "sound",
+     "source": "noah",
+     "cue": null,
+     "difficulty": 3,
+     "text": "The choir plays in the middle of the fair.",
+     "evidence": "time:choir;map:stage"
+    },
+    {
+     "n": 18,
+     "id": "B18",
+     "board": "map",
+     "type": "value",
+     "truth": "flawed",
+     "source": "amira",
+     "cue": "sure",
+     "difficulty": 1,
+     "text": "I'm sure the hut is next to the gym.",
+     "evidence": "map:hut,gym"
+    },
+    {
+     "n": 19,
+     "id": "B20",
+     "board": "map",
+     "type": "compare",
+     "truth": "flawed",
+     "source": "teacher",
+     "cue": null,
+     "difficulty": 2,
+     "text": "The hut is nearer the gate than the juice stall.",
+     "evidence": "map:hut,juice,gate"
+    },
+    {
+     "n": 20,
+     "id": "B22",
+     "board": "map",
+     "type": "always",
+     "truth": "flawed",
+     "source": "noah",
+     "cue": "crowd",
+     "difficulty": 2,
+     "text": "Everyone says every stall is next to the stage.",
+     "evidence": "map:all"
+    },
+    {
+     "n": 21,
+     "id": "B17",
+     "board": "map",
+     "type": "cross",
+     "truth": "sound",
+     "source": "raj",
+     "cue": null,
+     "difficulty": 3,
+     "text": "Balloon art is next to the juice stall.",
+     "evidence": "time:balloon art;map:hut,juice"
+    },
+    {
+     "n": 22,
+     "id": "B19",
+     "board": "map",
+     "type": "value",
+     "truth": "sound",
+     "source": "liam",
+     "cue": "sure",
+     "difficulty": 2,
+     "text": "I'm sure the seed stall isn't next to the stage.",
+     "evidence": "map:seeds,stage"
+    },
+    {
+     "n": 23,
+     "id": "B24",
+     "board": "map",
+     "type": "cross",
+     "truth": "flawed",
+     "source": "mia",
+     "cue": null,
+     "difficulty": 3,
+     "text": "The puppet show is next to the stage.",
+     "evidence": "time:puppet show;map:gym,stage"
+    },
+    {
+     "n": 24,
+     "id": "B21",
+     "board": "map",
+     "type": "always",
+     "truth": "sound",
+     "source": "amira",
+     "cue": null,
+     "difficulty": 2,
+     "text": "The cookie and juice stalls are both next to the gate.",
+     "evidence": "map:juice,cookies,gate"
+    }
+   ],
+   "setbackAfter": 12,
+   "setback": "Liam bumped the board! The timetable rows get mixed up (same content, new order)."
+  }
+ },
+ "practice": {
+  "board": {
+   "stall": "Fruit stall",
+   "sold": {
+    "apples": 12,
+    "pears": 8
+   },
+   "weather": "sunny"
+  },
+  "claims": [
+   {
+    "n": 1,
+    "text": "Apples sold 12.",
+    "truth": "sound",
+    "feedback": "Right, the board shows 12."
+   },
+   {
+    "n": 2,
+    "text": "Pears sold more than apples.",
+    "truth": "flawed",
+    "feedback": "The board shows pears 8, apples 12."
+   },
+   {
+    "n": 3,
+    "text": "Apples sold more because it was sunny.",
+    "truth": "flawed",
+    "feedback": "The board shows the sales and the sun, but never says why. Only agree if the board shows it."
+   }
+  ]
+ }
+}

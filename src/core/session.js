@@ -14,6 +14,8 @@ export const session = {
   name: null,
   runNo: null,
   completed: [], // module ids completed (real round) in the current run
+  authExtra: null, // extra fields merged into casual-style auth by an extension (e.g. a signed test identity)
+  moduleOptions: {}, // per-module options handed to scenes (manifest.devOptions values), empty in normal play
 
   set(data) {
     const id = data.identity;
@@ -28,7 +30,7 @@ export const session = {
   get key() { return !this.userId ? null : this.casual ? `casual:${this.sessionId}` : this.userId; },
   auth() {
     if (!this.userId) return null;
-    return this.casual ? { casual: true, sessionId: this.sessionId } : { userId: this.userId, email: this.email, phone: this.phone };
+    return this.casual ? { casual: true, sessionId: this.sessionId, ...(this.authExtra || {}) } : { userId: this.userId, email: this.email, phone: this.phone };
   },
   uuid,
   CASUAL_ID,

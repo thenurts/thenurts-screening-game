@@ -5,7 +5,7 @@ import jar from './assets/jar.webp';
 
 export default {
   id: 'lucky-dip',
-  version: 2, // v1.1 patch: chilli, starter sweet, 15 scored bags (sequenceVersion 2)
+  version: 3, // v1.2: no round timer (v1.1 = 2: chilli, starter sweet, 15 scored bags, sequenceVersion 2)
   title: 'Lucky Dip',
   tagline: 'Fill your jar with sweets from Mia’s lucky bags. Just watch out for the chilli!',
   trait: 'risk',
@@ -20,12 +20,13 @@ export default {
     { title: 'Keep or Dip', body: 'Tap Keep to put the tray in your jar, or Dip to draw again. Every sweet makes the tray worth more.', img: jar },
     { title: 'Mind the chilli', body: 'The chilli spoils that bag’s tray. Gold bags are worth ×3. Free bags have no chillies at all.', img: chilli },
   ],
-  practice: { durationSec: 60, showTimer: false, scored: false },
-  round: { durationSec: 180, showTimer: false }, // decision budget of 17 bags; 180 s is only an idle cap
+  practice: { durationSec: null, showTimer: false, scored: false },
+  round: { durationSec: null, showTimer: false }, // no timer: the round ends after 17 bags (idle time is logged as idleMs)
   metrics: [
     { key: 'points', label: 'Sweets haul', unit: 'pts', primary: true, higherIsBetter: true },
     { key: 'bagsBanked', label: 'Bags kept', unit: '', higherIsBetter: true },
   ],
   traitScore: (m) => Number(m.riskScore ?? 50), // style scale: shown as a Cautious ↔ Bold spectrum
+  devOptions: { sequence: ['A', 'generated'] }, // developer mode only: which bag order the real round uses
   load: () => import('./GameScene.js'),
 };

@@ -126,7 +126,7 @@ async function play(manifest, mode) {
   if (mode === 'real') attempts[attemptKey] = (attempts[attemptKey] || 0) + 1;
   game.scene.add(key, SceneClass, true, {
     manifest, mode, roundUid, roundNo: null, runNo: session.runNo, seed,
-    playerKey: playerKey(), attemptNo: attempts[attemptKey] || 0,
+    playerKey: playerKey(), attemptNo: attempts[attemptKey] || 0, options: session.moduleOptions?.[manifest.id] || {},
     onDone: (res) => roundDone(manifest, mode, base, res, key),
   });
   scene = game.scene.getScene(key);
@@ -178,3 +178,21 @@ async function report() {
     },
   });
 }
+
+/**
+ * Small API for extensions registered at boot (e.g. a test tool). Core never depends on any of them.
+ * startCustom: sign in with identity data shaped like enter()'s, play the given modules in the given order (no
+ * shuffle), starting in 'real', 'practice' or 'pregame' mode.
+ */
+export const app = {
+  get game() { return game; },
+  home: () => home(),
+  report: () => report(),
+  preGame: (m) => preGame(m),
+  startCustom(data, order, mode = 'real') {
+    session.set(data);
+    session.order = order;
+    if (mode === 'pregame') preGame(order[0]);
+    else play(order[0], mode === 'practice' ? 'practice' : 'real');
+  },
+};

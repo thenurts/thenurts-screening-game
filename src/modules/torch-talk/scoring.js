@@ -1,4 +1,4 @@
-// Torch Talk scoring (build pack v2.1 §9). Pure: takes the raw turn log, returns metrics. Weights → ScoringConfig later.
+// Torch Talk scoring (build pack v2.2 §9). Pure: takes the raw turn log, returns metrics. Weights → ScoringConfig later.
 export const WEIGHTS = { meaning: 0.40, adaptation: 0.20, ask: 0.15, efficiency: 0.15, repair: 0.10 };
 export const TURNS = 10;
 // Reactions depend on the outcome only (never on message length or on asking). Build pack §8.
@@ -11,9 +11,9 @@ export const REACTIONS = {
 const mean = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0);
 const r3 = (x) => Math.round(x * 1000) / 1000;
 
-/** Shown points for one turn: pass → round(10 × ideal ÷ used); fail → 0; each ask −1; floored at 0. */
+/** Shown points for one turn: the message's points (checker.points: clarifiers count) minus 1 per ask, floored at 0. */
 export function turnPoints(t) {
-  const base = t.pass ? Math.round((10 * t.ideal) / t.used) : 0;
+  const base = t.base ?? (t.pass ? Math.round((10 * t.ideal) / t.used) : 0); // `base` is set by the game (v2.2)
   return Math.max(0, base - (t.asks?.length || 0));
 }
 
@@ -29,11 +29,11 @@ export function repairOf(first = [], fix) {
  * turns: [{ turn, itemId, words[], ideal, used, pass, failReason, shorthandTile?, contextTile?, known[], asks[{q, correct}], gap, fix?{words, pass} }]
  * Unplayed turns (time cap) are simply absent: they count as failures in meaningRate.
  */
-export function score({ turns = [], idleNudges = 0, timedOut = false, restartedAfterSetback = false, nTurns = TURNS }) {
+export function score({ turns = [], idleNudges = 0, restartedAfterSetback = false, nTurns = TURNS }) {
   const byTurn = Object.fromEntries(turns.map((t) => [t.turn, t]));
   const passed = turns.filter((t) => t.pass);
   const meaningRate = passed.length / nTurns;
-  const efficiency = mean(passed.map((t) => t.ideal / t.used));
+  const efficiency = mean(passed.map((t) => t.ratio ?? Math.min(1, t.ideal / t.used))); // v2.2: same ratio as the points, unrounded
 
   // audience adaptation: the Casual Acquaintance turns (T4, T7, T8), skipping the known fact on T2,
   // and the curse-of-knowledge pair (T3 code word with a Close Friend → T7 with an acquaintance)
@@ -64,7 +64,7 @@ export function score({ turns = [], idleNudges = 0, timedOut = false, restartedA
 
   const commScore = Math.round(100 * (WEIGHTS.meaning * meaningRate + WEIGHTS.adaptation * adaptation + WEIGHTS.ask * askScore + WEIGHTS.efficiency * efficiency + WEIGHTS.repair * repairQuality));
   const flags = [];
-  if (timedOut || idleNudges >= 3) flags.push('idle');
+  if (idleNudges >= 3) flags.push('idle'); // no round cap since v2.2: idle is only flagged, never cut short
   if (restartedAfterSetback) flags.push('restartedAfterSetback');
   return {
     commScore, meaningRate: r3(meaningRate), efficiency: r3(efficiency), adaptation: r3(adaptation), shorthandAdaptation,

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { check, fixPasses, nicknames } from '../src/modules/torch-talk/checker.js';
+import { check, fixPasses, nicknames, points, pyRound } from '../src/modules/torch-talk/checker.js';
 import { buildRound, trayOrder, ITEMS, TAGS, QUESTIONS } from '../src/modules/torch-talk/forms.js';
 import { score, turnPoints, repairOf, REACTIONS } from '../src/modules/torch-talk/scoring.js';
 
@@ -17,32 +17,41 @@ test('item bank passes the Game Ideas validator (incl. 10,000 random rounds)', (
   assert.equal(out.trim(), 'ALL CHECKS PASS');
 });
 
-test('JS checker matches the Python reference on every fixture case', () => {
+test('JS checker and points match the Python reference on every fixture case', () => {
   const cases = JSON.parse(readFileSync('tests/fixtures/torch-talk-parity.json', 'utf8'));
   assert.ok(cases.length > 1000);
-  for (const [id, msg, want] of cases) assert.equal(check(msg, byId[id]), want, `${id}: ${msg.join(' ')}`);
+  for (const [id, msg, want, pts] of cases) {
+    assert.equal(check(msg, byId[id]), want, `${id}: ${msg.join(' ')}`);
+    assert.equal(points(msg, byId[id]), pts, `points ${id}: ${msg.join(' ')}`);
+  }
 });
 
-test('spot checks from build pack v2.1 §13', () => {
+test('spot checks from build pack v2.2 (meaning + clarifier points)', () => {
   const c = (id, m) => check(m.split(' '), byId[id]);
-  assert.equal(c('A-03', 'paint brushes den 2pm'), 'missing');           // fused nouns need "and"
-  assert.equal(c('A-03', 'paint and brushes den 2pm'), 'pass');
-  assert.equal(c('A-03', 'and paint brushes den 2pm'), 'between');
-  assert.equal(c('A-06', 'back gate shut'), 'missing');                  // a request says what to do
+  const p = (id, m) => points(m.split(' '), byId[id]);
+  assert.equal(c('A-03', 'take paint brushes den 2pm'), 'missing');      // fused nouns need "and"
+  assert.equal(c('A-03', 'take paint and brushes den 2pm'), 'pass');
+  assert.equal(c('A-03', 'and take paint brushes den 2pm'), 'between');
+  assert.equal(c('A-03', 'paint and brushes den 2pm'), 'missing');       // a request says what to do
+  assert.equal(c('A-06', 'back gate shut'), 'missing');
   assert.equal(c('A-06', 'keep back gate shut'), 'pass');
   assert.equal(c('A-04', 'sandpit after school sweep toys arrange chairs'), 'missing'); // "sweep" alone isn't the paraphrase
   assert.equal(c('A-04', 'sandpit after school tidy toys put out chairs'), 'pass');    // phrase tiles in a row
-  assert.equal(c('A-04', 'sandpit after school tidy toys out put chairs'), 'missing');
-  assert.equal(c('A-07', 'glue string Mia\'s garage 11am'), 'breaker');
-  assert.equal(c('A-07', 'glue string Mia\'s garage noon'), 'pass');
-  assert.equal(c('A-07', 'glue string den noon'), 'missing');            // acquaintances don't know the den
-  assert.equal(c('A-03', 'paint and brushes den 2pm'), 'pass');          // …but a Close Friend does
+  assert.equal(c('A-07', 'bring glue string Mia\'s garage 11am'), 'breaker');
+  assert.equal(c('A-07', 'bring glue string Mia\'s garage noon'), 'pass');
+  assert.equal(c('A-07', 'bring glue string den noon'), 'missing');      // acquaintances don't know the den
   assert.equal(c('C-04', 'fetch cake Nana\'s carefully'), 'missing');
-  assert.equal(c('B-06', 'Liam brings drinks you bring cups'), 'pass');  // who-does-what (bind)
-  assert.equal(c('B-06', 'you bring cups Liam brings drinks'), 'pass');
+  assert.equal(c('B-06', 'you bring cups Liam brings drinks'), 'pass');  // who-does-what (bind)
   assert.equal(c('B-06', 'Liam brings cups you bring drinks'), 'bind');
-  assert.equal(c('A-01', 'pool hole bring tape Friday fixed'), 'breaker');
-  assert.equal(c('A-01', 'pool hole bring tape Friday not fixed'), 'pass');
+  assert.equal(c('A-01', 'bring tape Friday fixed'), 'breaker');
+  assert.equal(c('A-01', 'bring tape Friday not fixed'), 'pass');
+  assert.equal(c('B-10', 'today fill pots soil plant seeds water not please hose'), 'pass'); // "not" + one filler + breaker
+  // clarifiers: A-10 build-pack examples 10 / 8 / 9
+  assert.equal(p('A-10', 'fair you hoops Zoey tickets Mia face painting'), 10);
+  assert.equal(p('A-10', 'you hoops Zoey tickets Mia face painting'), 8);
+  assert.equal(p('A-10', 'fair you hoops Zoey tickets Mia face painting please'), 9);
+  assert.equal(p('A-10', 'you hoops Mia face painting'), 0);             // meaning fails → 0
+  assert.equal(pyRound(7.5), 8); assert.equal(pyRound(8.5), 8); assert.equal(pyRound(6.6), 7);
 });
 
 test('italics: every *word* in a note is exactly the item’s nickname / code-word tiles', () => {

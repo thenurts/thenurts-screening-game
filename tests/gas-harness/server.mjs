@@ -47,6 +47,11 @@ class Range {
     return this;
   }
   setValue(x) { return this.setValues([[x]]); }
+  clearContent() { // like Sheets: cleared rows at the bottom no longer count towards getLastRow()
+    for (let i = 0; i < this.nr; i++) { const row = this.sh.data[this.r - 1 + i]; if (row) for (let j = 0; j < this.nc; j++) row[this.c - 1 + j] = ''; }
+    while (this.sh.data.length && this.sh.data.at(-1).every((x) => x === '' || x == null)) this.sh.data.pop();
+    return this;
+  }
   setNumberFormat(f) { for (let j = 0; j < this.nc; j++) this.sh.fmt[this.c - 1 + j] = f; return this; }
   setFontWeight() { return this; }
   setBackground() { return this; }
@@ -55,7 +60,8 @@ class Range {
 let state;
 function fresh() {
   const sheets = [new Sheet('Sheet1')];
-  const props = {}; const cache = new Map(); const files = [];
+  const props = { DEV_PIN: process.env.DEV_PIN ?? '2468' }; // test-only PIN (same as the mock)
+  const cache = new Map(); const files = [];
   const ss = {
     getSheetByName: (n) => sheets.find((s) => s.name === n) || null,
     insertSheet: (n, i) => { const s = new Sheet(n); if (i === 0) sheets.unshift(s); else sheets.push(s); return s; },
@@ -72,7 +78,7 @@ function fresh() {
       getAll: (ks) => Object.fromEntries(ks.filter((k) => cache.has(k)).map((k) => [k, cache.get(k)])),
       putAll: (o) => Object.entries(o).forEach(([k, v]) => cache.set(k, String(v))),
     }) },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] ?? null, setProperty: (k, v) => { props[k] = v; } }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] ?? null, setProperty: (k, v) => { props[k] = v; }, deleteProperty: (k) => { delete props[k]; } }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s) => ({ content: s, setMimeType() { return this; } }) },
     Utilities: {
       base64Decode: (b) => [...Buffer.from(b, 'base64')], getUuid: () => randomUUID(),
@@ -101,6 +107,7 @@ http.createServer((req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'OPTIONS') { res.statusCode = 405; return res.end(); } // Apps Script can't answer preflights either
     if (req.url.startsWith('/__dump')) return res.end(JSON.stringify({ sheets: dump(), files: state.files }));
+    if (req.url.startsWith('/__prop/')) { const [k, v] = decodeURIComponent(req.url.slice(8)).split('='); state.ctx.PropertiesService.getScriptProperties().setProperty(k, v || null); return res.end('{"ok":true}'); } // e.g. /__prop/DEV_PIN= (unset)
     if (req.url.startsWith('/__reset')) { fresh(); return res.end('{"ok":true}'); }
     if (req.url.startsWith('/__run/')) { state.ctx[req.url.slice(7)](); return res.end('{"ok":true}'); } // e.g. /__run/refreshSummary
     if (req.method === 'GET') return res.end(state.ctx.doGet().content);

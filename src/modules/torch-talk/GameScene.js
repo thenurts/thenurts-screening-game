@@ -4,7 +4,7 @@ import { C, hex, FONT } from '../../core/theme.js';
 import { sfx } from '../../core/sfx.js';
 import { charImg } from '../../core/ui/dom.js';
 import { buildRound, trayOrder, QUESTIONS, TAGS, ITEM_BANK_VERSION } from './forms.js';
-import { check, fixPasses, slotsFor, nicknames } from './checker.js';
+import { check, fixPasses, slotsFor, nicknames, points, ratio } from './checker.js';
 import { score, turnPoints, REACTIONS } from './scoring.js';
 import bgUrl from './assets/bg-garden.webp';
 import torchUrl from './assets/torch.webp';
@@ -133,7 +133,7 @@ export default class GameScene extends ModuleScene {
 
   // ---------------------------------------------------------------- round
   onStart() {
-    const r = buildRound({ mode: this.mode, runNo: this.runNo, attemptNo: this.attemptNo, rand: this.rand });
+    const r = buildRound({ mode: this.mode, runNo: this.runNo, attemptNo: this.attemptNo, rand: this.rand, form: this.options.form });
     this.form = r.form; this.items = r.items; this.restarted = r.restartedAfterSetback;
     this.trace('round_setup', { form: this.form, itemIds: this.items.map((x) => x.id), attemptNo: this.attemptNo, runNo: this.runNo });
     this.nextTurn();
@@ -440,7 +440,13 @@ export default class GameScene extends ModuleScene {
   }
 
   // ---------------------------------------------------------------- idle
-  armIdle() { this.clearIdle(); this.bubble.setAlpha(0); this.idleTimer = this.time.delayedCall(IDLE_MS, () => this.nudge()); }
+  armIdle() {
+    // idleMs = time spent past the nudge point without doing anything (no round cap since v2.2, so slow play is logged, not cut)
+    const now = performance.now();
+    if (this.lastInputAt) this.idleMs = (this.idleMs || 0) + Math.max(0, now - this.lastInputAt - IDLE_MS);
+    this.lastInputAt = now;
+    this.clearIdle(); this.bubble.setAlpha(0); this.idleTimer = this.time.delayedCall(IDLE_MS, () => this.nudge());
+  }
   clearIdle() { this.idleTimer?.remove(); this.idleTimer = null; }
   nudge() {
     if (this.ended) return;
@@ -472,6 +478,7 @@ export default class GameScene extends ModuleScene {
         words, ideal: it.ideal.length, used: words.length, pass: res === 'pass', failReason: res === 'pass' ? '' : res,
         shorthandTile: it.shorthand?.tile || '', contextTile: it.context?.tile || '', usedShorthand: !!(it.shorthand && words.includes(it.shorthand.tile)),
         asks: this.asks.slice(), ms: Math.round(performance.now() - this.turnStartAt) };
+      rec.base = points(words, it); rec.ratio = ratio(words, it); // v2.2: clarifiers count; asks are subtracted below
       rec.points = turnPoints(rec);
       this.cur = rec; this.turns.push(rec);
       this.trace('comm_message', { turn: rec.turn, itemId: rec.itemId, tag: rec.tag, words, ideal: rec.ideal, used: rec.used, pass: rec.pass, failReason: rec.failReason, usedShorthand: rec.usedShorthand });
@@ -550,19 +557,14 @@ export default class GameScene extends ModuleScene {
     this.finish(this.metrics());
   }
 
-  onTimeUp() { // 300 s cap: unplayed turns score 0 and the round is flagged
-    this.clearIdle(); this.timedOut = true;
-    this.trace('time_cap', { turnsPlayed: this.turns.length });
-    this.finish(this.metrics());
-  }
 
   // ---------------------------------------------------------------- results
   metrics() {
     const turns = this.turns || [];
-    const s = score({ turns, idleNudges: this.idleNudges || 0, timedOut: !!this.timedOut, restartedAfterSetback: !!this.restarted, nTurns: (this.items || []).length || 10 });
+    const s = score({ turns, idleNudges: this.idleNudges || 0, restartedAfterSetback: !!this.restarted, nTurns: (this.items || []).length || 10 });
     return {
       ...s,
-      itemBankVersion: ITEM_BANK_VERSION, form: this.form || '', itemIds: (this.items || []).map((x) => x.id).join(' '), turnsPlayed: turns.length, idleNudges: this.idleNudges || 0,
+      itemBankVersion: ITEM_BANK_VERSION, form: this.form || '', itemIds: (this.items || []).map((x) => x.id).join(' '), turnsPlayed: turns.length, idleNudges: this.idleNudges || 0, idleMs: Math.round(this.idleMs || 0),
       // raw turns for re-scoring later: [turn, itemId, message, pass, failReason, asks (q+ right / q- other), points, fix (+ passed / - not)]
       turnLog: turns.map((t) => [t.turn, t.itemId, t.words.join(' '), t.pass ? 1 : 0, t.failReason, t.asks.map((a) => a.q + (a.correct ? '+' : '-')).join(','), t.points,
         t.fix ? t.fix.words.join(' ') + (t.fix.pass ? ' +' : ' -') : '', t.ms]),

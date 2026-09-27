@@ -154,3 +154,8 @@ html, body { margin: 0; height: 100%; background: var(--cream); }
 @media (min-width: 900px) { .tn-card { max-width: 460px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .tn-optional { display: inline-block; font: 800 11px var(--font-body); text-transform: uppercase; letter-spacing: .06em; background: var(--mint); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 8px; margin-left: 4px; vertical-align: 1px; }
+
+/* Home extras slot (buttons registered at runtime, e.g. by a test tool) */
+.tn-home-extras { position: absolute; top: var(--safe-t); right: 12px; display: flex; gap: 6px; z-index: 5; }
+.tn-home-extra { width: 44px; height: 44px; border-radius: 50%; border: 0; background: transparent; font-size: 20px; opacity: .35; cursor: pointer; }
+.tn-home-extra:hover, .tn-home-extra:focus-visible { opacity: .8; }

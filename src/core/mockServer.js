@@ -20,7 +20,15 @@ const now = () => new Date().toISOString();
 const err = (code) => { const e = new Error(code); e.code = code; throw e; };
 
 /** Resolve the caller: a registered user row, or a per-session casual row. `key` scopes rounds. */
+export const MOCK_DEV_PIN = '2468'; // test backend only; the real PIN is Script Property DEV_PIN on the server
+const DEV_ID = 'Dev Test';
+const uidOf = (w) => (w.dev ? DEV_ID : w.casual ? CASUAL_ID : w.row.userId);
 function who(auth) {
+  if (auth?.dev) {
+    if (!auth.devToken || !(db().devTokens || {})[auth.devToken] || !auth.sessionId) err('dev_refused');
+    const c = db().casual['dev:' + auth.sessionId] ||= { sessionId: auth.sessionId, currentRun: 1, createdAt: now(), dev: true };
+    return { key: 'dev:' + auth.sessionId, row: c, casual: true, dev: true };
+  }
   if (auth?.casual && auth.sessionId) {
     const c = db().casual[auth.sessionId] ||= { sessionId: auth.sessionId, currentRun: 1, createdAt: now() };
     return { key: 'casual:' + auth.sessionId, row: c, casual: true };
@@ -34,7 +42,7 @@ function completedIn(key, runNo) {
 }
 function identity(w) {
   const r = w.row;
-  const id = w.casual ? { userId: CASUAL_ID, casual: true } : { userId: r.userId, email: r.email, phone: r.phone, name: r.name };
+  const id = w.dev ? { userId: DEV_ID, casual: true, dev: true } : w.casual ? { userId: CASUAL_ID, casual: true } : { userId: r.userId, email: r.email, phone: r.phone, name: r.name };
   return { identity: id, runNo: r.currentRun, completed: completedIn(w.key, r.currentRun) };
 }
 function closeOpen(key, exceptUid) {
@@ -50,14 +58,14 @@ function ensureRound(w, b) {
   if (r) return r;
   const mode = b.mode === 'practice' ? 'practice' : 'real'; const run = w.row.currentRun;
   const n = db().rounds.filter((x) => x.key === w.key && x.runNo === run && x.module === b.module && x.mode === mode).length + 1;
-  r = { key: w.key, casual: w.casual, runNo: run, module: b.module, moduleVersion: b.moduleVersion, roundNo: mode === 'practice' ? 'P' + n : String(n), mode, startedAt: now(), endedAt: null, status: 'started', metrics: {}, roundUid: b.roundUid, seed: b.seed, positionInRun: b.positionInRun || null, moduleOrder: b.moduleOrder || '' };
+  r = { key: w.key, userId: uidOf(w), casual: w.casual, runNo: run, module: b.module, moduleVersion: b.moduleVersion, roundNo: mode === 'practice' ? 'P' + n : String(n), mode, startedAt: now(), endedAt: null, status: 'started', metrics: {}, roundUid: b.roundUid, seed: b.seed, positionInRun: b.positionInRun || null, moduleOrder: b.moduleOrder || '' };
   db().rounds.push(r);
-  const t = db().traces[b.roundUid] ||= { roundUid: b.roundUid, userId: w.casual ? CASUAL_ID : w.row.userId, module: b.module, mode, status: 'started', items: [], partial: null, elapsedMs: 0 };
+  const t = db().traces[b.roundUid] ||= { roundUid: b.roundUid, userId: uidOf(w), module: b.module, mode, status: 'started', items: [], partial: null, elapsedMs: 0 };
   t.roundNo = r.roundNo;
   return r;
 }
 function addTrace(w, tr) {
-  const t = db().traces[tr.roundUid] ||= { roundUid: tr.roundUid, userId: w.casual ? CASUAL_ID : w.row.userId, module: tr.module, mode: tr.mode, status: 'started', items: [], partial: null, elapsedMs: 0 };
+  const t = db().traces[tr.roundUid] ||= { roundUid: tr.roundUid, userId: uidOf(w), module: tr.module, mode: tr.mode, status: 'started', items: [], partial: null, elapsedMs: 0 };
   t.items.push(...(tr.items || [])); if (tr.partial != null) t.partial = tr.partial; if (tr.elapsedMs != null) t.elapsedMs = tr.elapsedMs; t.updatedAt = now();
 }
 const median = (a) => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -109,6 +117,12 @@ const handlers = {
     if (!u) err('login_fail');
     closeOpen(u.userId, null);
     return identity({ key: u.userId, row: u, casual: false });
+  },
+  devAuth({ pin }) {
+    if (String(pin || '') !== MOCK_DEV_PIN) err('dev_pin');
+    const token = 'devtok-' + Math.random().toString(36).slice(2);
+    (db().devTokens ||= {})[token] = now();
+    return { token };
   },
   casualStart({ auth }) {
     const w = who(auth);
@@ -165,7 +179,7 @@ function logEvents(w, events) {
     if (db().seen[e.event_id]) return;
     db().seen[e.event_id] = 1;
     const rno = e.round_no || (e.round_uid && db().rounds.find((r) => r.roundUid === e.round_uid)?.roundNo) || '';
-    db().interactions.push([now(), w.casual ? CASUAL_ID : w.row.userId, w.casual ? '' : w.row.email, w.casual ? '' : w.row.phone,
+    db().interactions.push([now(), uidOf(w), w.casual ? '' : w.row.email, w.casual ? '' : w.row.phone,
       e.module, rno, e.interaction, e.value, w.row.currentRun, e.session_id, e.client_ts, e.event_id, e.module_version, e.round_uid || '']);
   });
 }

@@ -1,65 +1,68 @@
-# Rebuilds src/modules/torch-talk/items.json (v2.1) from the compact source below — same data as the Game Ideas
-# thread's torch-talk-items.json v2.1. Tiles = slot words (phrases split, gap answer left out) + breakers + fillers.
+# Rebuilds src/modules/torch-talk/items.json (v2.2) from the compact source below — same data as the Game Ideas
+# thread's torch-talk-items.json v2.2. Tiles = slot words (phrases split, gap answer left out) + clarifier words
+# + breakers + fillers, each once.
 # Check with: python3 tests/torch-talk-validate.py
 import json, sys
 N = None
 CF = {"liam", "mia", "zoey"}
-def it(id, tier, rec, type, topic, note, slots, br, fi, ideal, known="", order="", bind="", between="", sh=N, ctx=N, gap=N, mix=N):
+def it(id, tier, rec, type, topic, note, slots, br, fi, ideal, known="", order="", bind="", between="", sh=N, ctx=N, gap=N, mix=N, clar=""):
     prac = id[0] == "P"
     S = [{"id": s.split(":")[0], "accept": s.split(":", 1)[1].split("|")} for s in slots.split(";")]
     ans = gap[2] if gap else N
+    CL = [{"id": c.split(":")[0], "accept": c.split(":", 1)[1].split("|")} for c in clar.split(";")] if clar else []
     acc = []
-    for s in S:
+    for s in S + CL:
         for a in s["accept"]:
             if a == ans: continue
             for w in a.split():
                 if w not in acc: acc.append(w)
+    tiles = acc + [w for w in br.split() + fi.split() if w not in acc]
     pairs = lambda txt, sep: [p.split(sep) for p in txt.split(",")] if txt else []
     ideal = ideal.split()
     return {"id": id, "pool": "practice" if prac else "real", "form": N if prac else id[0], "slot": N if prac else int(id[2:]),
             "tier": tier, "recipient": rec, "tag": "Close Friend" if rec in CF else "Casual Acquaintance", "type": type, "topic": topic,
-            "note": note, "slots": S, "breakers": br.split(), "fillers": fi.split(), "known": known.split(),
+            "note": note, "slots": S, "clarifiers": CL, "breakers": br.split(), "fillers": fi.split(), "known": known.split(),
             "order": pairs(order, "<"), "bind": pairs(bind, ">"), "between": pairs(between, "~"),
             "shorthand": {"tile": sh[0], "slots": sh[1].split()} if sh else N,
             "context": {"tile": ctx[0], "type": ctx[1], "slot": ctx[2]} if ctx else N,
             "gap": {"slot": gap[0], "question": gap[1], "answerTile": gap[2], "reply": gap[3]} if gap else N,
             "mixup": {"echo": mix[0], "fixSlot": mix[1]} if mix else N,
-            "ideal": ideal, "tiles": acc + br.split() + fi.split(), "cap": min(len(ideal) + 4, 10)}
+            "ideal": ideal, "tiles": tiles, "cap": min(len(ideal) + 4, 10)}
 I = [
 it("A-01","E","liam","problem-fix","paddling pool hole","Liam, the paddling pool has a hole! Can you bring some tape on Friday so we can fix it?",
-   "obj:pool;problem:hole;action:bring;item:tape;day:Friday","glue Saturday fixed","paddling some fix can you not please the hi we","pool hole bring tape Friday"),
+   "action:bring;item:tape;day:Friday","glue Saturday fixed","paddling some can you not please the hi we","pool hole bring tape Friday",clar="why:pool hole|fix pool"),
 it("A-02","E","mia","news","lemonade sold out","Mia, great news: the lemonade sold out by noon! Tomorrow we need two jugs, not one. Same spot by the gate, as you know.",
    "day:tomorrow;what:lemonade;count:two;item:jugs","one three cups","sold same spot gate great news need not please the hi","tomorrow lemonade two jugs",known="gate spot"),
 it("A-03","M","liam","request","paint to the den","Liam, can you take the paint and brushes to the *den* (Mia's garage) by 2pm? We're painting the stall sign.",
-   "item1:paint;and:and;item2:brushes;place:den|garage;owner:den|Mia's;time:2pm","glue 3pm shed","take sign painting stall can you by not","paint and brushes den 2pm",
+   "action:take|bring;item1:paint;and:and;item2:brushes;place:den|garage;owner:den|Mia's;time:2pm","glue 3pm shed","sign painting stall can you not","take paint and brushes den 2pm",
    between="item1~and~item2",sh=("den","place owner")),
 it("A-04","M","raj","instructions","tidy the sandpit","Raj, please help at the *Castle* (our name for the big sandpit) after school. First sweep up the toys, then put out the chairs.",
    "place:sandpit;w1:after;w2:school;t1:clear|tidy;o1:toys;t2:arrange|put out;o2:chairs","tables park before","castle sweep up then not","sandpit after school clear toys arrange chairs",
    order="w1<w2,t1<t2",bind="t1>o1,t2>o2",ctx=("castle","nickname","place")),
 it("A-05","E","liam","gap","collect chairs","Liam, someone needs to collect the chairs from school on Friday. Mum is choosing who.",
-   "who:Mia;task:collect;item:chairs;place:school;day:Friday","Zoey Noah Thursday","someone needs from choosing not please the hi we our","Mia collect chairs school Friday",
-   gap=("who","who","Mia","Mum says Mia.")),
+   "who:you;task:collect;item:chairs;place:school;day:Friday","Zoey Mia Thursday","someone needs choosing not please the hi we our","you collect chairs from school Friday",
+   gap=("who","who","you","Mum says you, Liam!"),clar="from:from"),
 it("A-06","M","mia","warning","keep the gate shut","Mia, please keep the back gate shut today. The puppy keeps running out, and Dad hasn't fixed the lock yet.",
    "action:keep;which:back;gate:gate;state:shut|closed","front open door","today puppy running out dad not please the hi we","keep back gate shut",mix=("front","which")),
 it("A-07","H","amira","request","fix the stall sign","Amira, the stall sign fell apart! Please bring glue and string to the *den* (Mia's garage) by 12pm, so we can fix it before the fair.",
-   "item1:glue;item2:string;owner:Mia's;place:garage;time:noon","tape 11am shed paint","den sign stall fell fix fair before bring not","glue string Mia's garage noon",
+   "action:bring;item1:glue;item2:string;owner:Mia's;place:garage;time:noon","tape 11am shed paint","den sign stall fell fix fair before not","bring glue string Mia's garage noon",
    ctx=("den","shorthand","place")),
 it("A-08","H","raj","change-of-plan","puppet show moves","Raj, the puppet show isn't at school any more. It's in the *Lab* now, which is what we call Mia's kitchen. Same time as before: Thursday at 3pm.",
    "e1:puppet;e2:show;owner:Mia's;place:kitchen;day:Thursday;time:3pm","school 4pm Friday hall","lab now same time moved not please the","puppet show Mia's kitchen Thursday 3pm",
    ctx=("lab","nickname","place")),
 it("A-09","M","zoey","gap","class bracelets","Zoey, we're making a bracelet for every kid in our class, so please buy enough beads. Liam is counting the kids.",
-   "buy:buy;beads:beads;for:for;count:24;item:bracelets","20 30 string","making class kid every enough counting not please the hi","buy beads for 24 bracelets",
+   "buy:buy;beads:beads;for:for|enough;count:24;item:bracelets","20 30 string","making class kid every counting not please the hi","buy beads for 24 bracelets",
    order="for<count,count<item",gap=("count","howmany","24","Liam says 24.")),
 it("A-10","H","liam","assignment","fair jobs","Liam, jobs for the fair: you run the hoops game, Zoey sells the tickets, and Mia does face painting. There's no cake stand this year.",
-   "p1:you;t1:hoops;p2:Zoey;t2:tickets;p3:Mia;t3a:face;t3b:painting","cakes Noah prizes","jobs fair run game sells does year not","you hoops Zoey tickets Mia face painting",
-   bind="p1>t1,p2>t2,p3>t3a,p3>t3b"),
+   "p1:you;t1:hoops;p2:Zoey;t2:tickets;p3:Mia;t3a:face;t3b:painting","cakes Noah Raj","jobs run game sells does year not","fair you hoops Zoey tickets Mia face painting",
+   bind="p1>t1,p2>t2,p3>t3a,p3>t3b",clar="where:fair"),
 it("B-01","E","zoey","lost-item","green jumper","Zoey, I left my green jumper at your house yesterday. Can you bring it to school tomorrow, please?",
-   "action:bring;colour:green;item:jumper;place:school;day:tomorrow","blue coat today","left your house yesterday it can you not please the","bring green jumper school tomorrow"),
+   "action:bring;which:my|green;item:jumper;place:school;day:tomorrow","blue coat today","left your house yesterday it can you not please","bring my jumper school tomorrow"),
 it("B-02","E","mia","pet-care","feed Biscuit","Mia, while we're away, please feed Biscuit the cat twice a day. The food is in the blue tin, as you know.",
    "task:feed;pet:Biscuit;freq:twice;per:daily|day","once milk weekly","cat away food tin blue while not please the hi","feed Biscuit twice daily",known="tin blue"),
 it("B-03","M","mia","news","club name vote","Mia, we voted! Our club name is the Rockets, not the Comets. Meet at *HQ* (the treehouse at 10am) on Saturday to paint the sign.",
-   "topic:name;value:Rockets;meet:meet;place:HQ|treehouse;time:HQ|10am;day:Saturday","Comets Sunday 11am","voted club paint sign not please the hi","name Rockets meet HQ Saturday",
-   sh=("HQ","place time")),
+   "topic:name;value:Rockets;meet:meet;place:HQ|treehouse;time:HQ|10am;day:Saturday","Comets Sunday 11am","voted paint sign not please the hi","club name Rockets meet HQ Saturday",
+   sh=("HQ","place time"),clar="club:club"),
 it("B-04","M","amira","request","pirate hats","Amira, the costume box is in the *Cave* (that's what we call the space under the stairs). Please bring the pirate hats for the show.",
    "action:bring;kind:pirate;item:hats;from:from;under:under;stairs:stairs","crowns attic capes","cave space costume box show not please the hi","bring pirate hats from under stairs",
    order="from<under,under<stairs",ctx=("cave","nickname","stairs")),
@@ -67,8 +70,8 @@ it("B-05","E","liam","gap","party cups","Liam, please bring a paper cup for ever
    "action:bring;count:12;item:cups;event:party;day:Saturday","10 20 plates Sunday","paper guest every counting not please the hi we","bring 12 cups party Saturday",
    gap=("count","howmany","12","Zoey says 12.")),
 it("B-06","M","mia","assignment","picnic jobs","Mia, for the picnic, Liam brings the drinks and you bring the cups. I'll make the sandwiches.",
-   "p1:Liam;v1:brings;t1:drinks;p2:you;v2:bring;t2:cups","plates snacks Zoey","picnic make for not please the hi we our","Liam brings drinks you bring cups",
-   bind="p1>v1,p1>t1,p2>v2,p2>t2",mix=("plates","t2")),
+   "p1:Liam;v1:brings;t1:drinks;p2:you;v2:bring;t2:cups","plates snacks Zoey","make for not please the hi we our","picnic Liam brings drinks you bring cups",
+   bind="p1>v1,p1>t1,p2>v2,p2>t2",mix=("plates","t2"),clar="event:picnic"),
 it("B-07","H","raj","conditional","club meeting","Raj, the club meets at *HQ* (the treehouse at 10am) on Sunday. If it's windy, we'll meet in my kitchen instead.",
    "event:club|meet;place:treehouse;time:10am;day:Sunday;if:if;cond:windy;owner:my|Noah's;alt:kitchen","rainy garden 11am Saturday","HQ meets instead not",
    "club treehouse 10am Sunday if windy my kitchen",bind="if>cond",ctx=("HQ","shorthand","place")),
@@ -79,13 +82,13 @@ it("B-09","M","zoey","gap","borrow Grandpa's tent","Zoey, can you pick up Grandp
    "action:collect|fetch|pick up;item:tent;owner:Grandpa's;place:shed;day:Thursday","garage attic Friday Saturday","camp ready where not please the","collect tent Grandpa's shed Thursday",
    gap=("place","where","shed","Grandpa says his shed.")),
 it("B-10","H","liam","instructions","plant the seeds","Liam, let's plant the seeds today. First fill the pots with soil, then push in the seeds, then water them. Don't use the hose, it's too strong.",
-   "day:today;t1:fill;pots:pots;soil:soil;t2:plant|push in;seeds:seeds;t3:water","hose sand tomorrow","first then strong use not please","today fill pots soil plant seeds water",
-   order="t1<t2,t2<t3"),
+   "day:today;t1:fill;pots:pots;soil:soil;t2:plant|push in;seeds:seeds;t3:water","hose sand tomorrow","first then strong not please the","today fill pots soil plant seeds water not hose",
+   order="t1<t2,t2<t3",clar="avoid:not hose"),
 it("C-01","E","liam","feedback","cookies too sweet","Liam, a customer said our cookies were too sweet. Next time, please use less sugar.",
    "less:less;sugar:sugar;item:cookies","more salt","customer said sweet next time use too not please the hi we our","less sugar cookies"),
 it("C-02","E","mia","quantity","fair tables","Mia, for the school fair we need 3 folding tables from your garage. As you know, your dad already said yes!",
-   "action:bring;count:3;item:tables;from:from;place:garage","2 chairs shed","school fair need folding your already said dad yes not","bring 3 tables from garage",
-   known="dad yes already",order="from<place"),
+   "dest:fair;action:bring;count:3;item:tables;from:from;place:garage","2 chairs shed","school need folding already said dad yes not","fair bring 3 tables from your garage",
+   known="dad yes already",order="from<place",clar="whose:your"),
 it("C-03","M","zoey","conditional","football if rain","Zoey, football is at the *usual* time and place (Friday at the park, 4pm). If it rains, we'll play in the school hall instead.",
    "event:football;day:usual|Friday;place:usual|park;time:usual|4pm;if:if;cond:rain;alt:hall","sunny gym Saturday","play school instead time place not please",
    "football usual if rain hall",bind="if>cond",sh=("usual","day place time")),
@@ -96,7 +99,7 @@ it("C-05","E","liam","gap","bring to the stall","Liam, Mum wants you to bring so
    "action:bring;item:scales;place:stall;time:9am","sign till 10am","wants something you mum not please the hi we our and","bring scales stall 9am",
    gap=("item","what","scales","Mum says the scales.")),
 it("C-06","M","mia","pricing","plant stall prices","Mia, for the plant stall, small pots are 2 coins and big pots are 5 coins. Please write the new signs.",
-   "write:write;signs:signs;h1:small;d1:2;h2:big;d2:5","3 4 medium","plant stall pots coins new not please the hi","write signs small 2 big 5",
+   "write:write;price:price|coins;signs:signs;h1:small;d1:2;h2:big;d2:5","3 4 medium","plant stall pots new not please the","write price signs small 2 big 5",
    bind="h1>d1,h2>d2",mix=("3","d2")),
 it("C-07","H","raj","instructions","football first time","Raj, come to football at the *usual* time and place (Friday at the park, 4pm). We warm up first, then pick teams, so wear trainers.",
    "event:football;day:Friday;place:park;time:4pm;wear:wear;item:trainers","Thursday 5pm boots field","usual warm up first then pick teams not","football Friday park 4pm wear trainers",
@@ -108,14 +111,14 @@ it("C-09","M","zoey","gap","vet visit","Zoey, can you help me take Rocky the dog
    "help:help;take:take;pet:Rocky;place:vet;day:Tuesday","Monday Friday cat","dog week me picking can you not please the hi","help take Rocky vet Tuesday",
    gap=("day","when","Tuesday","Mum says Tuesday.")),
 it("C-10","H","liam","conditional","late bus","Liam, if the bus is late, walk to the library and wait inside. Don't wait outside in the rain. I'll meet you there at 4pm.",
-   "if:if;bus:bus;cond:late;wait:wait;how:inside;place:library;time:4pm","outside 5pm park early","walk rain meet there you not please","if bus late wait inside library 4pm",
+   "if:if;bus:bus;cond:late;wait:wait;how:inside;place:library;meet:meet;time:4pm","outside 5pm park early","walk rain there you not please","if bus late wait inside library meet 4pm",
    bind="if>cond"),
 it("P-01","E","liam","instructions","ice-cream van","Liam, the ice-cream van is here until 3pm. Bring coins, not notes.",
    "van:van;until:until;time:3pm;bring:bring;item:coins","notes 4pm","ice-cream here not please the hi we our and to at","van until 3pm bring coins",order="until<time"),
 it("P-02","E","mia","change-of-plan","art class moves","Mia, art class has moved from Monday to Tuesday. It's still at 5pm, as you know.",
-   "event:art;day:Tuesday","Monday 6pm","class moved still 5pm not please the hi we our and to at on","art Tuesday",known="5pm"),
+   "event:art;day:Tuesday","Monday 6pm","class still 5pm not please the hi we our and to at on","art moved Tuesday",known="5pm",clar="change:moved"),
 it("P-03","E","raj","instructions","water the garden","Raj, please water the plants in the *Jungle* (that's what we call the back garden).",
-   "task:water;item:plants;side:back;place:garden","front cactus","jungle not please the hi we our and to at on for","water plants back garden",ctx=("jungle","nickname","place")),
+   "task:water;item:plants;side:back;place:garden","front lawn","jungle not please the hi we our and to at on for","water plants back garden",ctx=("jungle","nickname","place")),
 it("P-04","E","liam","quantity","party balloons","Liam, please buy 6 more balloons for the party.",
    "buy:buy;count:6;item:balloons","5 cups","more party not please the hi we our and to at on for","buy 6 balloons"),
 it("P-05","E","amira","change-of-plan","lunch at the Nest","Amira, lunch is at the *Nest* today (that's Gran's house). Please be there by noon.",
@@ -130,7 +133,7 @@ it("P-08","E","mia","gap","picnic chairs","Mia, please bring chairs for everyone
    "bring:bring;count:8;item:chairs;event:picnic","6 10","everyone counting heads not please the hi we our and to at","bring 8 chairs picnic",
    gap=("count","howmany","8","Liam says 8.")),
 ]
-D = {"version": "2.1", "date": "2026-09-27",
+D = {"version": "2.2", "scoring": {"clarifierWeight": 2.5, "points": "min(10, round(10*idealLen/(wordsUsed + clarifierWeight*missingClarifiers))); 0 if the meaning fails"}, "date": "2026-09-27",
      "questions": {"when": "When?", "where": "Where?", "who": "Who?", "what": "What?", "howmany": "How many?"},
      "recipients": {"liam": "Close Friend", "mia": "Close Friend", "zoey": "Close Friend", "raj": "Casual Acquaintance", "amira": "Casual Acquaintance"},
      "italicMarkup": "*word* in a note = a nickname or code word, shown in italics", "items": I}

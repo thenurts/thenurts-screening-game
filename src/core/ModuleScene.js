@@ -21,13 +21,15 @@ export class ModuleScene extends Phaser.Scene {
     this.roundUid = data.roundUid;
     this.playerKey = data.playerKey || ''; // stable per player (for counterbalancing, e.g. button side)
     this.attemptNo = data.attemptNo || 1;  // real attempts at this game in this run, counted on this device
+    this.options = data.options || {};     // per-module options (manifest.devOptions), empty in normal play
     this.showTimer = (this.mode === 'practice' ? this.manifest.practice : this.manifest.round).showTimer !== false;
     this.runNo = data.runNo;
     this.seed = data.seed >>> 0;
     this.onDone = data.onDone;
     this.rand = mulberry32(this.seed || 1);
     this.W = W; this.H = H;
-    this.duration = (this.mode === 'practice' ? this.manifest.practice.durationSec : this.manifest.round.durationSec) * 1000;
+    const sec = (this.mode === 'practice' ? this.manifest.practice : this.manifest.round).durationSec;
+    this.duration = sec ? sec * 1000 : Infinity; // durationSec: null = no round cap (the game ends itself)
     this.elapsed = 0; this.running = false; this.ended = false; this.hiddenAt = null;
   }
 
