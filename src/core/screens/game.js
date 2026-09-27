@@ -58,13 +58,17 @@ export function howToModal(manifest, parent) {
   const onLeave = () => { record('left_page'); flushBeacon(); };
   window.addEventListener('pagehide', onLeave);
   const close = () => { record('closed'); window.removeEventListener('pagehide', onLeave); modal.remove(); };
+  const setNext = (on) => { next.disabled = !on; next.style.opacity = on ? '' : '0.45'; };
   function render() {
     const p = pages[i];
     art.innerHTML = '';
-    art.append(p.img ? h('img', { src: p.img.startsWith('char:') ? charImg(...p.img.slice(5).split('-')) : p.img, alt: '' }) : h('span', { 'aria-hidden': 'true' }, p.icon || '🎮'));
+    art.classList.toggle('tn-howto__art--demo', !!p.demo);
+    if (p.demo) art.append(demoView(p.demo, () => setNext(true)));
+    else art.append(p.img ? h('img', { src: p.img.startsWith('char:') ? charImg(...p.img.slice(5).split('-')) : p.img, alt: '' }) : h('span', { 'aria-hidden': 'true' }, p.icon || '🎮'));
     title.textContent = p.title; body.textContent = p.body; count.textContent = `${i + 1} / ${pages.length}`;
     prev.style.visibility = i ? 'visible' : 'hidden';
     next.lastChild.textContent = i === pages.length - 1 ? 'Got it!' : 'Next';
+    setNext(!(p.demo && p.demo.target)); // cards with a target message need the player to build it first
   }
   function go(d) {
     if (i + d >= pages.length) return close();
@@ -75,6 +79,36 @@ export function howToModal(manifest, parent) {
       art, title, body, count, h('div', { class: 'tn-row' }, prev, next)));
   render();
   parent.append(modal);
+}
+
+// ---- How-to live example (a card's optional `demo`): a note, a recipient tag, tappable tiles, a results strip, Ask chips.
+//   { note, tag: { label, who, face }, tiles: [...], target: [...], result: '✓ 10', results: [{ msg, ok, note }], chips: [{ label, reply }] }
+// `*word*` in a note or message is shown in italics (nicknames and code words).
+const italic = (text) => text.split(/(\*[^*]+\*)/).map((part) => (/^\*[^*]+\*$/.test(part) ? h('em', {}, part.slice(1, -1)) : part));
+function demoView(d, onReady) {
+  const box = h('div', { class: 'tn-demo' });
+  if (d.tag) box.append(h('div', { class: 'tn-demo__tag' }, d.tag.face ? h('img', { src: charImg(...d.tag.face.split('-')), alt: '' }) : '', h('b', {}, d.tag.who), h('span', { class: 'tn-tag' }, d.tag.label)));
+  if (d.note) box.append(h('div', { class: 'tn-demo__note' }, ...italic(d.note)));
+  const results = h('div', { class: 'tn-demo__res' });
+  const showResults = () => (d.results || []).forEach((r) => results.append(h('div', { class: 'tn-demo__row' }, h('span', { class: r.ok ? 'tn-ok' : 'tn-bad' }, r.ok ? '✓' : '✗'), h('span', { class: 'tn-demo__msg' }, ...italic(r.msg)), r.note ? h('small', {}, r.note) : '')));
+  if (d.tiles) {
+    const msg = []; const bar = h('div', { class: 'tn-demo__bar' }); const tray = h('div', { class: 'tn-demo__tiles' });
+    const done = () => d.target && msg.length === d.target.length && d.target.every((w) => msg.includes(w));
+    const draw = () => {
+      bar.innerHTML = ''; tray.innerHTML = '';
+      if (!msg.length) bar.append(h('span', { class: 'tn-muted' }, 'Tap the words'));
+      msg.forEach((w, k) => bar.append(h('button', { class: 'tn-tile tn-tile--on', onclick: () => { msg.splice(k, 1); draw(); } }, w)));
+      d.tiles.forEach((w) => tray.append(h('button', { class: `tn-tile${msg.includes(w) ? ' is-used' : ''}${d.target?.includes(w) && !msg.includes(w) ? ' is-hint' : ''}`, disabled: msg.includes(w) || done(), onclick: () => { msg.push(w); draw(); } }, w)));
+      if (done()) { bar.append(h('span', { class: 'tn-ok tn-demo__score' }, d.result || '✓')); showResults(); onReady(); }
+    };
+    box.append(bar, tray); draw();
+  } else showResults();
+  if (d.chips) {
+    const reply = h('div', { class: 'tn-demo__reply' });
+    box.append(h('div', { class: 'tn-demo__chips' }, ...d.chips.map((c) => h('button', { class: 'tn-tile', onclick: () => { reply.textContent = c.reply; reply.classList.add('is-on'); } }, c.label))), reply);
+  }
+  box.append(results);
+  return box;
 }
 
 /** Median bar: a single track with "You" (filled) and "Median" (outlined) markers. */

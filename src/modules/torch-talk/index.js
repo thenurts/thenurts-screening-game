@@ -1,11 +1,9 @@
 // Torch Talk · effective communication (Noah). Brief: ./README.md · build pack: 11-game-concepts.md (C1 v1.1)
-import notePng from './assets/note.webp';
 import torchPng from './assets/torch.webp';
-import walkiePng from './assets/walkie.webp';
 
 export default {
   id: 'torch-talk',
-  version: 1,
+  version: 2, // v2.1 patch: item bank v2.1, Close Friend / Casual Acquaintance, italics (itemBankVersion 2)
   title: 'Torch Talk',
   tagline: 'Flash Noah’s messages across the garden. Every word costs a flash!',
   trait: 'communication',
@@ -15,12 +13,23 @@ export default {
   logEvents: [], // v1.8 policy: comm_message / comm_ask / comm_repair / comm_setback_next go to the round trace + turnLog
   // Staff-only values copied to the Candidate Summary (never shown to the player)
   summaryKeys: ['commScore', 'meaningRate', 'efficiency', 'adaptation', 'askScore', 'repairQuality', 'form', 'flags'],
+  // 6 cards with live examples (build pack v2.1 §1). The how-to uses its own nickname (*Rocket*) so no real item is primed.
   howTo: [
-    { title: 'Read Noah’s note', body: 'Each turn, Noah has a note for one friend. Old friends know our nicknames. New friends don’t.', img: notePng },
-    { title: 'Build a short message', body: 'Tap words to build the shortest message that still gets the point across. Each word costs one flash. E.g. “Liam, the kite day is on Monday. Bring string.” → kite Monday string.', img: torchPng },
-    { title: 'Missing something? Ask', body: 'If the note leaves out something your friend needs, tap Ask. Each question costs 1 point, so only ask when you need to.', img: walkiePng },
+    { title: 'Pass on Noah’s note', body: 'Noah gets a note. Flash it to a friend in as few words as you can.', img: torchPng },
+    { title: 'Short, clear, right', body: 'Keep only what they need, including what to do. Wrong or unclear scores 0.',
+      demo: { note: 'Mia, the picnic is on Sunday now, not Saturday. Please bring a blanket.', tiles: ['the', 'picnic', 'Saturday', 'Sunday', 'is', 'bring', 'please', 'blanket'],
+        target: ['picnic', 'Sunday', 'bring', 'blanket'], result: '✓ 10',
+        results: [{ msg: 'the picnic is on Sunday so please bring a blanket', ok: true, note: '4 (too long)' }, { msg: 'picnic Saturday bring blanket', ok: false, note: '0 (wrong day)' }, { msg: 'picnic Sunday blanket', ok: false, note: '0 (what should she do?)' }] } },
+    { title: 'Your own words work', body: 'The note’s words aren’t always the best ones. Pick words that say what’s meant.',
+      demo: { note: 'Can you give the plants a drink?', tiles: ['give', 'drink', 'water', 'the', 'plants', 'a'], target: ['water', 'plants'], result: '✓' } },
+    { title: 'Close Friends know our nicknames', body: 'Close Friends know our nicknames and code words. They’re shown in italics.',
+      demo: { tag: { who: 'Liam', label: 'Close Friend', face: 'liam-happy' }, note: 'Meet at the *Rocket* (our name for the big slide) at 3pm.', results: [{ msg: 'meet *Rocket* 3pm', ok: true, note: 'Liam knows it' }] } },
+    { title: 'Others don’t', body: 'A Casual Acquaintance doesn’t know our nicknames, so spell it out.',
+      demo: { tag: { who: 'Raj', label: 'Casual Acquaintance', face: 'raj-worried' }, note: 'Meet at the *Rocket* (our name for the big slide) at 3pm.', results: [{ msg: 'meet *Rocket* 3pm', ok: false, note: 'Raj looks puzzled' }, { msg: 'meet big slide 3pm', ok: true }] } },
+    { title: 'Something missing? Ask', body: 'If the note leaves out something they need, tap Ask. Asking when it’s all there costs a point.',
+      demo: { note: 'Liam, the kite day is on Saturday at the park. Mum will say what time.', chips: [{ label: '🕒 When?', reply: '“Mum says 4pm.” (it was missing)' }, { label: '📍 Where?', reply: '“It’s in the note!” (−1)' }, { label: '👤 Who?', reply: '“It’s in the note!” (−1)' }, { label: '📦 What?', reply: '“It’s in the note!” (−1)' }, { label: '🔢 How many?', reply: '“It’s in the note!” (−1)' }] } },
   ],
-  practice: { durationSec: 120, showTimer: false, scored: false },
+  practice: { durationSec: 180, showTimer: false, scored: false }, // 3 turns
   round: { durationSec: 300, showTimer: false }, // 10 turns (~3–3.5 min); 300 s is only an idle cap
   metrics: [
     { key: 'messageScore', label: 'Message score', unit: 'pts', primary: true, higherIsBetter: true },

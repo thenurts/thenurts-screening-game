@@ -1,7 +1,7 @@
-// Lucky Dip scoring (build pack v1 §6). Pure functions over the RAW decision list, so the Sheet-side
+// Lucky Dip scoring (build pack v1.1 §6). Pure functions over the RAW decision list, so the Sheet-side
 // scoring layer can recompute later with a new config. Thresholds = the future ScoringConfig keys.
 export const SCORING = {
-  version: 'ld-1',
+  version: 'ld-2',
   bands: [35, 65],           // risk.bands: C < 35 ≤ B < 65 ≤ Bo
   calibrationBand: 0.35,     // risk.calibrationBand
   calibNaBelow: 1.3,         // risk.calibNaBelow
@@ -16,16 +16,17 @@ export const SCORING = {
 };
 
 /**
- * decisions: [{ bag, stake: 'normal'|'gold'|'free', k, choice: 'keep'|'dip', ms }]
- * bags:      [{ bag, stake, j, dips, endedBy: 'keep'|'pepper'|'auto', points }]  (dips = player dips, excl. Mia's)
+ * decisions: [{ bag, stake: 'normal'|'gold'|'free', k, choice: 'keep'|'dip', ms }]   k = player dips already made (0–3)
+ * bags:      [{ bag, stake, j, dips, endedBy: 'keep'|'chilli'|'auto', points }]      (v1 logs said 'pepper': same thing)
  */
+const isChilli = (b) => b.endedBy === 'chilli' || b.endedBy === 'pepper'; // 'pepper' = v1 log alias
 export function intendedStop(decisions) {
   const p = [];
-  for (let k = 1; k <= 4; k++) {
+  for (let k = 0; k <= 3; k++) {
     const at = decisions.filter((d) => d.k === k);
-    p[k] = at.length ? at.filter((d) => d.choice === 'dip').length / at.length : k > 1 ? p[k - 1] : 0;
+    p[k] = at.length ? at.filter((d) => d.choice === 'dip').length / at.length : k > 0 ? p[k - 1] : 0;
   }
-  return 1 + p[1] + p[1] * p[2] + p[1] * p[2] * p[3] + p[1] * p[2] * p[3] * p[4];
+  return 1 + p[0] + p[0] * p[1] + p[0] * p[1] * p[2] + p[0] * p[1] * p[2] * p[3];
 }
 export const riskFromStop = (s) => Math.round(1000 * (100 * (s - 1)) / 4) / 1000;
 
@@ -63,22 +64,24 @@ export function score({ decisions, bags, idleNudges = 0, timedOut = false, repea
   let consistency = null;
   if (scored.length) {
     consistency = 0;
-    for (let t = 1; t <= 5; t++) consistency = Math.max(consistency, scored.filter((d) => (d.k < t) === (d.choice === 'dip')).length / scored.length);
+    for (let t = 0; t <= 4; t++) consistency = Math.max(consistency, scored.filter((d) => (d.k < t) === (d.choice === 'dip')).length / scored.length);
   }
   const stakeShift = r2(intendedStop(scored.filter((d) => d.stake === 'normal')) - intendedStop(scored.filter((d) => d.stake === 'gold')));
 
-  // calibration: depth on the next scored bag after each loss vs all other decision bags
+  // calibration: depth on the next scored bag after each of the player's own chillies vs all other bags
   const depth = (b) => b.dips; // dips the player chose before the bag ended
-  const decided = scoredBags.filter((b) => b.j !== 1);
   const afterLoss = new Set();
-  scoredBags.forEach((b, i) => { if (b.endedBy === 'pepper') { const nxt = scoredBags.slice(i + 1).find((x) => x.j !== 1); if (nxt) afterLoss.add(nxt.bag); } });
-  const post = decided.filter((b) => afterLoss.has(b.bag)).map(depth);
-  const other = decided.filter((b) => !afterLoss.has(b.bag)).map(depth);
+  scoredBags.forEach((b, i) => { if (isChilli(b) && scoredBags[i + 1]) afterLoss.add(scoredBags[i + 1].bag); });
+  const post = scoredBags.filter((b) => afterLoss.has(b.bag)).map(depth);
+  const other = scoredBags.filter((b) => !afterLoss.has(b.bag)).map(depth);
   const calDelta = post.length && other.length ? mean(post) - mean(other) : null;
   let riskCalibration = calDelta == null ? 'n/a' : calDelta <= -cfg.calibrationBand ? 'yes' : calDelta >= cfg.calibrationBand ? 'no' : 'partly';
-  if (stop <= cfg.calibNaBelow) riskCalibration = 'n/a-low';
-  const d17 = (from, to) => mean(scoredBags.filter((b) => b.bag >= from && b.bag <= to && b.j !== 1).map(depth));
-  const postSetbackDelta = r2(d17(5, 7) != null && d17(1, 3) != null ? d17(5, 7) - d17(1, 3) : null);
+  const firstChilli = scoredBags.findIndex(isChilli);
+  if (stop <= cfg.calibNaBelow || firstChilli < 0) riskCalibration = 'n/a-low'; // too cautious to pull back, or never lost
+  // resilience hook: depth on the 3 scored bags after the first chilli minus the depth before it
+  const before = mean(scoredBags.slice(0, Math.max(0, firstChilli)).map(depth));
+  const after3 = mean(scoredBags.slice(firstChilli + 1, firstChilli + 4).map(depth));
+  const postSetbackDelta = r2(firstChilli >= 0 && before != null && after3 != null ? after3 - before : null);
 
   const msMed = median(scored.map((d) => d.ms));
   const allSame = scored.length > 0 && new Set(scored.map((d) => d.choice)).size === 1;

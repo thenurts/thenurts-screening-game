@@ -3,8 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { check, fixPasses } from '../src/modules/torch-talk/checker.js';
-import { buildRound, trayOrder, ITEMS } from '../src/modules/torch-talk/forms.js';
+import { check, fixPasses, nicknames } from '../src/modules/torch-talk/checker.js';
+import { buildRound, trayOrder, ITEMS, TAGS, QUESTIONS } from '../src/modules/torch-talk/forms.js';
 import { score, turnPoints, repairOf, REACTIONS } from '../src/modules/torch-talk/scoring.js';
 
 const byId = Object.fromEntries(ITEMS.map((x) => [x.id, x]));
@@ -23,13 +23,40 @@ test('JS checker matches the Python reference on every fixture case', () => {
   for (const [id, msg, want] of cases) assert.equal(check(msg, byId[id]), want, `${id}: ${msg.join(' ')}`);
 });
 
-test('spot checks from the build pack', () => {
-  assert.equal(check(['football', 'Saturday', 'usual', 'water'], byId['A-03']), 'pass'); // shorthand works for Liam
-  assert.equal(check(['kite', 'Sunday', 'usual', 'paper', 'tape'], byId['A-07']), 'missing'); // …but not for Zoey
-  assert.equal(check(['bike', 'Saturday', 'helmet', 'forget'], byId['A-01']), 'breaker');
-  assert.equal(check(['bike', 'Saturday', 'helmet', 'not', 'forget'], byId['A-01']), 'pass');
-  assert.equal(check(["Zoey's", 'party', 'Sunday', '1pm', 'swimsuit'], byId['B-06']), 'breaker');
-  assert.equal(check(['beach', 'Saturday', '9am', 'wash', 'car'], byId['A-10']), 'order');
+test('spot checks from build pack v2.1 §13', () => {
+  const c = (id, m) => check(m.split(' '), byId[id]);
+  assert.equal(c('A-03', 'paint brushes den 2pm'), 'missing');           // fused nouns need "and"
+  assert.equal(c('A-03', 'paint and brushes den 2pm'), 'pass');
+  assert.equal(c('A-03', 'and paint brushes den 2pm'), 'between');
+  assert.equal(c('A-06', 'back gate shut'), 'missing');                  // a request says what to do
+  assert.equal(c('A-06', 'keep back gate shut'), 'pass');
+  assert.equal(c('A-04', 'sandpit after school sweep toys arrange chairs'), 'missing'); // "sweep" alone isn't the paraphrase
+  assert.equal(c('A-04', 'sandpit after school tidy toys put out chairs'), 'pass');    // phrase tiles in a row
+  assert.equal(c('A-04', 'sandpit after school tidy toys out put chairs'), 'missing');
+  assert.equal(c('A-07', 'glue string Mia\'s garage 11am'), 'breaker');
+  assert.equal(c('A-07', 'glue string Mia\'s garage noon'), 'pass');
+  assert.equal(c('A-07', 'glue string den noon'), 'missing');            // acquaintances don't know the den
+  assert.equal(c('A-03', 'paint and brushes den 2pm'), 'pass');          // …but a Close Friend does
+  assert.equal(c('C-04', 'fetch cake Nana\'s carefully'), 'missing');
+  assert.equal(c('B-06', 'Liam brings drinks you bring cups'), 'pass');  // who-does-what (bind)
+  assert.equal(c('B-06', 'you bring cups Liam brings drinks'), 'pass');
+  assert.equal(c('B-06', 'Liam brings cups you bring drinks'), 'bind');
+  assert.equal(c('A-01', 'pool hole bring tape Friday fixed'), 'breaker');
+  assert.equal(c('A-01', 'pool hole bring tape Friday not fixed'), 'pass');
+});
+
+test('italics: every *word* in a note is exactly the item’s nickname / code-word tiles', () => {
+  for (const it of ITEMS) {
+    const ital = [...it.note.matchAll(/\*([^*]+)\*/g)].map((m) => m[1].toLowerCase()).sort();
+    assert.deepEqual(ital, nicknames(it).sort(), it.id);
+  }
+});
+
+test('recipients: slots 4, 7, 8 go to Raj or Amira (Casual Acquaintance); everyone else is a Close Friend', () => {
+  for (const it of ITEMS.filter((x) => x.pool === 'real')) {
+    assert.equal(['raj', 'amira'].includes(it.recipient), [4, 7, 8].includes(it.slot), it.id);
+    assert.equal(it.tag, TAGS[it.recipient]);
+  }
 });
 
 test('gap turns: the answer tile is not in the tray until asked', () => {
@@ -45,10 +72,11 @@ test('gap turns: the answer tile is not in the tray until asked', () => {
 });
 
 test('T6 fix rule', () => {
-  const it = byId['A-06']; // echo 8pm, fix slot time (7pm)
-  assert.ok(fixPasses(['7pm'], it));
-  assert.ok(fixPasses(['not', '8pm'], it));
-  assert.ok(!fixPasses(['movie', 'Friday'], it));
+  const it = byId['A-06']; // echo "front", fix slot "which" (back)
+  assert.ok(fixPasses(['back'], it));
+  assert.ok(fixPasses(['not', 'front'], it));
+  assert.ok(!fixPasses(['keep', 'gate'], it));
+  assert.ok(fixPasses(['you', 'bring', 'cups'], byId['B-06']));
   assert.equal(repairOf(['movie', 'Friday', '7pm', 'blanket', 'pillow'], { words: ['7pm'], pass: true }), 1);
   assert.equal(repairOf(['movie', 'Friday', '7pm', 'blanket', 'pillow'], { words: ['movie', 'Friday', '7pm', 'blanket', 'pillow'], pass: true }), 0.25);
   assert.equal(repairOf(['movie', 'Friday', '7pm', 'blanket', 'pillow'], { words: ['movie', 'at', '7pm'], pass: true }), 0.5);
@@ -68,8 +96,11 @@ test('form logic: first run = A, restart = B (flagged), later runs = slot-random
     assert.equal(r.items[2].form, r.items[6].form, 'T3/T7 paired');
     assert.ok(r.items.every((x) => x.form !== 'A'));
     const p = buildRound({ mode: 'practice', rand: rnd });
-    assert.equal(p.items.length, 2); assert.notEqual(p.items[0].id, p.items[1].id);
+    assert.equal(p.items.length, 3); assert.equal(new Set(p.items.map((x) => x.id)).size, 3);
     assert.ok(p.items.every((x) => x.pool === 'practice'));
+    assert.ok(!p.items[0].gap && !p.items[0].context, 'practice 1: normal');
+    assert.ok(p.items[1].context && TAGS[p.items[1].recipient] === 'Casual Acquaintance', 'practice 2: acquaintance nickname');
+    assert.ok(p.items[2].gap, 'practice 3: gap');
   }
 });
 
@@ -86,9 +117,9 @@ function playBot(strategy) {
     const words = r.words, asks = r.asks || [];
     const res = check(words, it);
     const t = { turn: i + 1, itemId: it.id, gap: !!it.gap, words, ideal: it.ideal.length, used: words.length, pass: res === 'pass', failReason: res,
-      shorthandTile: it.shorthand?.tile || '', contextTile: it.context?.tile || '', asks };
+      shorthandTile: it.shorthand?.tile || '', contextTile: it.context?.tile || '', known: it.known || [], asks };
     t.points = turnPoints(t);
-    if (it.mixup) t.fix = r.fix || { words: [it.slots.find((s) => s.id === it.mixup.fixSlot).accept[0]], pass: true };
+    if (it.mixup) t.fix = r.fix || { words: it.slots.find((s) => s.id === it.mixup.fixSlot).accept[0].split(' '), pass: true };
     return t;
   });
   return score({ turns });
@@ -105,9 +136,14 @@ test('bots: ideal ≈ 100; always-cap scores less; 2-word messages score ≈ 0 o
   const two = playBot((it) => ({ words: it.ideal.slice(0, 2) }));
   assert.equal(two.meaningRate, 0); assert.ok(two.commScore <= 25, String(two.commScore));
   // Asking on every turn costs points and askScore
-  const nosy = playBot((it) => ({ words: it.ideal, asks: [{ q: 'when', correct: it.gap?.question === 'when' }, { q: 'where', correct: it.gap?.question === 'where' }, { q: 'bring', correct: it.gap?.question === 'bring' }] }));
+  const nosy = playBot((it) => ({ words: it.ideal, asks: [{ q: 'when', correct: it.gap?.question === 'when' }, { q: 'where', correct: it.gap?.question === 'where' }, { q: 'who', correct: it.gap?.question === 'who' }] }));
   assert.ok(nosy.askScore < best.askScore && nosy.messageScore < best.messageScore);
   // curse of knowledge: shorthand with Liam then again with Zoey → adaptation drops
-  const cursed = playBot((it) => (it.id === 'A-07' ? { words: ['kite', 'Sunday', 'usual', 'paper', 'tape'] } : ideal(it)));
-  assert.equal(cursed.shorthandAdaptation, 0); assert.equal(cursed.adaptation, 0.5); assert.ok(cursed.commScore < best.commScore);
+  // curse of knowledge: the code word works with a Close Friend on T3, not with Amira on T7 → adaptation drops
+  const cursed = playBot((it) => (it.id === 'A-07' ? { words: ['glue', 'string', 'den', 'noon'] } : ideal(it)));
+  assert.equal(cursed.shorthandAdaptation, 0); assert.equal(cursed.adaptation, 0.6); assert.ok(cursed.commScore < best.commScore);
+  // known fact: repeating what the friend already knows (T2 "as you know") passes but loses the knownSkip facet
+  const told = playBot((it) => (it.id === 'A-02' ? { words: [...it.ideal, 'gate'] } : ideal(it)));
+  assert.equal(told.knownSkip, 0); assert.equal(best.knownSkip, 1);
+  assert.deepEqual(Object.keys(QUESTIONS), ['when', 'where', 'who', 'what', 'howmany']);
 });

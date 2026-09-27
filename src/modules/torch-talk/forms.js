@@ -4,21 +4,23 @@ import DATA from './items.json' with { type: 'json' };
 export const CONFIG = { firstRunForm: 'A', restartForm: 'B' }; // tt.firstRunForm (keep on A until the 30+ play review)
 export const ITEMS = DATA.items;
 export const QUESTIONS = DATA.questions;
+export const TAGS = DATA.recipients; // liam/mia/zoey → Close Friend · raj/amira → Casual Acquaintance
+export const ITEM_BANK_VERSION = 2; // bank v2.1 (v1 rounds are itemBankVersion 1)
 const REAL = ITEMS.filter((x) => x.pool === 'real');
 const PRACTICE = ITEMS.filter((x) => x.pool === 'practice');
 const bySlot = (form, slot) => REAL.find((x) => x.form === form && x.slot === slot);
 
 /**
- * mode 'practice' → 2 distinct practice-pool items.
+ * mode 'practice' → 3 turns: a normal item, a Casual Acquaintance nickname item, then a gap item (build pack v2.1 §1).
  * real, first run, first attempt → Form A (identical for everyone: the official score).
  * real, first run, a restart after leaving the round → Form B, flagged restartedAfterSetback.
  * real, later runs → slot-wise random (T3 and T7 from the same form), from forms other than the first-run form.
  */
 export function buildRound({ mode, runNo = 1, attemptNo = 1, rand = Math.random, cfg = CONFIG }) {
   if (mode === 'practice') {
-    const a = Math.floor(rand() * PRACTICE.length);
-    let b = Math.floor(rand() * (PRACTICE.length - 1)); if (b >= a) b++;
-    return { form: 'P', restartedAfterSetback: false, items: [PRACTICE[a], PRACTICE[b]] };
+    const pickOf = (list) => list[Math.floor(rand() * list.length)];
+    const normal = PRACTICE.filter((x) => !x.gap && !x.context), nick = PRACTICE.filter((x) => x.context), gap = PRACTICE.filter((x) => x.gap);
+    return { form: 'P', restartedAfterSetback: false, items: [pickOf(normal), pickOf(nick), pickOf(gap)] };
   }
   const first = Number(runNo) <= 1;
   if (first && attemptNo <= 1) return fixed(cfg.firstRunForm, false);
@@ -28,7 +30,7 @@ export function buildRound({ mode, runNo = 1, attemptNo = 1, rand = Math.random,
     const pick = {}; for (let s = 1; s <= 10; s++) pick[s] = pool[Math.floor(rand() * pool.length)];
     pick[7] = pick[3]; // they share one shorthand
     const items = Array.from({ length: 10 }, (_, i) => bySlot(pick[i + 1], i + 1));
-    if (new Set(items.map((x) => x.id)).size === 10 && new Set(items.map((x) => x.note)).size === 10) return { form: 'R', restartedAfterSetback: false, items };
+    if (new Set(items.map((x) => x.id)).size === 10 && new Set(items.map((x) => x.topic)).size === 10) return { form: 'R', restartedAfterSetback: false, items };
   }
   return fixed(pool[0], false);
 }

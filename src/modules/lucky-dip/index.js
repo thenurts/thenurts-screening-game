@@ -1,13 +1,13 @@
 // Lucky Dip · risk appetite (style: Cautious ↔ Bold). Brief: ./README.md · build pack: claude_11-game-concepts.md
 import bagNormal from './assets/bag-normal.webp';
-import pepper from './assets/pepper.webp';
+import chilli from './assets/chilli.webp';
 import jar from './assets/jar.webp';
 
 export default {
   id: 'lucky-dip',
-  version: 1,
+  version: 2, // v1.1 patch: chilli, starter sweet, 15 scored bags (sequenceVersion 2)
   title: 'Lucky Dip',
-  tagline: 'Fill your jar with sweets from Mia’s lucky bags. Just watch out for the pepper!',
+  tagline: 'Fill your jar with sweets from Mia’s lucky bags. Just watch out for the chilli!',
   trait: 'risk',
   host: 'mia',
   hostLine: 'My lucky bags! Keep the sweets you’ve got, or dip for more?',
@@ -16,12 +16,12 @@ export default {
   // Staff-only values copied to the Candidate Summary (never shown to the player)
   summaryKeys: ['riskScore', 'riskBand', 'riskCalibration', 'consistency', 'stakeShift', 'flags'],
   howTo: [
-    { title: 'Mia dips first', body: 'Each bag holds 5 sweets and 1 pepper. The strip shows what’s left inside.', img: bagNormal },
+    { title: 'Mia starts you off', body: 'Mia pops a starter sweet onto your tray. The strip shows what’s left in the bag: 4 sweets and 1 chilli.', img: bagNormal },
     { title: 'Keep or Dip', body: 'Tap Keep to put the tray in your jar, or Dip to draw again. Every sweet makes the tray worth more.', img: jar },
-    { title: 'Mind the pepper', body: 'The pepper spoils that bag’s tray. Gold bags are worth ×3. Free bags have no pepper at all.', img: pepper },
+    { title: 'Mind the chilli', body: 'The chilli spoils that bag’s tray. Gold bags are worth ×3. Free bags have no chillies at all.', img: chilli },
   ],
   practice: { durationSec: 60, showTimer: false, scored: false },
-  round: { durationSec: 180, showTimer: false }, // decision budget of 20 bags; 180 s is only an idle cap
+  round: { durationSec: 180, showTimer: false }, // decision budget of 17 bags; 180 s is only an idle cap
   metrics: [
     { key: 'points', label: 'Sweets haul', unit: 'pts', primary: true, higherIsBetter: true },
     { key: 'bagsBanked', label: 'Bags kept', unit: '', higherIsBetter: true },

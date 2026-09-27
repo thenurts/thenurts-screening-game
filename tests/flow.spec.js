@@ -47,11 +47,13 @@ async function playRound(page, strategy = 't3') {
           s.msg = strat === 'cap' ? [...it.ideal, ...it.fillers.filter((f) => f !== 'not')].slice(0, it.cap) : [...it.ideal];
           s.send(); return 'chose';
         }
-        if (s.phase === 'fix') { s.msg = [it.slots.find((x) => x.id === it.mixup.fixSlot).accept[0]]; s.send(); return 'chose'; }
+        if (s.phase === 'fix') { s.msg = it.slots.find((x) => x.id === it.mixup.fixSlot).accept[0].split(' '); s.send(); return 'chose'; }
         return 'wait';
       }
       if (s.running && !s.locked && s.cur) {
         const k = s.cur.k;
+        // tray-bug regression (v1.1): at a bag's first decision the tray holds only this bag's sweets
+        if (!s.cur.checked) { s.cur.checked = true; const want = s.cur.type === 'free' ? 0 : 1; if (s.trayItems.list.length > want) (window.__trayBad ||= []).push(`bag ${s.cur.bag}: ${s.trayItems.list.length}`); }
         const dip = strat === 'dip' ? true : strat === 'keep' ? false : s.cur.type === 'free' ? k < 3 : k < 3;
         s.choose(dip ? 'dip' : 'keep');
         return 'chose';
@@ -61,6 +63,7 @@ async function playRound(page, strategy = 't3') {
     if (state === 'gone' || state === 'ending') break;
     await page.waitForTimeout(state === 'chose' ? 60 : 120);
   }
+  expect(await page.evaluate(() => window.__trayBad || [])).toEqual([]);
 }
 const botFor = async (page) => ((await page.textContent('h1')).includes('Torch') ? 'ideal' : 't3');
 // From the post-game screen: play every remaining game for real, then land on the report.
@@ -111,7 +114,11 @@ test('applicant: register → how to → practice → real round → report → 
 
   // How to play: page through and close
   await page.click('#btn-howto');
-  while (await page.locator('.tn-modal').count()) await page.click('#btn-howto-next');
+  while (await page.locator('.tn-modal').count()) {
+    // live-example cards unlock Next once the target words are tapped (the targets pulse as a hint)
+    while (await page.locator('.tn-demo__tiles .tn-tile.is-hint').count()) await page.locator('.tn-demo__tiles .tn-tile.is-hint').first().click();
+    await page.click('#btn-howto-next');
+  }
   await expect(page.locator('.tn-modal')).toHaveCount(0);
 
   // Practice round (10 s)

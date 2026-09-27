@@ -1,4 +1,4 @@
-// Torch Talk scoring (build pack §9). Pure: takes the raw turn log, returns metrics. Weights → ScoringConfig later.
+// Torch Talk scoring (build pack v2.1 §9). Pure: takes the raw turn log, returns metrics. Weights → ScoringConfig later.
 export const WEIGHTS = { meaning: 0.40, adaptation: 0.20, ask: 0.15, efficiency: 0.15, repair: 0.10 };
 export const TURNS = 10;
 // Reactions depend on the outcome only (never on message length or on asking). Build pack §8.
@@ -26,7 +26,7 @@ export function repairOf(first = [], fix) {
 }
 
 /**
- * turns: [{ turn, itemId, probe, words[], ideal, used, pass, failReason, shorthandTile?, contextTile?, asks[{q, correct}], gap, fix?{words, pass} }]
+ * turns: [{ turn, itemId, words[], ideal, used, pass, failReason, shorthandTile?, contextTile?, known[], asks[{q, correct}], gap, fix?{words, pass} }]
  * Unplayed turns (time cap) are simply absent: they count as failures in meaningRate.
  */
 export function score({ turns = [], idleNudges = 0, timedOut = false, restartedAfterSetback = false, nTurns = TURNS }) {
@@ -35,8 +35,12 @@ export function score({ turns = [], idleNudges = 0, timedOut = false, restartedA
   const meaningRate = passed.length / nTurns;
   const efficiency = mean(passed.map((t) => t.ideal / t.used));
 
-  // audience adaptation: new-friend turns + the curse-of-knowledge pair (T3 shorthand with Liam → T7 with Zoey)
+  // audience adaptation: the Casual Acquaintance turns (T4, T7, T8), skipping the known fact on T2,
+  // and the curse-of-knowledge pair (T3 code word with a Close Friend → T7 with an acquaintance)
   const adaptParts = [4, 7, 8].map((n) => (byTurn[n]?.pass ? 1 : 0));
+  const t2 = byTurn[2];
+  const knownSkip = t2 && t2.known?.length ? (t2.pass && !t2.words.some((w) => t2.known.includes(w)) ? 1 : 0) : 'n/a';
+  if (knownSkip !== 'n/a') adaptParts.push(knownSkip);
   const t3 = byTurn[3], t7 = byTurn[7];
   let shorthandAdaptation = 'n/a';
   if (t3 && t3.shorthandTile && t3.words.includes(t3.shorthandTile)) {
@@ -64,7 +68,7 @@ export function score({ turns = [], idleNudges = 0, timedOut = false, restartedA
   if (restartedAfterSetback) flags.push('restartedAfterSetback');
   return {
     commScore, meaningRate: r3(meaningRate), efficiency: r3(efficiency), adaptation: r3(adaptation), shorthandAdaptation,
-    askScore: r3(askScore), gapAsk: gapScores.join('/'), unneededAsks, repairQuality,
+    knownSkip, askScore: r3(askScore), gapAsk: gapScores.join('/'), unneededAsks, repairQuality,
     messageScore: turns.reduce((s, t) => s + turnPoints(t), 0), understood: passed.length,
     flags: flags.join(' '),
   };

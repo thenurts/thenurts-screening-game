@@ -3,12 +3,12 @@ import { ModuleScene } from '../../core/ModuleScene.js';
 import { C, hex } from '../../core/theme.js';
 import { sfx } from '../../core/sfx.js';
 import { charImg } from '../../core/ui/dom.js';
-import { SEQUENCES, SETBACK_BAG, trayValue, LADDER, GOLD_X, FREE_STEP, FREE_DIPS } from './rules.js';
+import { SEQUENCES, SEQUENCE_VERSION, CONFIG, generate, code, trayValue, LADDER, GOLD_X, FREE_STEP, FREE_DIPS } from './rules.js';
 import { score } from './scoring.js';
 import bgUrl from './assets/bg-stall.webp';
 import bagNormalUrl from './assets/bag-normal.webp';
 import bagGoldUrl from './assets/bag-gold.webp';
-import pepperUrl from './assets/pepper.webp';
+import chilliUrl from './assets/chilli.webp';
 import jarUrl from './assets/jar.webp';
 import trayUrl from './assets/tray.webp';
 import sOrange from './assets/sweet-orange.webp';
@@ -27,7 +27,7 @@ function hash32(s) { let h = 2166136261; for (const ch of String(s)) h = Math.im
 
 export default class GameScene extends ModuleScene {
   preload() {
-    const imgs = { 'ld-bg': bgUrl, 'ld-bag-normal': bagNormalUrl, 'ld-bag-gold': bagGoldUrl, 'ld-pepper': pepperUrl, 'ld-jar': jarUrl, 'ld-tray': trayUrl, 'ld-sweet-orange': sOrange, 'ld-sweet-teal': sTeal, 'ld-sweet-yellow': sYellow };
+    const imgs = { 'ld-bg': bgUrl, 'ld-bag-normal': bagNormalUrl, 'ld-bag-gold': bagGoldUrl, 'ld-chilli': chilliUrl, 'ld-jar': jarUrl, 'ld-tray': trayUrl, 'ld-sweet-orange': sOrange, 'ld-sweet-teal': sTeal, 'ld-sweet-yellow': sYellow };
     Object.entries(imgs).forEach(([k, u]) => { if (!this.textures.exists(k)) this.load.image(k, u); });
     for (const p of ['happy', 'worried', 'excited']) if (!this.textures.exists(`mia-${p}`)) this.load.image(`mia-${p}`, charImg('mia', p));
   }
@@ -47,7 +47,7 @@ export default class GameScene extends ModuleScene {
     this.buttonSide = this.keepLeft ? 'keep-left' : 'keep-right';
 
     // --- HUD: bag counter + jar total
-    this.counter = this.pill(W / 2, 64, 230, 'Bag 0 / 20');
+    this.counter = this.pill(W / 2, 64, 230, 'Bag 0 / 17');
     // --- Mia (reacts to outcomes only)
     this.mia = this.add.image(120, 250, 'mia-happy'); this.sizeMia();
     this.mia.baseY = 250;
@@ -85,11 +85,14 @@ export default class GameScene extends ModuleScene {
   }
 
   onStart() {
-    const repeat = this.mode === 'real' && (this.attemptNo > 1 || (this.roundNo && this.roundNo !== '1'));
-    this.sequenceId = this.mode === 'practice' ? 'P' : repeat ? 'B' : 'A';
-    this.repeatAttempt = !!repeat;
-    this.seq = SEQUENCES[this.sequenceId];
-    this.trace('round_setup', { sequenceId: this.sequenceId, buttonSide: this.buttonSide, attemptNo: this.attemptNo });
+    // Official round (run 1, first attempt) = shared sequence A; a restart after leaving it, or any later run, gets a
+    // freshly generated order of the same 15 bags (same maximum, same fixed-strategy totals).
+    const official = this.mode === 'real' && Number(this.runNo || 1) <= 1 && this.attemptNo <= 1 && !CONFIG.firstRunRandom;
+    this.repeatAttempt = this.mode === 'real' && Number(this.runNo || 1) <= 1 && this.attemptNo > 1;
+    this.sequenceId = this.mode === 'practice' ? 'P' : official ? 'A' : 'generated';
+    this.seq = this.sequenceId === 'generated' ? generate(this.rand) : SEQUENCES[this.sequenceId];
+    this.sequenceCode = code(this.seq);
+    this.trace('round_setup', { sequenceVersion: SEQUENCE_VERSION, sequenceId: this.sequenceId, order: this.sequenceCode, buttonSide: this.buttonSide, attemptNo: this.attemptNo });
     this.nextBag();
   }
 
@@ -97,7 +100,11 @@ export default class GameScene extends ModuleScene {
   nextBag() {
     this.clearIdle();
     this.bagIdx++;
-    if (this.bagIdx >= this.seq.length) { this.miaPose('excited', 'bounce'); return this.finish(this.metrics()); }
+    this.trayItems.removeAll(true); // never carry a sweet sprite into the next bag
+    if (this.bagIdx >= this.seq.length) {
+      if (this.mode === 'real' && !this.hadChilli) this.trace('setback_next', { action: 'none' }); // never met a chilli
+      this.miaPose('excited', 'bounce'); return this.finish(this.metrics());
+    }
     const b = this.seq[this.bagIdx];
     this.cur = { ...b, bag: this.bagIdx + 1, k: 0, drawn: [] };
     this.counter.text.setText(`Bag ${this.bagIdx + 1} / ${this.seq.length}`); this.pop(this.counter);
@@ -113,7 +120,7 @@ export default class GameScene extends ModuleScene {
     this.setTray(0);
     this.time.delayedCall(ms('arrive'), () => {
       if (b.type === 'free') return this.awaitChoice();
-      // Mia always makes the first dip (so the bag-4 loss is identical and unavoidable for everyone)
+      // Mia pops a starter sweet onto the tray (the chilli is never the first draw)
       this.miaDip();
       this.time.delayedCall(ms('mia'), () => this.reveal());
     });
@@ -127,10 +134,10 @@ export default class GameScene extends ModuleScene {
   reveal() {
     const b = this.cur;
     const drawNo = b.k + 1; // 1-based draw index (Mia's = 1)
-    const isPepper = b.type !== 'free' && drawNo === b.j;
-    const item = this.add.image(this.bag.x, this.bag.y - 80, isPepper ? 'ld-pepper' : SWEETS[drawNo % 3]).setDisplaySize(isPepper ? 90 : 110, isPepper ? 98 : 62).setDepth(40);
+    const isChilli = b.type !== 'free' && drawNo === b.j;
+    const item = this.add.image(this.bag.x, this.bag.y - 80, isChilli ? 'ld-chilli' : SWEETS[drawNo % 3]).setDisplaySize(isChilli ? 90 : 110, isChilli ? 98 : 62).setDepth(40);
     this.pop(this.bag, 1.08, 90);
-    if (isPepper) {
+    if (isChilli) {
       this.tweens.add({ targets: item, y: 720, angle: 25, duration: ms('reveal'), ease: 'Cubic.easeOut' });
       this.time.delayedCall(ms('reveal'), () => this.spoil(item));
       return;
@@ -139,7 +146,7 @@ export default class GameScene extends ModuleScene {
     sfx.play('dip', { step: b.k });
     const slot = this.trayItems.list.length;
     this.tweens.add({ targets: item, x: 250 - 80 + (slot % 5) * 40, y: 880 - Math.floor(slot / 5) * 20, displayWidth: 70, displayHeight: 40, duration: ms('reveal'), ease: 'Cubic.easeIn',
-      onComplete: () => { item.destroy(); const s = this.add.image(-80 + (slot % 5) * 40, -Math.floor(slot / 5) * 20, SWEETS[drawNo % 3]).setDisplaySize(70, 40); this.trayItems.add(s); this.burst(250, 880, [C.sun, C.teal, C.orange]); } });
+      onComplete: () => { item.destroy(); if (b.ended) return; const s = this.add.image(-80 + (slot % 5) * 40, -Math.floor(slot / 5) * 20, SWEETS[drawNo % 3]).setDisplaySize(70, 40); this.trayItems.add(s); this.burst(250, 880, [C.sun, C.teal, C.orange]); } });
     this.time.delayedCall(ms('reveal'), () => {
       this.setTray(trayValue(b, b.k));
       this.drawStrip(); this.drawLadder();
@@ -173,8 +180,8 @@ export default class GameScene extends ModuleScene {
       this.trace('free_choice', { bag: b.bag, k: b.k, choice, ms: t });
       this.freeChoices = (this.freeChoices || 0) + 1;
     } else {
-      this.decisions.push({ bag: b.bag, stake: b.type, k: b.k, choice, ms: t });
-      this.trace('dip_choice', { bag: b.bag, stake: b.type, k: b.k, sweetsLeft: 5 - b.k, trayValue: trayValue(b, b.k), choice, ms: t });
+      this.decisions.push({ bag: b.bag, stake: b.type, k: b.k - 1, choice, ms: t }); // k = player dips so far (0–3)
+      this.trace('dip_choice', { bag: b.bag, stake: b.type, k: b.k - 1, sweetsLeft: 5 - b.k, trayValue: trayValue(b, b.k), choice, ms: t });
     }
     if (choice === 'keep') this.bank('keep');
     else { this.pop(this.bag, 1.1, 100); this.reveal(); }
@@ -199,23 +206,23 @@ export default class GameScene extends ModuleScene {
     this.time.delayedCall(ms('bank'), () => this.nextBag());
   }
 
-  spoil(pepperImg) {
+  spoil(chilliImg) {
     const b = this.cur;
-    this.recordBag('pepper', 0);
+    this.recordBag('chilli', 0);
     sfx.play('fizz');
     this.shake(220, 0.01);
     this.miaPose('worried', 'wobble');
     this.trayItems.list.forEach((s) => this.tweens.add({ targets: s, alpha: 0, y: s.y + 30, duration: ms('spoil') * 0.6 }));
-    this.tweens.add({ targets: pepperImg, alpha: 0, scale: pepperImg.scale * 1.4, delay: ms('spoil') * 0.5, duration: ms('spoil') * 0.4, onComplete: () => pepperImg.destroy() });
+    this.tweens.add({ targets: chilliImg, alpha: 0, scale: chilliImg.scale * 1.4, delay: ms('spoil') * 0.5, duration: ms('spoil') * 0.4, onComplete: () => chilliImg.destroy() });
     this.setTray(0, true);
     this.tweens.add({ targets: this.bag, x: -260, angle: -12, delay: ms('spoil') * 0.5, duration: ms('spoil') * 0.5, ease: 'Back.easeIn' });
-    if (b.bag === SETBACK_BAG && this.mode === 'real') this.pendingSetback = performance.now() + ms('spoil');
+    if (!this.hadChilli && this.mode === 'real') { this.hadChilli = true; this.pendingSetback = performance.now() + ms('spoil'); } // first chilli = the setback
     this.time.delayedCall(ms('spoil'), () => { this.trayItems.removeAll(true); this.nextBag(); });
   }
 
   recordBag(endedBy, points) {
-    const b = this.cur;
-    const rec = { bag: b.bag, stake: b.type, j: b.j ?? null, dips: b.type === 'free' ? b.k : Math.max(0, (endedBy === 'pepper' ? b.j : b.k) - 1), endedBy, points };
+    const b = this.cur; b.ended = true; // late tray tweens must not add sprites after this
+    const rec = { bag: b.bag, stake: b.type, j: b.j ?? null, dips: b.type === 'free' ? b.k : Math.max(0, (endedBy === 'chilli' ? b.j : b.k) - 1), endedBy, points };
     this.bags.push(rec);
     this.trace(b.type === 'free' ? 'free_bag' : 'bag_end', b.type === 'free' ? { bag: b.bag, dipsTaken: b.k, points } : { bag: b.bag, stake: b.type, dips: rec.dips, endedBy, points });
   }
@@ -242,19 +249,19 @@ export default class GameScene extends ModuleScene {
     if (type === 'gold') this.tweens.add({ targets: this.badge, angle: { from: -6, to: 6 }, duration: 700, yoyo: true, repeat: 2 });
   }
 
-  /** Icons for what's still inside: sweets left + the pepper (shape + ✕ badge, never colour alone). */
+  /** Icons for what's still inside: sweets left + the chilli (shape + ✕ badge, never colour alone). */
   drawStrip() {
     const b = this.cur; this.strip.removeAll(true);
     const total = b.type === 'free' ? FREE_DIPS : 5;
     const left = total - b.k;
     const items = []; for (let i = 0; i < left; i++) items.push(SWEETS[(b.k + 1 + i) % 3]);
-    if (b.type !== 'free') items.push('pepper');
+    if (b.type !== 'free') items.push('chilli');
     const gap = 74, x0 = -((items.length - 1) * gap) / 2;
     const plate = this.add.graphics().fillStyle(hex(C.white), 0.92).fillRoundedRect(x0 - 50, -44, (items.length - 1) * gap + 100, 88, 44).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(x0 - 50, -44, (items.length - 1) * gap + 100, 88, 44);
     this.strip.add(plate);
     items.forEach((k, i) => {
-      if (k === 'pepper') {
-        this.strip.add(this.add.image(x0 + i * gap, 0, 'ld-pepper').setDisplaySize(46, 50));
+      if (k === 'chilli') {
+        this.strip.add(this.add.image(x0 + i * gap, 0, 'ld-chilli').setDisplaySize(46, 50));
         const x = x0 + i * gap + 20, y = -22;
         this.strip.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillCircle(x, y, 14));
         this.strip.add(this.txt(x, y, '✕', { fontSize: '18px', color: C.white }));
@@ -302,8 +309,8 @@ export default class GameScene extends ModuleScene {
       bagsBanked: (this.bags || []).filter((b) => b.points > 0).length,
       bagsPlayed: (this.bags || []).length,
       ...s,
-      sequenceId: this.sequenceId || '', buttonSide: this.buttonSide, idleNudges: this.idleNudges || 0,
-      // raw decisions for re-scoring later: [bag, stake(N|G), k, choice(0 keep|1 dip), ms]
+      sequenceVersion: SEQUENCE_VERSION, sequenceId: this.sequenceId || '', sequence: this.sequenceCode || '', buttonSide: this.buttonSide, idleNudges: this.idleNudges || 0,
+      // raw decisions for re-scoring later: [bag, stake(N|G), k = player dips so far (0–3), choice(0 keep|1 dip), ms]
       decisions: (this.decisions || []).map((d) => [d.bag, d.stake === 'gold' ? 'G' : 'N', d.k, d.choice === 'dip' ? 1 : 0, d.ms]),
       bagLog: (this.bags || []).map((b) => [b.bag, b.stake[0].toUpperCase(), b.dips, b.endedBy[0], b.points]),
     };

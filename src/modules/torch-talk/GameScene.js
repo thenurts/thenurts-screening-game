@@ -3,8 +3,8 @@ import { ModuleScene } from '../../core/ModuleScene.js';
 import { C, hex, FONT } from '../../core/theme.js';
 import { sfx } from '../../core/sfx.js';
 import { charImg } from '../../core/ui/dom.js';
-import { buildRound, trayOrder, QUESTIONS } from './forms.js';
-import { check, fixPasses, slotsFor } from './checker.js';
+import { buildRound, trayOrder, QUESTIONS, TAGS, ITEM_BANK_VERSION } from './forms.js';
+import { check, fixPasses, slotsFor, nicknames } from './checker.js';
 import { score, turnPoints, REACTIONS } from './scoring.js';
 import bgUrl from './assets/bg-garden.webp';
 import torchUrl from './assets/torch.webp';
@@ -22,15 +22,17 @@ const ms = (k) => T[k] / SPEED;
 const IDLE_MS = 20000;
 const PAPER = '#FDFAE2', PAPER_EDGE = '#6E2415';
 const FIX_CAP = 6, MAX_ASKS = 3;
-const NAMES = { liam: 'Liam', mia: 'Mia', zoey: 'Zoey', noah: 'Noah' };
-const ICON = { when: '🕒', where: '📍', bring: '🎒' };
+const NAMES = { liam: 'Liam', mia: 'Mia', zoey: 'Zoey', noah: 'Noah', raj: 'Raj', amira: 'Amira' };
+const ICON = { when: '🕒', where: '📍', who: '👤', what: '📦', howmany: '🔢' };
+// Raj and Amira are supporting characters with busts only (no full-body 'front' pose): their resting pose is 'happy'.
+const REST = (who) => (who === 'raj' || who === 'amira' ? 'happy' : 'front');
 const norm = (w) => w.replace(/[^A-Za-z0-9'’\-é]/g, '').replace('’', "'").toLowerCase();
 
 export default class GameScene extends ModuleScene {
   preload() {
     const imgs = { 'tt-bg': bgUrl, 'tt-torch': torchUrl, 'tt-slip': slipUrl, 'tt-notebook': notebookUrl, 'tt-walkie': walkieUrl, 'tt-pencil': pencilUrl, 'tt-tape': tapeUrl };
     Object.entries(imgs).forEach(([k, u]) => { if (!this.textures.exists(k)) this.load.image(k, u); });
-    const poses = { noah: ['happy', 'worried', 'excited', 'threequarter'], liam: ['front', 'happy', 'worried', 'excited'], mia: ['front', 'happy', 'worried', 'excited'], zoey: ['front', 'happy', 'worried', 'excited'] };
+    const poses = { noah: ['happy', 'worried', 'excited', 'threequarter'], liam: ['front', 'happy', 'worried', 'excited'], mia: ['front', 'happy', 'worried', 'excited'], zoey: ['front', 'happy', 'worried', 'excited'], raj: ['happy', 'worried', 'excited'], amira: ['happy', 'worried', 'excited'] };
     for (const [c, ps] of Object.entries(poses)) for (const p of ps) if (!this.textures.exists(`${c}-${p}`)) this.load.image(`${c}-${p}`, charImg(c, p));
   }
 
@@ -80,7 +82,7 @@ export default class GameScene extends ModuleScene {
     const n = at(0.30, 0.485), f = at(0.72, 0.80);
     this.noahH = 0.15 * v.vh; this.friendH = 0.14 * v.vh;
     this.noah = this.add.image(Math.max(n.x, 90), n.y, 'noah-happy').setOrigin(0.5, 1); this.sizeChar(this.noah, this.noahH);
-    this.friend = this.add.image(Math.min(f.x, W - 70), f.y, `${this.item?.recipient || 'liam'}-front`).setOrigin(0.5, 1); this.sizeChar(this.friend, this.friendH);
+    this.friend = this.add.image(Math.min(f.x, W - 70), f.y, `${this.item?.recipient || 'liam'}-${REST(this.item?.recipient || 'liam')}`).setOrigin(0.5, 1); this.sizeChar(this.friend, this.friendH);
     this.torch = this.add.image(this.noah.x + this.noah.displayWidth * 0.5, this.noah.y - this.noahH * 0.3, 'tt-torch');
     this.torch.setDisplaySize(0.085 * v.vh, 0.085 * v.vh * this.torch.height / this.torch.width);
     const fx = this.friend.x, fy = this.friend.y - this.friendH * 0.62;
@@ -146,12 +148,13 @@ export default class GameScene extends ModuleScene {
     this.tray = trayOrder(it);
     this.turnStartAt = performance.now();
     this.turnPill.text.setText(`Turn ${this.turnIdx + 1} / ${this.items.length}`); this.pop(this.turnPill);
-    this.pose(this.friend, it.recipient, 'front');
+    this.pose(this.friend, it.recipient, REST(it.recipient));
     this.trace('turn', { turn: this.turnIdx + 1, itemId: it.id, recipient: it.recipient });
     this.renderPanel();
     this.panel.x = this.W; this.tweens.add({ targets: this.panel, x: 0, duration: ms('noteIn'), ease: 'Cubic.easeOut' });
     sfx.play('whoosh');
     this.armIdle();
+    if (this.mode === 'practice' && it.gap && !this.coached) { this.coached = true; this.time.delayedCall(ms('noteIn') + 200, () => this.coach()); }
   }
 
   // ---------------------------------------------------------------- panel rendering
@@ -189,14 +192,15 @@ export default class GameScene extends ModuleScene {
     const lines = this.add.graphics(); c.add(lines);
     const tape = this.add.image(0, -2, 'tt-tape').setOrigin(0.5, 81 / 135); tape.setDisplaySize(170, 170 * tape.height / tape.width); c.add(tape);
     const hl = this.add.container(0, 0); c.add(hl); c.hl = hl;
-    const words = this.item.note.split(/\s+/);
+    const words = this.item.note.split(/\s+/); // *word* = nickname / code word → italics
     let fs = 31, laid;
     for (; fs >= 20; fs--) { laid = this.flow(words, w - 72, fs); if (laid.rows * fs * 1.36 <= h - 56) break; }
     const lh = fs * 1.36, top = 34 + (h - 46 - laid.rows * lh) / 2;
     lines.lineStyle(2, hex(C.sky), 0.8);
     for (let r = 0; r < laid.rows; r++) lines.lineBetween(-w / 2 + 28, top + (r + 1) * lh - 3, w / 2 - 28, top + (r + 1) * lh - 3);
     c.words = laid.items.map((p) => {
-      const t = this.add.text(-w / 2 + 36 + p.x, top + p.row * lh + lh / 2, p.word, { fontFamily: FONT.body, fontSize: fs + 'px', fontStyle: '600', color: C.ink }).setOrigin(0, 0.5);
+      const ital = /\*/.test(p.word);
+      const t = this.add.text(-w / 2 + 36 + p.x, top + p.row * lh + lh / 2, p.word.replace(/\*/g, ''), { fontFamily: FONT.body, fontSize: fs + 'px', fontStyle: ital ? 'italic 800' : '600', color: C.ink }).setOrigin(0, 0.5);
       t.setResolution(Math.min(3, Math.max(1, this.zoom || 1)));
       c.add(t); return { t, key: norm(p.word) };
     });
@@ -206,10 +210,10 @@ export default class GameScene extends ModuleScene {
   /** Greedy word wrap using measured widths. */
   flow(words, maxW, fs) {
     const probe = this.add.text(0, 0, '', { fontFamily: FONT.body, fontSize: fs + 'px', fontStyle: '600' });
-    const space = (probe.setText('a a').width - probe.setText('aa').width);
+    const space = (probe.setText('a a').width - probe.setText('aa').width) * 1.15;
     let x = 0, row = 0; const items = [];
     for (const word of words) {
-      const wd = probe.setText(word).width;
+      const wd = probe.setFontStyle(/\*/.test(word) ? 'italic 800' : '600').setText(word.replace(/\*/g, '')).width;
       if (x > 0 && x + wd > maxW) { row++; x = 0; }
       items.push({ word, x, row, w: wd }); x += wd + space;
     }
@@ -220,7 +224,8 @@ export default class GameScene extends ModuleScene {
   noteCollapsed(y) {
     const c = this.add.container(this.W / 2, y);
     const g = this.add.graphics().fillStyle(hex(PAPER), 1).fillRoundedRect(-330, 0, 660, this.L.noteH, 18).lineStyle(5, hex(PAPER_EDGE), 1).strokeRoundedRect(-330, 0, 660, this.L.noteH, 18);
-    const first = this.item.note.length > 34 ? this.item.note.slice(0, 32).replace(/\s+\S*$/, '') + '…' : this.item.note;
+    const plain = this.item.note.replace(/\*/g, '');
+    const first = plain.length > 34 ? plain.slice(0, 32).replace(/\s+\S*$/, '') + '…' : plain;
     c.add([g, this.txt(-300, this.L.noteH / 2, first, { fontSize: '26px', fontStyle: '600' }).setOrigin(0, 0.5),
       this.add.graphics().fillStyle(hex(C.sun), 1).fillRoundedRect(170, 14, 146, this.L.noteH - 28, 20).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(170, 14, 146, this.L.noteH - 28, 20),
       this.txt(243, this.L.noteH / 2 + 1, 'Read ▼', { fontSize: '24px' })]);
@@ -257,17 +262,20 @@ export default class GameScene extends ModuleScene {
   recipientStrip(y) {
     const it = this.item; const c = this.add.container(0, y);
     const g = this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(40, 0, 640, 84, 42).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(40, 0, 640, 84, 42);
-    const face = this.add.image(96, 42, `${it.recipient}-front`); const fr = face.frame; const s = 110 / fr.height;
-    face.setDisplaySize(fr.width * s, 110).setCrop(0, 0, fr.width, fr.height * 0.58).setPosition(96, 42 + 110 * 0.21);
+    const pose = REST(it.recipient), face = this.add.image(96, 42, `${it.recipient}-${pose}`); const fr = face.frame;
+    if (pose === 'front') { const s = 110 / fr.height; face.setDisplaySize(fr.width * s, 110).setCrop(0, 0, fr.width, fr.height * 0.58).setPosition(96, 42 + 110 * 0.21); }
+    else face.setDisplaySize(68 * fr.width / fr.height, 68).setPosition(96, 42);
     c.add([g, face, this.txt(150, 42, `To ${NAMES[it.recipient]}`, { fontSize: '30px' }).setOrigin(0, 0.5)]);
-    const old = it.knowsContext;
-    const label = old ? 'Old friend' : 'New friend · first day';
-    const lw = old ? 220 : 330, bx = 668 - lw;
-    c.add(this.add.graphics().fillStyle(hex(old ? C.butter : C.mint), 1).fillRoundedRect(bx, 14, lw, 56, 28).lineStyle(3, hex(C.ink), 1).strokeRoundedRect(bx, 14, lw, 56, 28));
-    const ic = this.add.graphics();
-    if (old) { ic.fillStyle(hex(C.teal), 1).fillCircle(bx + 30, 36, 9).fillCircle(bx + 46, 36, 9).fillRoundedRect(bx + 18, 46, 40, 14, 7); }
-    else { ic.fillStyle(hex(C.green), 1).fillEllipse(bx + 28, 38, 18, 11).fillEllipse(bx + 46, 34, 20, 12).fillRect(bx + 36, 38, 4, 20); }
-    c.add([ic, this.txt(bx + 64, 43, label, { fontSize: '24px', fontStyle: '800' }).setOrigin(0, 0.5)]);
+    // Tag pill: the shape and the words carry the meaning, never colour. What each tag means is taught in the how-to only.
+    const close = (TAGS[it.recipient] || it.tag) === 'Close Friend';
+    const label = close ? 'Close Friend' : 'Casual Acquaintance';
+    const lw = close ? 236 : 356, bx = 668 - lw;
+    c.add(this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(bx, 14, lw, 56, 28).lineStyle(3, hex(C.ink), 1).strokeRoundedRect(bx, 14, lw, 56, 28));
+    const ic = this.add.graphics().fillStyle(hex(C.ink), 1);
+    if (close) { // two hearts
+      for (const dx of [0, 16]) { const x = bx + 26 + dx, yy = 40; ic.fillCircle(x - 4, yy - 3, 5).fillCircle(x + 4, yy - 3, 5).fillTriangle(x - 9, yy - 1, x + 9, yy - 1, x, yy + 9); }
+    } else { ic.fillCircle(bx + 34, 32, 8).fillRoundedRect(bx + 22, 42, 24, 14, 7); } // one simple person
+    c.add([ic, this.txt(bx + 58, 43, label, { fontSize: '24px', fontStyle: '800' }).setOrigin(0, 0.5)]);
     return c;
   }
 
@@ -330,7 +338,7 @@ export default class GameScene extends ModuleScene {
       const isNew = this.item.gap && w === this.item.gap.answerTile;
       tc.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(-tw / 2, -th / 2 + 5, tw, th - 4, (th - 4) / 2)
         .fillStyle(hex(isNew ? C.mint : C.white), 1).fillRoundedRect(-tw / 2, -th / 2, tw, th - 4, (th - 4) / 2).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(-tw / 2, -th / 2, tw, th - 4, (th - 4) / 2));
-      tc.add(this.txt(0, -2, w, { fontSize: '30px' }));
+      tc.add(this.txt(0, -2, w, { fontSize: '30px', fontStyle: nicknames(this.item).includes(w.toLowerCase()) ? 'italic 800' : '800' })); // nickname tiles in italics
       tc.setAlpha(used ? 0.3 : full || !active ? 0.6 : 1);
       if (!used && active) {
         tc.setSize(tw, th).setInteractive({ useHandCursor: true });
@@ -371,17 +379,18 @@ export default class GameScene extends ModuleScene {
   openAsk() {
     if (this.phase !== 'compose' || this.asks.length >= MAX_ASKS) return;
     this.armIdle(); this.hideOverlay();
-    const v = this.view(), W = this.W, cy = this.L.trayY + 200;
+    const v = this.view(), W = this.W, top = Math.max(this.L.stripY, this.L.btnY - 780);
     const dim = this.add.rectangle(W / 2, this.H / 2, v.vw + 40, v.vh + 40, 0x0b0b0b, 0.5).setInteractive();
-    const g = this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(90, cy - 250 + 10, 540, 540, 36).fillStyle(hex(C.white), 1).fillRoundedRect(90, cy - 250, 540, 540, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(90, cy - 250, 540, 540, 36);
-    const title = this.txt(W / 2, cy - 190, 'What do you need to know?', { fontSize: '32px' });
-    const note = this.txt(W / 2, cy - 145, 'Each question costs 1 point', { fontSize: '22px', fontStyle: '600', color: C.charcoal });
+    const ph = 720;
+    const g = this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(90, top + 10, 540, ph, 36).fillStyle(hex(C.white), 1).fillRoundedRect(90, top, 540, ph, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(90, top, 540, ph, 36);
+    const title = this.txt(W / 2, top + 56, 'What do you need to know?', { fontSize: '32px' });
+    const note = this.txt(W / 2, top + 100, 'Each question costs 1 point', { fontSize: '22px', fontStyle: '600', color: C.charcoal });
     const asked = this.asks.map((a) => a.q);
-    const chips = ['when', 'where', 'bring'].map((k, i) => {
-      const b = this.btn(W / 2, cy - 60 + i * 100, `${ICON[k]}  ${QUESTIONS[k]}`, () => { this.hideOverlay(); this.ask(k); }, { w: 400, h: 84, size: 30, fill: C.butter });
+    const chips = Object.keys(QUESTIONS).map((k, i) => { // When? · Where? · Who? · What? · How many?
+      const b = this.btn(W / 2, top + 180 + i * 92, `${ICON[k] || ''}  ${QUESTIONS[k]}`, () => { this.hideOverlay(); this.ask(k); }, { w: 400, h: 78, size: 30, fill: C.butter });
       this.enable(b, !asked.includes(k)); return b;
     });
-    const cancel = this.btn(W / 2, cy + 240, 'Back', () => { this.hideOverlay(); this.trace('ask_cancel'); }, { w: 240, h: 68, size: 26, fill: C.white });
+    const cancel = this.btn(W / 2, top + ph - 60, 'Back', () => { this.hideOverlay(); this.trace('ask_cancel'); }, { w: 240, h: 68, size: 26, fill: C.white });
     this.overlay.add([dim, g, title, note, ...chips, cancel]);
     this.trace('ask_open', { turn: this.turnIdx + 1 });
   }
@@ -400,10 +409,9 @@ export default class GameScene extends ModuleScene {
       this.burst(40 + (i % 3) * (tw + 12) + tw / 2, this.L.trayY + Math.floor(i / 3) * (this.L.tileH + this.L.gap) + this.L.tileH / 2, [C.sun, C.mint, C.teal]);
       sfx.play('good');
     } else {
-      const slots = slotsFor(k, it);
       this.renderPanel();
-      if (slots.length) { this.replySlip('It’s in the note!', false); this.highlight(slots.flatMap((s) => s.accept.map(norm))); }
-      else this.replySlip('You don’t need that for this one.', false);
+      this.replySlip('It’s in the note!', false);
+      this.highlight(slotsFor(k, it).flatMap((s) => s.accept.flatMap((a) => a.split(' ').map(norm))));
       sfx.play('tick');
     }
   }
@@ -416,6 +424,19 @@ export default class GameScene extends ModuleScene {
     this.add.existing(c);
     this.tweens.add({ targets: c, alpha: 1, y: c.y - 20, duration: 220 });
     this.tweens.add({ targets: c, alpha: 0, delay: ms('reply'), duration: 300, onComplete: () => c.destroy() });
+  }
+
+  /** One-time practice hint on the first gap turn (build pack v2.1 §1). */
+  coach() {
+    if (this.ended || this.phase !== 'compose') return;
+    this.trace('coach', { turn: this.turnIdx + 1 });
+    this.bubble.removeAll(true);
+    this.bubble.add([this.add.graphics().fillStyle(hex(C.sun), 1).fillRoundedRect(-230, -40, 460, 80, 30).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(-230, -40, 460, 80, 30),
+      this.txt(0, 0, 'Something missing? Tap Ask.', { fontSize: '28px' })]);
+    this.bubble.setPosition(this.W / 2, this.L.btnY - 100).setAlpha(1).setScale(0.3);
+    this.tweens.add({ targets: this.bubble, scale: 1, duration: 300, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: this.askBtn, scale: 1.08, yoyo: true, repeat: 3, duration: 260 });
+    this.time.delayedCall(3200, () => this.tweens.add({ targets: this.bubble, alpha: 0, duration: 300, onComplete: () => this.bubble.setPosition(this.W / 2, this.L.stripY + 40) }));
   }
 
   // ---------------------------------------------------------------- idle
@@ -447,13 +468,13 @@ export default class GameScene extends ModuleScene {
       outcome = pass ? 'pass' : 'fail';
     } else {
       const res = check(words, it);
-      const rec = { turn: this.turnIdx + 1, itemId: it.id, form: it.form || 'P', recipient: it.recipient, knowsContext: it.knowsContext, gap: !!it.gap,
+      const rec = { turn: this.turnIdx + 1, itemId: it.id, form: it.form || 'P', recipient: it.recipient, tag: it.tag, known: it.known || [], gap: !!it.gap,
         words, ideal: it.ideal.length, used: words.length, pass: res === 'pass', failReason: res === 'pass' ? '' : res,
         shorthandTile: it.shorthand?.tile || '', contextTile: it.context?.tile || '', usedShorthand: !!(it.shorthand && words.includes(it.shorthand.tile)),
         asks: this.asks.slice(), ms: Math.round(performance.now() - this.turnStartAt) };
       rec.points = turnPoints(rec);
       this.cur = rec; this.turns.push(rec);
-      this.trace('comm_message', { turn: rec.turn, itemId: rec.itemId, words, ideal: rec.ideal, used: rec.used, pass: rec.pass, failReason: rec.failReason, usedShorthand: rec.usedShorthand });
+      this.trace('comm_message', { turn: rec.turn, itemId: rec.itemId, tag: rec.tag, words, ideal: rec.ideal, used: rec.used, pass: rec.pass, failReason: rec.failReason, usedShorthand: rec.usedShorthand });
       outcome = it.mixup ? 'echo' : rec.pass ? 'pass' : 'fail';
     }
     this.phase = 'send';
@@ -500,7 +521,7 @@ export default class GameScene extends ModuleScene {
     const hold = ms('react') + (this.mode === 'practice' ? 1200 / SPEED : 0);
     this.time.delayedCall(hold, () => {
       this.slip.setAlpha(0); this.notebook.setAlpha(0); this.nbText.setAlpha(0);
-      this.pose(this.noah, 'noah', 'happy'); this.pose(this.friend, it.recipient, 'front');
+      this.pose(this.noah, 'noah', 'happy'); this.pose(this.friend, it.recipient, REST(it.recipient));
       if (outcome === 'echo') { this.phase = 'fix'; this.cap = FIX_CAP; this.msg = []; this.renderPanel(); this.slideUp(); this.armIdle(); return; }
       this.endTurn();
     });
@@ -541,7 +562,7 @@ export default class GameScene extends ModuleScene {
     const s = score({ turns, idleNudges: this.idleNudges || 0, timedOut: !!this.timedOut, restartedAfterSetback: !!this.restarted, nTurns: (this.items || []).length || 10 });
     return {
       ...s,
-      form: this.form || '', itemIds: (this.items || []).map((x) => x.id).join(' '), turnsPlayed: turns.length, idleNudges: this.idleNudges || 0,
+      itemBankVersion: ITEM_BANK_VERSION, form: this.form || '', itemIds: (this.items || []).map((x) => x.id).join(' '), turnsPlayed: turns.length, idleNudges: this.idleNudges || 0,
       // raw turns for re-scoring later: [turn, itemId, message, pass, failReason, asks (q+ right / q- other), points, fix (+ passed / - not)]
       turnLog: turns.map((t) => [t.turn, t.itemId, t.words.join(' '), t.pass ? 1 : 0, t.failReason, t.asks.map((a) => a.q + (a.correct ? '+' : '-')).join(','), t.points,
         t.fix ? t.fix.words.join(' ') + (t.fix.pass ? ' +' : ' -') : '', t.ms]),

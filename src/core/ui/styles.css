@@ -104,6 +104,27 @@ html, body { margin: 0; height: 100%; background: var(--cream); }
 .tn-modal .tn-card { margin: 0; animation: tn-pop .35s cubic-bezier(.2,1.4,.4,1); }
 .tn-howto__art { height: 150px; border-radius: 16px; background: var(--butter); border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; overflow: hidden; font-size: 64px; }
 .tn-howto__art img { max-height: 140px; }
+.tn-howto__art--demo { height: auto; min-height: 150px; display: block; padding: 10px; font-size: 15px; background: var(--cream); }
+.tn-demo { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.tn-demo__note { background: #FDFAE2; border: 2px solid #6E2415; border-radius: 12px; padding: 8px 10px; font-weight: 600; line-height: 1.35; }
+.tn-demo__note em, .tn-demo__msg em, .tn-tile em { font-style: italic; font-weight: 800; }
+.tn-demo__tag { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.tn-demo__tag img { width: 36px; height: 36px; object-fit: cover; object-position: top; border-radius: 50%; border: 2px solid var(--ink); background: var(--butter); }
+.tn-tag { margin-left: auto; padding: 3px 10px; border: 2px solid var(--ink); border-radius: 999px; background: var(--white); font-size: 13px; }
+.tn-demo__bar { min-height: 42px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border: 2px solid var(--ink); border-radius: 12px; background: var(--white); }
+.tn-demo__tiles, .tn-demo__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tn-tile { font: 700 15px/1 var(--font-body); min-height: 40px; padding: 0 12px; border: 2px solid var(--ink); border-radius: 999px; background: var(--white); color: var(--ink); cursor: pointer; }
+.tn-tile--on { background: var(--sun); }
+.tn-tile.is-used { opacity: .3; }
+.tn-tile.is-hint { animation: tn-hint 1.4s ease-in-out infinite; }
+@keyframes tn-hint { 50% { box-shadow: 0 0 0 4px var(--sun); } }
+.tn-demo__score { margin-left: auto; font-weight: 900; }
+.tn-demo__res { display: flex; flex-direction: column; gap: 4px; }
+.tn-demo__row { display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+.tn-demo__row small { color: var(--charcoal); margin-left: auto; white-space: nowrap; }
+.tn-demo__msg { font-weight: 700; }
+.tn-ok { color: var(--green); font-weight: 900; } .tn-bad { color: var(--red); font-weight: 900; }
+.tn-demo__reply { min-height: 22px; font-weight: 800; opacity: 0; transition: opacity .2s; } .tn-demo__reply.is-on { opacity: 1; }
 @keyframes tn-fade { from { opacity: 0; } }
 
 /* Post-game */

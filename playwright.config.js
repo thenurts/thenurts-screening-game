@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 const exe = existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined;
 export default defineConfig({
   testDir: 'tests',
+  testMatch: '**/*.spec.js', // unit tests (*.unit.test.mjs) run with npm run test:unit
   timeout: 180_000,
   use: { baseURL: 'http://localhost:4173', launchOptions: exe ? { executablePath: exe } : {} },
   // LIVE=1 also starts the Apps Script harness; build first with VITE_API_URL=http://localhost:8787
