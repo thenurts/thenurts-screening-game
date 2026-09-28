@@ -159,6 +159,15 @@ export default class GameScene extends ModuleScene {
   awaitChoice() {
     this.choiceAt = performance.now();
     this.setButtons(true);
+    // Practice = learn by doing (standard #19d): the first two choices are guided, one button at a time
+    this.guideText?.destroy(); this.guideText = null;
+    const g = this.mode === 'practice' ? (this.guide ?? 0) : 2;
+    if (g < 2) {
+      const want = g === 0 ? this.dipBtn : this.keepBtn, other = want === this.dipBtn ? this.keepBtn : this.dipBtn;
+      other.setAlpha(0.3).disableInteractive();
+      this.guideText = this.txt(360, 1030, g === 0 ? '👉 Tap Dip to draw one more sweet' : '👉 Now tap Keep to put the tray in your jar', { fontSize: '30px', stroke: C.white, strokeThickness: 8 }).setDepth(60);
+      this.tweens.add({ targets: want, scale: { from: 1, to: 1.06 }, yoyo: true, repeat: -1, duration: 420 });
+    }
     this.idleTimer = this.time.delayedCall(IDLE_MS, () => this.nudge());
   }
 
@@ -174,6 +183,7 @@ export default class GameScene extends ModuleScene {
 
   choose(choice) {
     if (this.locked || !this.running) return;
+    if (this.mode === 'practice' && (this.guide ?? 0) < 2) { this.guide = (this.guide ?? 0) + 1; this.tweens.killTweensOf([this.keepBtn, this.dipBtn]); this.keepBtn.setScale(1); this.dipBtn.setScale(1); this.guideText?.destroy(); this.guideText = null; }
     this.setButtons(false); this.clearIdle();
     const b = this.cur; const t = Math.round(performance.now() - this.choiceAt);
     this.idleMs = (this.idleMs || 0) + Math.max(0, t - IDLE_MS); // time past the "Still there?" point (no cap: logged only)
@@ -217,6 +227,8 @@ export default class GameScene extends ModuleScene {
     this.trayItems.list.forEach((s) => this.tweens.add({ targets: s, alpha: 0, y: s.y + 30, duration: ms('spoil') * 0.6 }));
     this.tweens.add({ targets: chilliImg, alpha: 0, scale: chilliImg.scale * 1.4, delay: ms('spoil') * 0.5, duration: ms('spoil') * 0.4, onComplete: () => chilliImg.destroy() });
     this.setTray(0, true);
+    const lost = trayValue(b, Math.max(0, b.k - 1));
+    if (lost > 0) this.floatText(250, 800, `−${lost} spoiled`, C.red); // visible consequence (standard #19e)
     this.tweens.add({ targets: this.bag, x: -260, angle: -12, delay: ms('spoil') * 0.5, duration: ms('spoil') * 0.5, ease: 'Back.easeIn' });
     if (!this.hadChilli && this.mode === 'real') { this.hadChilli = true; this.pendingSetback = performance.now() + ms('spoil'); } // first chilli = the setback
     this.time.delayedCall(ms('spoil'), () => { this.trayItems.removeAll(true); this.nextBag(); });
@@ -311,5 +323,18 @@ export default class GameScene extends ModuleScene {
       decisions: (this.decisions || []).map((d) => [d.bag, d.stake === 'gold' ? 'G' : 'N', d.k, d.choice === 'dip' ? 1 : 0, d.ms]),
       bagLog: (this.bags || []).map((b) => [b.bag, b.stake[0].toUpperCase(), b.dips, b.endedBy[0], b.points]),
     };
+  }
+
+  // ---------------------------------------------------------------- how-to screenshots (standard #19b)
+  stageHowTo(n) {
+    this.clearCallouts(); this.bubble.setAlpha(0); this.guideText?.destroy(); this.tweens.killTweensOf([this.keepBtn, this.dipBtn]); this.keepBtn.setScale(1); this.dipBtn.setScale(1);
+    if (n === 0) { this.callout(560, 860, 120, 'your jar: fill it up', 520, 700); this.callout(250, 900, 120, 'this bag’s tray', 250, 1030);
+      return { x: 0, y: 150, w: 720, h: 900 }; }
+    if (n === 1) { this.callout(this.keepBtn.x, this.keepBtn.y, 100, this.keepLeft ? 'Keep: tray → jar' : 'Keep: tray → jar', this.keepBtn.x, 1010);
+      this.callout(this.dipBtn.x, this.dipBtn.y, 100, 'Dip: draw one more', this.dipBtn.x, 1010);
+      return [{ x: 0, y: 760, w: 720, h: 230 }, { x: 0, y: 960, w: 720, h: 250 }]; }
+    if (n === 2) { this.callout(this.strip.x, this.strip.y, 150, 'left in the bag: sweets + 1 chilli', 360, 250); this.callout(this.ladder.x, this.ladder.y, 150, 'what the tray is worth next', 360, 520);
+      return { x: 0, y: 190, w: 720, h: 380 }; }
+    return null;
   }
 }

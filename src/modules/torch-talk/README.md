@@ -38,3 +38,8 @@ Each of 10 turns: read Noah's note → tap words (18-tile tray, each used once; 
 8. `idleMs` = time spent past the 20 s nudge point with no input, summed over the round.
 9. Message-bar words are under 48 CSS px on phones (up to 10 words must fit); the tray, Ask and Send meet 48 px.
 10. Raj and Amira use their `happy` bust as the resting pose (they have no full-body art).
+
+## Update 13 (requests #19–21, 2026-09-28)
+- How-to cards are now screenshots of the real UI with callouts (card 1 states the goal); the **?** in play is the suite-wide one (core HUD) and reopens both cards.
+- Learning (request #20): `learn = {firstUse, noRepeat, pickup}` in metrics; `learn_probe` traced on slots 4 (nickname to a Casual Acquaintance), 5 (first missing-info turn) and 10 (who-does-what / order).
+- Creativity (request #21): `paraphraseRate` = passing messages that use at least one word not in the note ÷ passing messages (logged only).

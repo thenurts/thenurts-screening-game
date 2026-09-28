@@ -1,4 +1,8 @@
 // Fair Board · critical thinking (Zoey). Brief: ./README.md · build pack: 11-game-concepts.md (CT2 v1)
+import h0 from './assets/howto-0.webp';
+import h1 from './assets/howto-1.webp';
+import h2 from './assets/howto-2.webp';
+
 export default {
   id: 'fair-board',
   version: 2, // v1.1 patch: the button says Disagree (stored response stays 'doubt')
@@ -11,10 +15,11 @@ export default {
   logEvents: [], // v1.8 policy: fb_claim and fb_bump_next go to the round trace + the claim log in metrics
   // Staff-only values copied to the Candidate Summary (never shown to the player)
   summaryKeys: ['fbScore', 'correct', 'claimAccuracy', 'checkCalibration', 'cueSway', 'postBumpDelta', 'form', 'flags'],
+  // Suite standard #19: goal first, real-UI screenshots with callouts (node tools/make-howto-shots.mjs fair-board), explicit controls
   howTo: [
-    { title: 'Read the board', body: 'Everyone at the fair is quoting the noticeboard. Are they right?', icon: '📌' },
-    { title: 'Only if the board shows it', body: 'Agree only if the board shows it. If the board doesn’t say why, disagree with “because…”.', icon: '✅' },
-    { title: 'No rush. Check it', body: 'Tap Check to zoom in. “Next to” means side by side, not corner to corner.', icon: '🔍' },
+    { title: 'Your goal', body: 'People at the fair keep quoting the noticeboard. Tap Agree if the board shows it’s true, Disagree if not. Get as many right as you can.', shot: h0 },
+    { title: 'Only if the board shows it', body: 'Agree only if the board shows it. If the board doesn’t say why, disagree with “because…”.', shot: h1 },
+    { title: 'No rush. Check it', body: 'Tap Check to zoom in on the board. It’s free. “Next to” means side by side, not corner to corner.', shot: h2 },
   ],
   practice: { durationSec: null, showTimer: false, scored: false }, // 3 claims with feedback
   round: { durationSec: null, showTimer: false }, // 24 claims, no timer (idle time is logged as idleMs)

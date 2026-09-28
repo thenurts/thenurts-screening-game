@@ -30,3 +30,6 @@ Raw decisions are `[bag, N|G, k = player dips so far (0–3), 0 keep | 1 dip, ms
 5. `lucky-dip-balance-check.py` v2 wasn't in the project, so the balance rules were ported from build pack §3/§9 into `rules.js` and `tests/lucky-dip.unit.test.mjs` (sequence A reproduces the pack's 685 / 300 / 6.7% figures exactly).
 
 **Hooks:** resilience = behaviour after the player's first chilli (`setback_next`, `none` if they never meet one, plus quits/abandons in Rounds); learning = practice → real (derived later).
+
+## Update 13 (suite how-to standard #19, 2026-09-28)
+Card 1 now states the goal; all 3 cards are real-UI screenshots with callouts. Practice starts with 2 guided choices (only Dip, then only Keep, is tappable, with a 👉 prompt), then plays freely. A spoiled tray shows "−N spoiled". The **?** in play reopens the cards. The real round is unchanged (version stays 3, so benchmarks carry on).

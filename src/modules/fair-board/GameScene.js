@@ -23,6 +23,9 @@ const ICONS = { gate: '🚪', lemonade: '🍋', tent: '⛺', cakes: '🧁', stag
   hut: '🛖', juice: '🧃', stickers: '⭐', cookies: '🍪', seeds: '🌻', lawn: '🌿', gym: '🏀' };
 const TILE = { gate: C.mint, stage: C.lilac, hall: C.sky, gym: C.sky, field: C.mint, lawn: C.mint, tent: C.butter, hut: C.butter };
 
+/** The latest practice on this page (the real round carries tutorialStruggle when ≥ 2 of the 3 claims needed the fail-safe). */
+export const practiceMemo = { done: false, failSafes: 0 };
+
 export default class GameScene extends ModuleScene {
   preload() {
     if (!this.textures.exists('fb-cork')) this.load.image('fb-cork', corkUrl);
@@ -44,6 +47,7 @@ export default class GameScene extends ModuleScene {
     this.form = pickForm({ mode: this.mode, runNo: this.runNo, attemptNo: this.attemptNo, form: this.options.form });
     this.repeatAttempt = this.mode === 'real' && Number(this.runNo || 1) <= 1 && this.attemptNo > 1;
     this.setupContent();
+    this.ptries = {}; this.pFailSafes = 0; this.failSafeFor = null;
     this.log = []; this.idx = -1; this.locked = true; this.idleNudges = 0; this.idleMs = 0; this.rowOrder = [0, 1, 2, 3, 4];
 
     this.counter = this.pill(W / 2, 64, 250, this.form === 'P' ? `Practice 1 / ${this.claims.length}` : `Claim 1 / ${this.claims.length}`);
@@ -299,6 +303,12 @@ export default class GameScene extends ModuleScene {
     sfx.play('pop');
     this.shownAt = this.elapsed;
     this.setButtons(true);
+    if (this.form === 'P' && this.failSafeFor === c.n) { // fail-safe: only the right answer is available
+      const right = c.truth === 'sound' ? this.agreeBtn : this.doubtBtn, other = right === this.agreeBtn ? this.doubtBtn : this.agreeBtn;
+      other.setAlpha(0.3).disableInteractive();
+      this.tweens.add({ targets: right, scale: { from: 1, to: 1.08 }, yoyo: true, repeat: 5, duration: 240, onComplete: () => right.setScale(1) });
+      this.say('zoey', 'happy', `${c.feedback} Tap ${right === this.agreeBtn ? 'Agree' : 'Disagree'}.`, 4000);
+    }
     this.armIdle();
   }
 
@@ -393,6 +403,7 @@ export default class GameScene extends ModuleScene {
     sfx.play('click');
     this.tweens.add({ targets: this.claimC, alpha: 0, x: -30, duration: ms('claimIn') * 0.8 });
     if (this.form === 'P') return this.practiceFeedback(entry);
+    this.floatText(this.W / 2, 150, '✓ answer saved', C.charcoal); // visible consequence, no right/wrong feedback (by design)
     if (this.setbackAfter && c.n === this.setbackAfter) return this.time.delayedCall(ms('claimIn'), () => this.bump());
     this.time.delayedCall(ms('claimIn'), () => this.next());
   }
@@ -406,9 +417,14 @@ export default class GameScene extends ModuleScene {
     const av = this.add.container(110, y0 + 90); this.makeAvatar(av, 'zoey', ok ? 'excited' : 'worried', 62); c.add(av);
     c.add(this.txt(200, y0 + 56, ok ? '✓ Right!' : '✗ Not quite.', { fontSize: '40px', align: 'left' }).setOrigin(0, 0.5));
     c.add(this.txt(200, y0 + 140, this.claim.feedback || '', { fontSize: '28px', fontStyle: '700', align: 'left', wordWrap: { width: 460 } }).setOrigin(0, 0.5));
-    const nb = this.btn(this.W / 2, y0 + 240, this.idx + 1 >= this.claims.length ? 'Finish' : 'Next', () => { this.waitingNext = null; c.destroy(true); this.next(); }, { w: 300, h: 96, size: 34 });
+    // learn by doing (standard #19d): a wrong answer is retried; after 2 wrong tries the right button is shown
+    const n = this.claim.n, tries = (this.ptries[n] = (this.ptries[n] || 0) + 1);
+    const again = () => { this.waitingNext = null; c.destroy(true); this.log.pop(); this.idx--; if (tries >= 2) { this.failSafeFor = n; this.pFailSafes++; } this.next(); };
+    const go = ok ? () => { this.waitingNext = null; c.destroy(true); this.next(); } : again;
+    const nb = this.btn(this.W / 2, y0 + 240, ok ? (this.idx + 1 >= this.claims.length ? 'Finish' : 'Next') : 'Try again', go, { w: 300, h: 96, size: 34 });
     c.add(nb);
-    this.waitingNext = () => { this.waitingNext = null; c.destroy(true); this.next(); }; // test hook
+    this.trace('fb_tutorial', { n, tries, ok });
+    this.waitingNext = go; // test hook
     c.setAlpha(0); this.tweens.add({ targets: c, alpha: 1, duration: 200 });
   }
 
@@ -428,7 +444,7 @@ export default class GameScene extends ModuleScene {
   end() {
     this.claim = null;
     this.setButtons(false);
-    if (this.form === 'P') return this.finish(this.metrics());
+    if (this.form === 'P') { Object.assign(practiceMemo, { done: true, failSafes: this.pFailSafes }); return this.finish(this.metrics()); }
     const m = this.metrics();
     this.trace('fb_recap', { correct: m.correct });
     const c = this.add.container(0, 0).setDepth(950);
@@ -458,7 +474,32 @@ export default class GameScene extends ModuleScene {
       claimLog: log.map((e) => [e.n, e.id, e.response === 'agree' ? 'A' : 'D', e.checks, e.ms, isCorrect(e) ? 1 : 0]),
       bumpNextMs: this.bumpNextMs ?? '', idleNudges: this.idleNudges || 0, idleMs: Math.round(this.idleMs || 0),
       repeatAttempt: !!this.repeatAttempt,
-      flags: [s.flags, this.repeatAttempt ? 'repeatAttempt' : ''].filter(Boolean).join(','),
+      practiceFailSafes: this.form === 'P' ? this.pFailSafes : practiceMemo.done ? practiceMemo.failSafes : '',
+      flags: [s.flags, this.repeatAttempt ? 'repeatAttempt' : '', (this.form === 'P' ? this.pFailSafes : practiceMemo.failSafes) >= 2 ? 'tutorialStruggle' : ''].filter(Boolean).join(','),
     };
+  }
+
+  // ---------------------------------------------------------------- how-to screenshots (standard #19b)
+  stageClaim(k) {
+    const c = this.claims[k]; this.idx = k; this.claim = c; this.checks = 0; this.clearCheck(true);
+    if (c.board !== this.board) this.showBoard(c.board, true);
+    this.makeAvatar(this.avatar, c.source); this.nameText.setText(NAMES[c.source] || ''); this.claimText.setText(c.text);
+    this.claimC.setAlpha(1).setX(0); this.setButtons(true);
+  }
+  stageHowTo(n) {
+    this.clearCallouts(); this.coach.setAlpha(0);
+    if (n === 0) { this.stageClaim(0);
+      this.callout(R.x + R.w / 2, R.y + 300, 120, 'the noticeboard', 360, R.y + 150);
+      this.callout(440, L.claimY + L.claimH / 2, 100, 'someone’s claim', 440, L.claimY - 30);
+      this.callout(360, L.btnY, 90, 'Agree or Disagree', 360, L.btnY - 110);
+      return [{ x: 0, y: R.y - 10, w: 720, h: 420 }, { x: 0, y: L.claimY - 70, w: 720, h: L.btnY - L.claimY + 140 }]; }
+    if (n === 1) { const k = this.claims.findIndex((c) => c.type === 'because'); this.stageClaim(k);
+      this.callout(440, L.claimY + L.claimH / 2, 110, '“because…”: does the board say why?', 400, L.claimY - 36);
+      this.callout(this.doubtBtn.x, L.btnY, 80, 'if not: Disagree', 480, L.btnY - 100);
+      return [{ x: 0, y: R.y - 10, w: 720, h: 420 }, { x: 0, y: L.claimY - 80, w: 720, h: L.btnY - L.claimY + 150 }]; }
+    if (n === 2) { const k = this.claims.findIndex((c) => c.board === 'sales' && c.type === 'value'); this.stageClaim(k); this.check(); this.checkTimer?.remove();
+      this.callout(this.checkBtn.x, this.checkBtn.y, 70, 'Check: zooms in, no cost', 360, this.checkBtn.y - 90);
+      return [{ x: 0, y: R.y - 10, w: 720, h: R.h + 20 }, { x: 0, y: this.checkBtn.y - 140, w: 720, h: 200 }]; }
+    return null;
   }
 }

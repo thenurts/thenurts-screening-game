@@ -1,4 +1,4 @@
-// The Nurts Mamak rules: a line-by-line port of tests/mamak-reference.py (build pack O1 v1.1). act(), metrics() and
+// The Nurts Mamak rules: a line-by-line port of tests/mamak-reference.py (build pack O1 v1.2). act(), metrics() and
 // orgScore() must match the reference exactly (tests/fixtures/mamak-parity.json, exported by tools/mk_parity_fixture.py).
 // Time is a wall clock that moves one minute per action (tick n = 7:(n-1) pm). There is no real-time timer anywhere.
 
@@ -35,14 +35,14 @@ const STREAM_B = [
   [22, 'o13', 'murtabak', 6, 'noah'], [25, 'o14', 'mee', 5, 'mia'], [28, 'o15', 'murtabak', 6, 'zoey'], [29, 'o16', 'kopi', 4, 'zoey'],
   [29, 'o17', 'kopi', 5, 'amira'], [31, 'o18', 'roti', 6, 'amira'],
 ];
-const PARKED = { id: 'tapau', item: 'roti', announce: 10, window: [21, 24], late: [25, 29], customer: 'amira' }; // tick 21 = 7:20
-const SETBACK = { tick: 18, station: 'griddle', ticks: 3 }; // the gas runs out: griddle off 7:17–7:19
+const PARKED = { id: 'tapau', item: 'roti', announce: 10, arrive: 21, waits: 3, customer: 'amira' }; // back at 7:20 (tick 21), collects automatically, waits to 7:23
+const SETBACK = { tick: 18, station: 'griddle', ticks: 3, noticeFrom: 13 }; // announced from 7:12: griddle off 7:17–7:19
 export const W = { valueDone: 0.30, expiredHigh: 0.20, halfDone: 0.20, parkedReturn: 0.15, errorsUnderLoad: 0.15 };
-export const VALUE_REF = 0.80; // o1.valueRef
+export const BEST_STARS = { A: 27, B: 27 }; // o1.bestStars: the best known plan per form (demand 33 ★ > capacity)
 
 export const FORMS = {
-  A: { stream: STREAM_A, parked: PARKED, setback: SETBACK, ticks: 36 },
-  B: { stream: STREAM_B, parked: PARKED, setback: SETBACK, ticks: 36 },
+  A: { stream: STREAM_A, parked: PARKED, setback: SETBACK, ticks: 36, bestStars: BEST_STARS.A },
+  B: { stream: STREAM_B, parked: PARKED, setback: SETBACK, ticks: 36, bestStars: BEST_STARS.B },
 };
 
 /** Python's round(x, n) (halves to even on exact ties), so metrics match the reference exactly. */
@@ -75,13 +75,11 @@ export function nextStation(st, id) {
   if (id === 'tapau') { const P = st.cfg.parked; return st.tapau.steps < MENU[P.item][2].length ? MENU[P.item][2][st.tapau.steps] : null; }
   const o = st.orders.get(id); return MENU[o.item][2][o.step];
 }
-/** One action = one minute. target: an order id, 'tapau', 'handover', or null (Wait). Returns the log entry. */
+/** One action = one minute. target: an order id, 'tapau' (cook a step of the parked order), or null (Wait). Returns the log entry. */
 export function act(st, target, station) {
   const load = active(st).length, P = st.cfg.parked;
   let ok = false;
-  if (target === 'handover') {
-    if (P && st.tapau.steps >= MENU[P.item][2].length && st.tapau.handed === null) { st.tapau.handed = st.tick; ok = true; }
-  } else if (target === 'tapau') {
+  if (target === 'tapau') {
     const steps = MENU[P.item][2], need = st.tapau.steps < steps.length ? steps[st.tapau.steps] : null;
     if (need && station === need && !blocked(st, station) && st.tick >= P.announce) { st.tapau.steps++; ok = true; }
     else if (need && station !== need) st.errors.push([st.tick, load]);
@@ -94,32 +92,37 @@ export function act(st, target, station) {
   }
   const entry = [st.tick, target ?? null, station ?? null, ok, load];
   st.log.push(entry);
-  st.tick++; expire(st); arrive(st);
+  st.tick++; expire(st); arrive(st); collect(st);
   return entry;
+}
+/** The customer collects the tapau herself: at `arrive` if it's ready, or the moment it's finished while she waits. */
+function collect(st) {
+  const P = st.cfg.parked, t = st.tapau;
+  if (P && t.handed === null && t.steps >= MENU[P.item][2].length && P.arrive <= st.tick && st.tick <= P.arrive + P.waits) t.handed = st.tick;
 }
 export const shiftOver = (st) => st.tick > st.cfg.ticks;
 
 export function metrics(st) {
   const P = st.cfg.parked, pStars = P ? MENU[P.item][1] : 0;
-  const allv = st.cfg.stream.reduce((a, [, , i]) => a + MENU[i][1], 0) + pStars;
   const val = st.done.reduce((a, id) => a + st.orders.get(id).stars, 0) + (st.tapau.handed ? pStars : 0);
+  const best = st.cfg.bestStars;
   const orders = [...st.orders.values()];
   const threes = orders.filter((o) => o.stars === 3);
   const expHi = threes.filter((o) => o.status === 'expired').length / Math.max(1, threes.length);
   const started = orders.filter((o) => st.started.has(o.id));
   const half = started.filter((o) => o.status !== 'done').length / Math.max(1, started.length);
   const h = st.tapau.handed;
-  const parked = P && h && P.window[0] <= h && h <= P.window[1] ? 1.0 : P && h && h <= P.late[1] ? 0.5 : 0.0;
+  const parked = P && h === P.arrive ? 1.0 : h ? 0.5 : 0.0; // ready when she arrived / finished while she waited / she left
   const hi = st.log.filter((e) => e[4] >= 3), errHi = st.errors.filter((e) => e[1] >= 3).length / Math.max(1, hi.length);
-  return { valueDone: pyRound(val / allv, 3), expiredHigh: pyRound(expHi, 3), halfDone: pyRound(half, 3), parkedReturn: parked, errorsUnderLoad: pyRound(errHi, 3) };
+  return { starsServed: val, bestPossible: best, valueShare: pyRound(Math.min(1.0, val / best), 3), expiredHigh: pyRound(expHi, 3), halfDone: pyRound(half, 3), parkedReturn: parked, errorsUnderLoad: pyRound(errHi, 3) };
 }
 export function orgScore(m) {
-  return pyRound(100 * (W.valueDone * Math.min(1, m.valueDone / VALUE_REF) + W.expiredHigh * (1 - m.expiredHigh) +
+  return pyRound(100 * (W.valueDone * m.valueShare + W.expiredHigh * (1 - m.expiredHigh) +
     W.halfDone * (1 - m.halfDone) + W.parkedReturn * m.parkedReturn + W.errorsUnderLoad * (1 - Math.min(1, m.errorsUnderLoad * 4))), 1);
 }
 /** Facet sub-scores (0–100): planning = the first three terms re-weighted; under pressure = the last two. */
 export function facets(m) {
-  const plan = (W.valueDone * Math.min(1, m.valueDone / VALUE_REF) + W.expiredHigh * (1 - m.expiredHigh) + W.halfDone * (1 - m.halfDone)) / (W.valueDone + W.expiredHigh + W.halfDone);
+  const plan = (W.valueDone * m.valueShare + W.expiredHigh * (1 - m.expiredHigh) + W.halfDone * (1 - m.halfDone)) / (W.valueDone + W.expiredHigh + W.halfDone);
   const press = (W.parkedReturn * m.parkedReturn + W.errorsUnderLoad * (1 - Math.min(1, m.errorsUnderLoad * 4))) / (W.parkedReturn + W.errorsUnderLoad);
   return { planScore: pyRound(100 * plan, 1), pressureScore: pyRound(100 * press, 1) };
 }
@@ -127,10 +130,9 @@ export function facets(m) {
 /** The reference's "careful" bot (for tests and automated play): finish started work, then value per step, then deadline. */
 export function careful(st) {
   const t = st.tick, P = st.cfg.parked, pSteps = P ? MENU[P.item][2].length : 0;
-  if (P && st.tapau.steps >= pSteps && st.tapau.handed === null && t >= P.window[0]) return ['handover', null];
   let cands = active(st).filter((o) => !blocked(st, nextStation(st, o.id)));
   const tapLeft = P ? pSteps - st.tapau.steps : 0;
-  if (P && t >= P.announce && tapLeft && P.window[0] - t <= tapLeft + 2 && !blocked(st, nextStation(st, 'tapau'))) return ['tapau', nextStation(st, 'tapau')];
+  if (P && t >= P.announce && tapLeft && P.arrive - t <= tapLeft + 2 && !blocked(st, nextStation(st, 'tapau'))) return ['tapau', nextStation(st, 'tapau')];
   cands = cands.filter((o) => o.due - t + 1 >= MENU[o.item][2].length - o.step);
   if (!cands.length) {
     if (tapLeft && t >= P.announce && !blocked(st, nextStation(st, 'tapau'))) return ['tapau', nextStation(st, 'tapau')];

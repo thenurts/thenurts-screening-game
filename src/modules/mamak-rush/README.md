@@ -1,4 +1,4 @@
-# The Nurts Mamak (`mamak-rush`) · v1 (build pack O1 v1.1) · built 2026-09-28
+# The Nurts Mamak (`mamak-rush`) · v2 (build pack O1 v1.2) · built 2026-09-28
 
 **Trait:** `organisation` (MIB 0–100), both facets: **planning** (valueDone, expiredHigh, halfDone) and **under pressure** (parkedReturn, errorsUnderLoad). Passive: `resilience` (the gas runs out), `learning` (practice → real). **Host:** Liam at the counter. **Customers:** Mia, Noah, Zoey, Raj, Amira (existing busts).
 **Source:** Game Ideas build pack O1 v1.1 (`11-game-concepts.md`) + `mamak-reference.py` (copied to `tests/mamak-reference.py`, minus its unreachable lines after `sys.exit`).
@@ -35,3 +35,13 @@ A 7:00–7:36 pm shift on a wall clock that moves **one minute per action** and 
 4. The hand-over is accepted only at 7:20–7:28 in the UI (the reference also accepts early hand-overs and scores them 0.5); nothing else differs, so the parity fixture still holds.
 5. The practice's pre-game message counts completed steps as ★ ("You got 3 ★").
 6. Open questions answered with the recommended defaults: no extra "uncle" customer; keep the short Manglish lines ("Boss, one roti canai tapau!").
+
+## v2 changes (build pack O1 v1.2, requests #18–20, 2026-09-28)
+- **No hand-over tap (it was a UI trap).** Amira's tapau ticket sits in a **Later** tray from 7:09 and is cooked like any order. At 7:20 she collects it automatically if it's ready; otherwise she waits (⏳ 3 min) and collects it the moment it's finished; at 7:23 she leaves. `parkedReturn` = ready on arrival 1 · finished while she waited 0.5 · she left 0.
+- **The gas outage is announced** from 7:12 on the notice bar ("⚠ Gas runs out 7:17–7:19 · griddle off") with a countdown badge on the Griddle.
+- **Score vs best possible:** `valueShare` = ★ served ÷ 27 (`o1.bestStars`); the HUD shows "★ 12 / 27" and the end card "You served 21 ★ of a possible 27 ★" + the missed orders. Careful plan 98.9 (26 ★).
+- **How-to v2:** 6 cards, each a screenshot of the real UI with callouts (`node tools/make-howto-shots.mjs mamak-rush`); **?** in play reopens cards 2–6.
+- **UI clarity kit:** the selected card glows and lifts (others dim); "1 min" floats from the station on a valid step; a wrong station shakes the card and shows a red "−1 min" (the right station is not revealed); "+★★★" flies to the counter; ⏳ ≤ 2 min turns amber with "!" and a pulse; a customer who leaves shows "−★★★ missed"; "Wait 1 min"; tapping a station with nothing selected says "Pick an order first" and uses no minute.
+- **Manglish bubbles** from a seeded line bank (`lines.js`), flavour only.
+- **Learning evidence (request #20):** `learn = {firstUse, noRepeat, trapPairs, pickup, probes}` in metrics; probes are also traced as `learn_probe {probe: "firstUse:<rule>", pass}` (valueFirst, tapauReady, gasPlanned, steps:<dish>); `o1_action` now carries `{item, stepIndex, wrong}`.
+- Deviation 4 above (early hand-over) no longer applies.

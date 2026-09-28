@@ -36,3 +36,6 @@ A corkboard (Adrian's background, nine-sliced so the frame, bunting and grass ke
 4. On wide screens the corkboard stays 720 units wide on a wooden wall rather than stretching.
 5. The bump uses one fixed row order for everyone (the pack says "same for everyone" but doesn't give the order).
 6. Open question kept: the teacher is a chalkboard icon for now.
+
+## Update 13 (suite how-to standard #19, 2026-09-28)
+Card 1 now states the goal; all 3 cards are real-UI screenshots with callouts. Practice: a wrong answer shows the feedback and "Try again" on the same claim; after 2 wrong tries only the right button is available (fail-safe, logged `fb_tutorial`). ≥ 2 fail-safes → `tutorialStruggle` in the real round's flags. The real round shows a neutral "✓ answer saved" after each answer (still no right/wrong feedback). The **?** in play reopens the cards.

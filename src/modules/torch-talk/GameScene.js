@@ -28,6 +28,27 @@ const ICON = { when: '🕒', where: '📍', who: '👤', what: '📦', howmany: 
 const REST = (who) => (who === 'raj' || who === 'amira' ? 'happy' : 'front');
 const HELP = '✂ Short   🎯 Say what to do   👤 Who’s reading?   ❓ Ask';
 const FAIL_TEXT = { missing: 'Hmm, something’s missing.', breaker: 'That’s not what the note says!', negated: 'That says the opposite!', order: 'The words are in a confusing order.', bind: 'Who does what? It’s mixed up.', between: 'The words are in a confusing order.' };
+/** Words in the note (italics markers and punctuation stripped), for the paraphrase signal. */
+const noteWords = (it) => new Set(it.note.replace(/\*/g, '').split(/\s+/).map((w) => norm(w)).filter(Boolean));
+/** Learning parts from Torch Talk (request #20): first-use probes, repeat errors, tutorial pickup. Counts only, no scores. */
+export function learnParts(turns, memo) {
+  const probes = turns.filter((t) => t.probe);
+  const cat = (t) => (t.failReason === 'missing' && t.contextTile && t.tag === 'Casual Acquaintance' && t.words.includes(t.contextTile) ? 'nickname'
+    : ['order', 'bind', 'between'].includes(t.failReason) ? 'order' : t.failReason);
+  let could = 0, repeats = 0;
+  turns.forEach((t, i) => {
+    if (t.pass) return;
+    const c = cat(t), later = turns.slice(i + 1).filter((u) => (c === 'nickname' ? u.contextTile && u.tag === 'Casual Acquaintance' : true));
+    if (!later.length) return;
+    could++; if (later.some((u) => !u.pass && cat(u) === c)) repeats++;
+  });
+  const steps = memo?.done ? memo.steps || [] : [];
+  return {
+    firstUse: [probes.filter((t) => t.pass).length, probes.length],
+    noRepeat: [repeats, could],
+    pickup: steps.length ? [steps.reduce((a, x) => a + (x.failSafe ? 2 : Math.min(2, x.tries - 1)), 0), steps.length * 2] : null,
+  };
+}
 const norm = (w) => w.replace(/[^A-Za-z0-9'’\-é]/g, '').replace('’', "'").toLowerCase();
 
 export default class GameScene extends ModuleScene {
@@ -49,7 +70,6 @@ export default class GameScene extends ModuleScene {
     this.tut = this.mode === 'practice'; // how-to v3: practice = the try-it steps
     this.turnPill = this.pill(215, 64, 200, this.tut ? 'Step 1 / 5' : 'Turn 0 / 10');
     this.scorePill = this.pill(420, 64, 180, 'Score 0');
-    this.helpBtn = this.roundIcon(560, 64, '?', () => this.openHelp()).setDepth(900); // reopens the recap card
     this.drawWorld();
     this.layout();
     const onResize = () => { this.drawWorld(); this.layout(); if (this.item) this.renderPanel(); };
@@ -197,22 +217,6 @@ export default class GameScene extends ModuleScene {
     if (t.width > 600) t.setScale(600 / t.width); // emoji widths vary by device font
     c.add(t);
     return c;
-  }
-
-  /** The recap card (how-to v3), reopened with the ? button. */
-  openHelp() {
-    if (this.ended) return;
-    this.hideOverlay(); this.trace('help_open', { turn: this.turnIdx + 1 });
-    const v = this.view(), W = this.W, top = Math.max(200, this.H / 2 - 330);
-    const dim = this.add.rectangle(W / 2, this.H / 2, v.vw + 40, v.vh + 40, 0x0b0b0b, 0.5).setInteractive();
-    const g = this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(70, top + 10, 580, 640, 36).fillStyle(hex(C.white), 1).fillRoundedRect(70, top, 580, 640, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(70, top, 580, 640, 36);
-    const rows = [['✂', 'Short', 'every word is 1 flash'], ['🎯', 'Clear', 'say what to do'], ['👤', 'Who’s reading?', 'Close Friends know nicknames'], ['❓', 'Ask', 'if something is missing']];
-    const items = rows.flatMap(([ic, a, b], i) => [this.txt(130, top + 130 + i * 96, ic, { fontSize: '44px' }),
-      this.txt(180, top + 116 + i * 96, a, { fontSize: '32px', align: 'left' }).setOrigin(0, 0.5), this.txt(180, top + 152 + i * 96, b, { fontSize: '24px', fontStyle: '600', color: C.charcoal, align: 'left' }).setOrigin(0, 0.5)]);
-    const foot = this.txt(W / 2, top + 520, 'No timer. Right but long = fewer points.\nWrong = 0.', { fontSize: '24px', fontStyle: '700' });
-    const close = this.btn(W / 2, top + 590, 'Got it', () => this.hideOverlay(), { w: 260, h: 72, size: 28, fill: C.sun });
-    this.overlay.add([dim, g, this.txt(W / 2, top + 56, 'Remember', { fontSize: '36px' }), ...items, foot, close]);
-    dim.on('pointerup', () => this.hideOverlay());
   }
 
   enable(b, on) { b.setAlpha(on ? 1 : 0.4); if (on) b.setInteractive({ useHandCursor: true }); else b.disableInteractive(); }
@@ -520,6 +524,9 @@ export default class GameScene extends ModuleScene {
         rec.stepOk = rec.pass && (!it.maxWords || words.length <= it.maxWords);
       }
       this.cur = rec; if (!this.tut || rec.stepOk) this.turns.push(rec);
+      const probe = { 4: 'firstUse:nickname', 5: 'firstUse:ask', 10: 'firstUse:whoDoesWhat' }[it.slot]; // learning probes (request #20)
+      if (probe && this.mode === 'real') { rec.probe = probe; this.trace('learn_probe', { probe, pass: rec.pass, turn: rec.turn, itemId: it.id }); }
+      rec.paraphrase = rec.pass && words.some((w) => !noteWords(it).has(norm(w))); // a correct message using words that aren't in the note
       this.trace('comm_message', { turn: rec.turn, itemId: rec.itemId, tag: rec.tag, words, ideal: rec.ideal, used: rec.used, pass: rec.pass, failReason: rec.failReason, usedShorthand: rec.usedShorthand });
       outcome = it.mixup ? 'echo' : rec.pass ? 'pass' : 'fail';
     }
@@ -571,6 +578,7 @@ export default class GameScene extends ModuleScene {
       if (this.tut && !this.cur.stepOk) return this.retryStep(this.cur);
       if (this.tut) this.trace('tt_tutorial', { step: it.step, itemId: it.id, tries: this.tries, firstMessage: this.firstMessage, usedFailSafe: this.usedFailSafe });
       if (this.tut) (this.tutLog ||= []).push({ id: it.id, step: it.step, tries: this.tries, usedFailSafe: this.usedFailSafe });
+      if (this.tut) this.floatText(this.W / 2, this.L.barY - 20, this.tries === 1 ? 'First try!' : '✓ Got it', C.green);
       this.endTurn();
     });
   }
@@ -651,8 +659,11 @@ export default class GameScene extends ModuleScene {
     const turns = this.turns || [];
     const s = score({ turns, idleNudges: this.idleNudges || 0, restartedAfterSetback: !!this.restarted, nTurns: (this.items || []).length || 10 });
     const flags = [s.flags, tutorialMemo.done && tutorialMemo.failSafes >= 3 ? 'tutorialStruggle' : ''].filter(Boolean).join(' ');
+    const passed = turns.filter((t) => t.pass);
     return {
       ...s, flags,
+      paraphraseRate: passed.length ? Math.round((passed.filter((t) => t.paraphrase).length / passed.length) * 1000) / 1000 : '', // secondary creative signal (#21)
+      learn: learnParts(turns, tutorialMemo), // learning parts (#20); the suite score is computed in src/core/learning.js
       tutorialDone: tutorialMemo.done, tutorialFailSafes: tutorialMemo.done ? tutorialMemo.failSafes : '',
       itemBankVersion: ITEM_BANK_VERSION, form: this.form || '', itemIds: (this.items || []).map((x) => x.id).join(' '), turnsPlayed: turns.length, idleNudges: this.idleNudges || 0, idleMs: Math.round(this.idleMs || 0),
       // raw turns for re-scoring later: [turn, itemId, message, pass, failReason, asks (q+ right / q- other), points, fix (+ passed / - not)]
@@ -665,10 +676,26 @@ export default class GameScene extends ModuleScene {
   tutorialMetrics() {
     const log = this.tutLog || [], done = log.length === (this.items || []).length && log.length > 0;
     const failSafes = log.filter((x) => x.usedFailSafe).length;
-    if (done) Object.assign(tutorialMemo, { done: true, failSafes });
+    if (done) Object.assign(tutorialMemo, { done: true, failSafes, steps: log.map((x) => ({ tries: x.tries, failSafe: x.usedFailSafe })) });
     const pts = (this.turns || []).reduce((a, t) => a + (t.base || 0), 0);
     return { messageScore: pts, understood: log.filter((x) => !x.usedFailSafe && x.tries === 1).length, tutorialVersion: TUTORIAL_VERSION, steps: log.length,
       failSafes, tries: log.map((x) => `${x.id}:${x.tries}${x.usedFailSafe ? '!' : ''}`).join(' '), idleMs: Math.round(this.idleMs || 0),
       flags: failSafes >= 3 ? 'tutorialStruggle' : '' };
+  }
+
+  // ---------------------------------------------------------------- how-to screenshots (standard #19b)
+  stageHowTo(n) {
+    this.clearCallouts(); this.hideOverlay(); this.bubble.setAlpha(0);
+    const L = this.L;
+    if (n === 0) { this.msg = this.item.ideal.slice(0, 2); this.renderPanel();
+      this.callout(360, L.noteY + Math.min(L.noteH, 200) / 2, 150, 'Noah’s note', 560, L.noteY - 10);
+      this.callout(200, L.trayY + L.tileH / 2, 70, 'tap words', 200, L.trayY - 40);
+      this.callout(530, L.btnY, 80, 'Send', 530, L.btnY - 100);
+      return [{ x: 0, y: L.noteY - 40, w: 720, h: L.trayY - L.noteY + 2 * L.tileH + 60 }, { x: 0, y: L.btnY - 160, w: 720, h: 230 }]; }
+    if (n === 1) { this.renderPanel();
+      this.callout(360, L.helpY + L.helpH / 2, 80, 'the 4 rules stay here', 360, L.helpY + 120);
+      this.callout(this.W - 150, 64, 46, '? reopens this card', 440, 170);
+      return { x: 0, y: 20, w: 720, h: L.helpY + 190 }; }
+    return null;
   }
 }

@@ -1,5 +1,6 @@
 // Torch Talk · effective communication (Noah). Brief: ./README.md · build pack: 11-game-concepts.md (C1 v1.1)
-import torchPng from './assets/torch.webp';
+import h0 from './assets/howto-0.webp';
+import h1 from './assets/howto-1.webp';
 
 export default {
   id: 'torch-talk',
@@ -15,8 +16,8 @@ export default {
   summaryKeys: ['commScore', 'meaningRate', 'efficiency', 'adaptation', 'askScore', 'repairQuality', 'form', 'flags'],
   // How-to v3 (request #17): one opening picture + the recap card; the learning happens in the try-it steps (Practice).
   howTo: [
-    { title: 'Pass Noah’s note', body: 'Pass Noah’s note to a friend by torch. Every word = 1 flash. Send the shortest message your friend will get right.', img: torchPng },
-    { title: 'Remember', body: '✂ Short · 🎯 Clear: say what to do · 👤 Who’s reading? · ❓ Ask if something’s missing. No timer. Right but long = fewer points. Wrong = 0. Tap Practice to try it step by step.', icon: '💡' },
+    { title: 'Your goal', body: 'Pass Noah’s note to a friend by torch. Tap words to build a message, then tap Send. Every word = 1 flash: send the shortest message your friend will get right.', shot: h0 },
+    { title: 'Remember', body: '✂ Short · 🎯 Clear: say what to do · 👤 Who’s reading? · ❓ Ask if something’s missing. No timer. Right but long = fewer points. Wrong = 0. Tap Practice to try it step by step.', shot: h1 },
   ],
   practice: { durationSec: null, showTimer: false, scored: false }, // the 5 try-it steps (6 notes); no cap
   round: { durationSec: null, showTimer: false }, // v2.2: no timer at all; the round ends after turn 10 (idleMs is logged)
