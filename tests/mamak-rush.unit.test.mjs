@@ -24,13 +24,13 @@ test('JS act/metrics/orgScore match the Python reference on every fixture run (1
   }
 });
 
-test('the JS careful bot plays exactly the reference careful plan (org 98.4 on both forms)', () => {
+test('the JS careful bot plays exactly the reference careful plan (org 98.9 on both forms)', () => {
   for (const f of ['A', 'B']) {
     const st = newState(FORMS[f]); const acts = [];
     while (!shiftOver(st)) { const [tg, sta] = careful(st); acts.push([tg, sta]); act(st, tg, sta); }
     assert.deepEqual(acts, runs.find((r) => r.form === f && r.bot === 'careful').actions);
-    assert.equal(orgScore(metrics(st)), 98.4);
-    assert.deepEqual(facets(metrics(st)), { planScore: 97.8, pressureScore: 100 });
+    assert.equal(orgScore(metrics(st)), 98.9); assert.equal(metrics(st).starsServed, 26);
+    assert.deepEqual(facets(metrics(st)), { planScore: 98.4, pressureScore: 100 });
   }
 });
 
@@ -42,6 +42,14 @@ test('clock, setback and parked order rules', () => {
   assert.ok(!blocked(st, 'urn'));
   const s2 = newState(FORMS.A);
   act(s2, 'tapau', 'griddle'); assert.equal(s2.tapau.steps, 0, 'the tapau can only be cooked from 7:09');
+  // v1.2: no hand-over tap. Amira collects at 7:20 if it's ready, or when it's finished while she waits (to 7:23)
+  const s3 = newState(FORMS.A); while (s3.tick < 10) act(s3, null, null);
+  for (const sta of ['griddle', 'griddle', 'counter']) act(s3, 'tapau', sta);
+  while (s3.tick < 21) act(s3, null, null);
+  assert.equal(s3.tapau.handed, 21); assert.equal(metrics(s3).parkedReturn, 1);
+  const s4 = newState(FORMS.A); while (s4.tick < 22) act(s4, null, null);
+  act(s4, 'tapau', 'griddle'); act(s4, 'tapau', 'griddle'); act(s4, 'tapau', 'counter');
+  assert.equal(s4.tapau.handed, null, 'finished after 7:23: she has left'); assert.equal(metrics(s4).parkedReturn, 0);
   assert.equal(Object.keys(MENU).length, 6);
   // every stream order is due after it arrives and every dish has its steps
   for (const f of ['A', 'B']) for (const [t, , item, due] of FORMS[f].stream) { assert.ok(due >= MENU[item][2].length && t >= 1 && t <= 36); }

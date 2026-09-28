@@ -1,4 +1,4 @@
-"""The Nurts Mamak: reference simulator (O1 build pack v1.1).
+"""The Nurts Mamak: reference simulator (O1 build pack v1.2).
 Player-facing time: tick n = 7:(n-1) pm on the mamak wall clock (1 action = 1 minute; shift 7:00-7:36). Never show "tick" to players. Run: python3 mamak-reference.py → PASS.
 The game's JS must match act(), metrics() and org_score() exactly (parity fixture exported from this file). Tick-based: the clock moves ONE tick per station tap.
 Selecting an order is free. Nothing moves while the player thinks, so speed never matters."""
@@ -46,8 +46,8 @@ STREAM_B = [  # Form B (restarts / later runs): Form A's rush logic, dishes swap
  (29, 'o17', 'kopi', 5, 'amira'),
  (31, 'o18', 'roti', 6, 'amira'),
 ]
-PARKED = dict(id="tapau", item="roti", announce=10, window=(21, 24), late=(25, 29), customer="amira")   # "Back at 7:20 for my tapau!" (tick 21 = 7:20)
-SETBACK = dict(tick=18, station="griddle", ticks=3)    # "The gas runs out!": griddle off for ticks 18-20
+PARKED = dict(id="tapau", item="roti", announce=10, arrive=21, waits=3, customer="amira")   # "Back at 7:20 for my tapau!" (tick 21 = 7:20). She collects it automatically; waits until 7:23
+SETBACK = dict(tick=18, station="griddle", ticks=3, notice_from=13)   # announced from 7:12: "Gas runs out 7:17-7:19, griddle off" (no surprise, so no luck)
 def new_state():
     return dict(tick=1, orders={}, done=[], expired=[], started=set(), errors=[], log=[],
                 tapau=dict(steps=0, handed=None), pins=0)
@@ -60,13 +60,11 @@ def expire(st):
         if st["tick"] > o["due"]: o["status"] = "expired"; st["expired"].append(o["id"])
 def blocked(st, station): return station == SETBACK["station"] and SETBACK["tick"] <= st["tick"] < SETBACK["tick"] + SETBACK["ticks"]
 def act(st, target, station):
-    """target: an order id, 'tapau' (prepare the parked order), 'handover' (tap the pin), or None (wait 1 tick).
+    """target: an order id, 'tapau' (cook a step of the parked order), or None (wait 1 minute).
     station: the station tapped. One call = one tick."""
     load = len(active(st))
     ok = False
-    if target == "handover":
-        if st["tapau"]["steps"] >= 3 and st["tapau"]["handed"] is None: st["tapau"]["handed"] = st["tick"]; ok = True
-    elif target == "tapau":
+    if target == "tapau":
         need = MENU["roti"][2][st["tapau"]["steps"]] if st["tapau"]["steps"] < 3 else None
         if need and station == need and not blocked(st, station) and st["tick"] >= PARKED["announce"]: st["tapau"]["steps"] += 1; ok = True
         elif need and station != need: st["errors"].append((st["tick"], load))
@@ -77,28 +75,33 @@ def act(st, target, station):
             if o["step"] == len(MENU[o["item"]][2]): o["status"] = "done"; st["done"].append(o["id"])
         elif station != need: st["errors"].append((st["tick"], load))
     st["log"].append((st["tick"], target, station, ok, load))
-    st["tick"] += 1; expire(st); arrive(st)
+    st["tick"] += 1; expire(st); arrive(st); collect(st)
+def collect(st):
+    """Amira collects her tapau automatically: at 7:20 if it's ready, or the moment it's finished while she waits (to 7:23)."""
+    t = st["tapau"]
+    if t["handed"] is None and t["steps"] >= 3 and PARKED["arrive"] <= st["tick"] <= PARKED["arrive"] + PARKED["waits"]:
+        t["handed"] = st["tick"]
 def metrics(st):
-    allv = sum(MENU[i][1] for (_, _, i, _, _) in STREAM) + MENU["roti"][1]
     val = sum(st["orders"][o]["stars"] for o in st["done"]) + (MENU["roti"][1] if st["tapau"]["handed"] else 0)
+    best = BEST_STARS["A" if STREAM is STREAM_A else "B"]
     threes = [o for o in st["orders"].values() if o["stars"] == 3]
     exp_hi = sum(1 for o in threes if o["status"] == "expired") / max(1, len(threes))
     started = [o for o in st["orders"].values() if o["id"] in st["started"]]
     half = sum(1 for o in started if o["status"] != "done") / max(1, len(started))
     h = st["tapau"]["handed"]
-    parked = 1.0 if h and PARKED["window"][0] <= h <= PARKED["window"][1] else 0.5 if h and h <= PARKED["late"][1] else 0.0
+    parked = 1.0 if h == PARKED["arrive"] else 0.5 if h else 0.0          # ready when she arrived / finished while she waited / she left
     hi = [e for e in st["log"] if e[4] >= 3]; err_hi = sum(1 for e in st["errors"] if e[1] >= 3) / max(1, len(hi))
-    return dict(valueDone=round(val / allv, 3), expiredHigh=round(exp_hi, 3), halfDone=round(half, 3), parkedReturn=parked, errorsUnderLoad=round(err_hi, 3))
+    return dict(starsServed=val, bestPossible=best, valueShare=round(min(1.0, val / best), 3), expiredHigh=round(exp_hi, 3), halfDone=round(half, 3), parkedReturn=parked, errorsUnderLoad=round(err_hi, 3))
 W = dict(valueDone=0.30, expiredHigh=0.20, halfDone=0.20, parkedReturn=0.15, errorsUnderLoad=0.15)
 def org_score(m):
-    return round(100 * (W["valueDone"] * min(1, m["valueDone"] / VALUE_REF) + W["expiredHigh"] * (1 - m["expiredHigh"]) +
+    return round(100 * (W["valueDone"] * m["valueShare"] + W["expiredHigh"] * (1 - m["expiredHigh"]) +
                         W["halfDone"] * (1 - m["halfDone"]) + W["parkedReturn"] * m["parkedReturn"] + W["errorsUnderLoad"] * (1 - min(1, m["errorsUnderLoad"] * 4))), 1)
-VALUE_REF = 0.80   # o1.valueRef: the beam-search best plan reaches ~0.82
+BEST_STARS = {"A": 27, "B": 27}   # o1.bestStars: best known plan per form (beam search 1,500 wide + the careful bot). Demand is 33 stars / 46 steps vs 36 minutes, so nobody can serve everything
 def run(policy, seed=0, slip=0.0):
     st = new_state(); arrive(st); rng = random.Random(seed)
     while st["tick"] <= TICKS:
         tgt, sta = policy(st, rng)
-        if tgt and tgt not in ("handover",) and sta and rng.random() < slip * (1 + len(active(st)) / 3):   # careless slips grow with load
+        if tgt and sta and rng.random() < slip * (1 + len(active(st)) / 3):   # careless slips grow with load
             sta = rng.choice([s for s in STATIONS if s != sta])
         act(st, tgt, sta)
     return st
@@ -108,10 +111,9 @@ def next_station(st, oid):
 # ---------------- policies ----------------
 def careful(st, rng):
     t = st["tick"]
-    if st["tapau"]["steps"] >= 3 and st["tapau"]["handed"] is None and t >= PARKED["window"][0]: return "handover", None
     cands = [o for o in active(st) if not blocked(st, next_station(st, o["id"]))]
     tap_left = 3 - st["tapau"]["steps"]
-    if t >= PARKED["announce"] and tap_left and PARKED["window"][0] - t <= tap_left + 2 and not blocked(st, next_station(st, "tapau")):
+    if t >= PARKED["announce"] and tap_left and PARKED["arrive"] - t <= tap_left + 2 and not blocked(st, next_station(st, "tapau")):
         return "tapau", next_station(st, "tapau")
     def feasible(o): return o["due"] - t + 1 >= len(MENU[o["item"]][2]) - o["step"]
     cands = [o for o in cands if feasible(o)]
@@ -123,7 +125,6 @@ def careful(st, rng):
         return (-(o["step"] > 0), -o["stars"] / left, o["due"])    # finish what's started, then value per step, then deadline
     o = min(cands, key=key); return o["id"], next_station(st, o["id"])
 def fifo(st, rng):
-    if st["tapau"]["steps"] >= 3 and st["tapau"]["handed"] is None and st["tick"] >= PARKED["window"][0]: return "handover", None
     c = [o for o in active(st) if not blocked(st, next_station(st, o["id"]))]
     if not c: return None, None
     o = min(c, key=lambda o: int(o["id"][1:])); return o["id"], next_station(st, o["id"])
@@ -135,24 +136,23 @@ def forgetful(st, rng):  # careful with orders, but never comes back for the tap
     saved = st["tapau"]; st["tapau"] = dict(steps=99, handed=0)
     try: tgt, sta = careful(st, rng)
     finally: st["tapau"] = saved
-    return (tgt, sta) if tgt not in ("tapau", "handover") else (None, None)
+    return (tgt, sta) if tgt != "tapau" else (None, None)
 def randomp(st, rng):
     c = active(st) + ([dict(id="tapau")] if st["tick"] >= PARKED["announce"] else [])
     if not c or rng.random() < 0.1: return None, None
     o = rng.choice(c)
     if o["id"] == "tapau":
-        if st["tapau"]["steps"] >= 3: return "handover", None
+        if st["tapau"]["steps"] >= 3: return None, None
         return "tapau", rng.choice(STATIONS)
     return o["id"], rng.choice(STATIONS) if rng.random() < 0.3 else next_station(st, o["id"])
 def best_plan(beam=400):
-    """Beam search over whole-shift plans: an upper reference for valueDone (sets VALUE_REF)."""
+    """Beam search over whole-shift plans: finds the best-known stars per form (sets BEST_STARS)."""
     st = new_state(); arrive(st); frontier = [st]
     while frontier[0]["tick"] <= TICKS:
         nxt = []
         for s0 in frontier:
             opts = [(None, None)] + [(o["id"], next_station(s0, o["id"])) for o in active(s0)]
             if s0["tick"] >= PARKED["announce"] and s0["tapau"]["steps"] < 3: opts.append(("tapau", next_station(s0, "tapau")))
-            if s0["tapau"]["steps"] >= 3 and s0["tapau"]["handed"] is None: opts.append(("handover", None))
             for tg, sta in opts:
                 s1 = copy.deepcopy(s0); act(s1, tg, sta); nxt.append(s1)
         def h(x):

@@ -40,6 +40,10 @@ async function playRound(page, strategy = 't3') {
       const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
       if (!s) return 'gone';
       if (s.ended) return 'ending';
+      if (s.manifest.id === 'fix-it-kit') { // the reference explorer, through the same taps
+        if (s.recapDone) { s.recapDone(); return 'chose'; }
+        return s.botStep() ? 'chose' : 'wait';
+      }
       if (s.manifest.id === 'mamak-rush') {
         if (s.shiftDone) { s.shiftDone(); return 'chose'; } // end-of-shift card
         return s.botStep() ? 'chose' : 'wait'; // the reference's careful plan, through the same buttons
@@ -79,7 +83,7 @@ async function playRound(page, strategy = 't3') {
   }
   expect(await page.evaluate(() => window.__trayBad || [])).toEqual([]);
 }
-const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : t.includes('Mamak') ? 'mk' : 't3'; };
+const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : t.includes('Mamak') ? 'mk' : t.includes('Fix-It') ? 'fx' : 't3'; };
 // From the post-game screen: play every remaining game for real, then land on the report.
 async function playRest(page) {
   for (;;) {
@@ -162,7 +166,7 @@ test('applicant: register → how to → practice → real round → report → 
   // Event policy v1.8: no navigation or round-lifecycle rows (rounds live in Rounds / RoundTraces)
   for (const ev of ['home_view', 'howto_page', 'pregame_view', 'round_start', 'round_complete', 'practice_start', 'postgame_view']) expect(rows).not.toContain(ev);
   expect(dbj.rounds.filter((r) => r.mode === 'practice')).toHaveLength(1);
-  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(4);
+  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(5);
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
   expect(dbj.traces.some((t) => t.items.length > 0 && t.partial)).toBeTruthy();
@@ -402,7 +406,7 @@ test('developer mode: PIN → Dev Test picker → chosen games + options → row
   expect(errors).toEqual([]);
 });
 
-test('the nurts mamak: careful plan = 98.4 on Form A; the clock moves only on actions; gas out 7:17–7:19', async ({ page }, info) => {
+test('the nurts mamak v1.2: careful plan = 98.9 on Form A (26 of 27 ★), tapau collected automatically; the clock moves only on actions; gas out 7:17–7:19', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/' + Q + 'speed=10&first=mamak-rush');
@@ -431,7 +435,10 @@ test('the nurts mamak: careful plan = 98.4 on Form A; the clock moves only on ac
   const m = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[10] === 'completed' && x[7] === 'real').map((x) => JSON.parse(x[12])).at(-1)
     : dbj.rounds.filter((x) => x.status === 'completed' && x.mode === 'real').map((x) => x.metrics).at(-1);
   expect(m.form).toBe('A');
-  expect(m.orgScore).toBe(98.4);
+  expect(m.orgScore).toBe(98.9);
+  expect(m.starsServed).toBe(26); expect(m.bestPossible).toBe(27);
+  expect(m.tapauCollected).toBe('7:20');
+  expect(m.learn.firstUse[1]).toBeGreaterThanOrEqual(3); expect(m.learn.firstUse[0]).toBe(m.learn.firstUse[1]); // careful play passes every probe
   expect(m.minutesPlayed).toBe(36);
   expect(m.parkedReturn).toBe(1);
   expect(errors).toEqual([]);
@@ -488,5 +495,56 @@ test('torch talk how-to v3: the try-it steps catch a sentence writer, fail-safe 
   expect(pick('practice').flags).toMatch(/tutorialStruggle/);
   expect(pick('real').flags).toMatch(/tutorialStruggle/);
   expect(pick('real').tutorialFailSafes).toBe(6);
+  expect(errors).toEqual([]);
+});
+
+test('fix-it kit: explorer = 83.6 on Form A; chips come from the kit; how-to uses real-UI screenshots; learning band on the report', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/' + Q + 'speed=10&first=fix-it-kit');
+  await reset(page);
+  await page.click('#btn-casual');
+  await page.click('#btn-howto');
+  await expect(page.locator('.tn-howto__art--shot img')).toBeVisible();
+  while (await page.locator('.tn-modal').count()) await page.click('#btn-howto-next');
+  await page.click('#btn-practice');
+  await playRound(page, 'fx');
+  await expect(page.locator('#btn-start')).toBeVisible({ timeout: 30_000 });
+  await page.click('#btn-start');
+  const S = (f) => page.evaluate(`(() => { const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:')); return s ? (${f})(s) : null; })()`);
+  await page.waitForFunction(() => window.__tnGame.scene.getScenes(true).some((x) => x.scene.key === 'mod:fix-it-kit' && x.running && x.ps), null, { timeout: 30_000 });
+  // the chip picker lists exactly the kit's chips, nothing pre-selected
+  expect(await S("(s) => { s.addToTray('U'); const c = s.chipBtns; const pre = s.tray[0].chip; s.pickChip('U', 'long'); s.removeFromTray('U'); return [c, pre]; }")).toEqual([['keeps you dry', 'long', 'hooked handle', 'opens wide'], null]);
+  // the ? button reopens the cards in play
+  await S('(s) => s.openHowTo()');
+  await expect(page.locator('.tn-modal')).toBeVisible();
+  while (await page.locator('.tn-modal').count()) await page.click('#btn-howto-next');
+  await playRound(page, 'fx');
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
+  await page.waitForTimeout(1500);
+  const dbj = await backend(page);
+  const m = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[10] === 'completed' && x[7] === 'real').map((x) => JSON.parse(x[12])).at(-1)
+    : dbj.rounds.filter((x) => x.status === 'completed' && x.mode === 'real').map((x) => x.metrics).at(-1);
+  expect(m.form).toBe('A');
+  expect(m.creativeScore).toBe(83.6);
+  expect(m.learn.pickup[1]).toBe(2);
+  if (!LIVE) expect(dbj.interactions.some((r) => r[6] === 'howto' && JSON.stringify(r[7]).includes('round'))).toBeTruthy();
+  expect(errors).toEqual([]);
+});
+
+test('how-to screenshots are staged from each game\'s real UI (standard #19b)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile', 'one device');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  for (const [id, cards] of [['lucky-dip', 3], ['torch-talk', 2], ['fair-board', 3], ['mamak-rush', 6], ['fix-it-kit', 4]]) {
+    await page.goto('/' + Q + 'speed=10&first=' + id);
+    await reset(page);
+    await page.click('#btn-casual');
+    await page.click('#btn-start');
+    await page.waitForFunction((k) => window.__tnGame.scene.getScene('mod:' + k)?.running, id, { timeout: 30_000 });
+    const got = await page.evaluate(([k, n]) => { const s = window.__tnGame.scene.getScene('mod:' + k); const out = [];
+      for (let i = 0; i < n + 1; i++) { const r = s.stageHowTo(i); out.push(r ? [].concat(r).every((q) => q.w > 0 && q.h > 0) : null); } return out; }, [id, cards]);
+    expect(got, id).toEqual([...Array(cards).fill(true), null]);
+    expect(await page.evaluate((k) => window.__tnGame.scene.getScene('mod:' + k).manifest.howTo.every((c) => c.shot), id), id).toBeTruthy();
+  }
   expect(errors).toEqual([]);
 });
