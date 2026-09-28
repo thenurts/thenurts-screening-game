@@ -8,6 +8,7 @@ import { C, hex, FONT, W, H } from './theme.js';
 import { log, trace, setPartial, flushBeacon } from './logger.js';
 import { sfx } from './sfx.js';
 import { api } from './api.js';
+import { howToModal } from './screens/game.js';
 
 function mulberry32(a) {
   return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -118,7 +119,32 @@ export class ModuleScene extends Phaser.Scene {
     const quit = this.roundIcon(58, 64, '✕', () => this.askQuit());
     this.muteBtn = this.roundIcon(W - 58, 64, sfx.muted ? '🔇' : '🔊', () => { sfx.toggle(); this.muteBtn.label.setText(sfx.muted ? '🔇' : '🔊'); });
     this.hud.add([quit, this.muteBtn]);
+    // Suite standard #19g: a ? button in play reopens the key how-to cards (manifest.helpCards, default all)
+    if (this.manifest.howTo?.length) { this.helpBtn = this.roundIcon(W - 150, 64, '?', () => this.openHowTo()); this.hud.add(this.helpBtn); }
   }
+
+  openHowTo() {
+    if (this.ended || this.helpOpen) return;
+    this.helpOpen = true; this.trace('help_open');
+    const wasRunning = this.running; this.running = false; this.pauseClock(); this.input.enabled = false;
+    howToModal(this.manifest, document.getElementById('tn-ui'), { pages: this.manifest.helpCards, where: 'round',
+      onClose: () => { this.helpOpen = false; this.input.enabled = true; this.resumeClock(); this.running = wasRunning && !this.ended; this.trace('help_close'); } });
+  }
+
+  /** How-to screenshots (standard #19b): an amber ring + a label, drawn on the real UI. Returns the objects for cleanup. */
+  callout(x, y, r, label, lx = x, ly = y - r - 50, depth = 3000) {
+    const g = this.add.graphics().setDepth(depth);
+    g.lineStyle(8, hex(C.amber), 1).strokeCircle(x, y, r);
+    const t = this.txt(lx, ly, label, { fontSize: '28px', color: C.ink }).setDepth(depth + 1);
+    const pad = 14, bw = t.width + pad * 2, bh = t.height + pad;
+    const bg = this.add.graphics().setDepth(depth).fillStyle(hex(C.sun), 1).fillRoundedRect(lx - bw / 2, ly - bh / 2, bw, bh, bh / 2).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(lx - bw / 2, ly - bh / 2, bw, bh, bh / 2);
+    // a short pointer from the label towards the ring
+    const ang = Math.atan2(y - ly, x - lx), d = Math.hypot(x - lx, y - ly);
+    if (d > r + bh) g.lineStyle(6, hex(C.ink), 1).lineBetween(lx + Math.cos(ang) * (bh / 2 + 4), ly + Math.sin(ang) * (bh / 2 + 4), x - Math.cos(ang) * (r + 4), y - Math.sin(ang) * (r + 4));
+    (this.callouts ||= []).push(g, bg, t);
+    return [g, bg, t];
+  }
+  clearCallouts() { (this.callouts || []).forEach((o) => o.destroy()); this.callouts = []; }
 
   roundIcon(x, y, glyph, cb) {
     const c = this.add.container(x, y);

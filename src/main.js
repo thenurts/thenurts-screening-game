@@ -35,6 +35,9 @@ async function boot() {
     input: { activePointers: 3 },
     scene: [BackdropScene],
     banner: false,
+    // Test builds only: headless browsers report the window as unfocused, and Phaser then clamps every frame to 16 ms,
+    // so animations crawl on slow machines. Players' games keep Phaser's default smoothing.
+    ...(MOCK || location.hostname === 'localhost' ? { fps: { smoothStep: false } } : {}),
   });
   const resize = () => { const s = size(); game.scale.resize(s.w * dpr(), s.h * dpr()); game.scale.setZoom(1 / dpr()); };
   window.addEventListener('resize', resize);

@@ -159,3 +159,8 @@ html, body { margin: 0; height: 100%; background: var(--cream); }
 .tn-home-extras { position: absolute; top: var(--safe-t); right: 12px; display: flex; gap: 6px; z-index: 5; }
 .tn-home-extra { width: 44px; height: 44px; border-radius: 50%; border: 0; background: transparent; font-size: 20px; opacity: .35; cursor: pointer; }
 .tn-home-extra:hover, .tn-home-extra:focus-visible { opacity: .8; }
+
+/* How-to cards: screenshots of the real game UI (suite standard #19b) */
+.tn-howto__art--shot { height: auto; min-height: 150px; background: var(--cream); padding: 0; }
+.tn-howto__art--shot img { max-height: 300px; width: 100%; object-fit: contain; display: block; }
+.tn-modal { pointer-events: auto; }

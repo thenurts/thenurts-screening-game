@@ -1,5 +1,6 @@
 // Pre-game (how to play / practice / start), post-game results and the end-of-run report.
 import { h, show, button, host, card, logo, countUp, charImg } from '../ui/dom.js';
+import { learningScore } from '../learning.js';
 import { log, flushBeacon } from '../logger.js';
 import { modules, hostOf } from '../registry.js';
 import { TRAITS } from '../traits.js';
@@ -40,8 +41,9 @@ export function preGameScreen({ manifest, completed, practiceResult, order = mod
 
 const howtoViews = {}; // module id → views this page load
 
-export function howToModal(manifest, parent) {
-  const pages = manifest.howTo;
+/** opts.pages: which cards (indexes) to show (default all) · opts.onClose · opts.where: 'pregame' | 'round' (logged). */
+export function howToModal(manifest, parent, opts = {}) {
+  const pages = opts.pages ? opts.pages.map((k) => manifest.howTo[k]).filter(Boolean) : manifest.howTo;
   let i = 0; const opened = performance.now(); const seen = new Set([0]);
   const ctx = { moduleVersion: manifest.version };
   const view = (howtoViews[manifest.id] = (howtoViews[manifest.id] || 0) + 1);
@@ -53,17 +55,19 @@ export function howToModal(manifest, parent) {
   // One row per viewing: which view this is (re-reads), time spent, and whether every page was seen.
   const record = (how) => {
     if (logged) return; logged = true;
-    log(manifest.id, 'howto', { view, dwellMs: Math.round(performance.now() - opened), pagesSeen: seen.size, pages: pages.length, closedBy: how }, ctx);
+    log(manifest.id, 'howto', { view, dwellMs: Math.round(performance.now() - opened), pagesSeen: seen.size, pages: pages.length, closedBy: how, where: opts.where || 'pregame' }, ctx);
   };
   const onLeave = () => { record('left_page'); flushBeacon(); };
   window.addEventListener('pagehide', onLeave);
-  const close = () => { record('closed'); window.removeEventListener('pagehide', onLeave); modal.remove(); };
+  const close = () => { record('closed'); window.removeEventListener('pagehide', onLeave); modal.remove(); opts.onClose?.(); };
   const setNext = (on) => { next.disabled = !on; next.style.opacity = on ? '' : '0.45'; };
   function render() {
     const p = pages[i];
     art.innerHTML = '';
     art.classList.toggle('tn-howto__art--demo', !!p.demo);
+    art.classList.toggle('tn-howto__art--shot', !!p.shot);
     if (p.demo) art.append(demoView(p.demo, () => setNext(true)));
+    else if (p.shot) art.append(h('img', { src: p.shot, alt: p.alt || '' })); // a screenshot of the game's own UI, with callouts
     else art.append(p.img ? h('img', { src: p.img.startsWith('char:') ? charImg(...p.img.slice(5).split('-')) : p.img, alt: '' }) : h('span', { 'aria-hidden': 'true' }, p.icon || '🎮'));
     title.textContent = p.title; body.textContent = p.body; count.textContent = `${i + 1} / ${pages.length}`;
     prev.style.visibility = i ? 'visible' : 'hidden';
@@ -210,6 +214,14 @@ export function reportScreen({ report, runNo, casual, onRestart, onApply }) {
         h('div', { title: `You: ${Math.round(a.you)}`, style: { position: 'absolute', top: '50%', left: `${a.you}%`, width: '18px', height: '18px', margin: '-9px 0 0 -9px', borderRadius: '50%', background: 'var(--ink)', border: '3px solid var(--white)' } })),
       h('div', { class: 'tn-muted', style: { display: 'flex', justifyContent: 'space-between' } }, h('span', {}, a.poles[0]), h('span', {}, a.poles[1]))));
   });
+  // Learning (request #20): no game of its own; a band built from evidence across the games, or "Not enough evidence".
+  const learn = learningScore(Object.fromEntries(Object.entries(report.results || {}).map(([k, r]) => [k, r.metrics])));
+  if (Object.keys(learn.parts).length) {
+    const text = { quick: 'Picks up new rules quickly', steady: 'Picks up new rules steadily', slow: 'Took a few tries to pick up new rules', none: 'Not enough evidence yet' }[learn.band];
+    chart.append(h('div', { class: 'tn-metric', id: 'tn-learning' },
+      h('div', { class: 'tn-metric__top' }, h('span', {}, TRAITS.learning.label), h('b', {}, text)),
+      h('div', { class: 'tn-muted' }, learn.score == null ? 'We need a little more play to say.' : 'From how quickly you used each game’s new rules.')));
+  }
   const legend = h('div', { class: 'tn-muted', style: { display: 'flex', gap: '14px', justifyContent: 'center', margin: '6px 0 12px' } },
     h('span', {}, h('b', { style: { display: 'inline-block', width: '14px', height: '14px', background: 'var(--sun)', border: '2px solid var(--ink)', borderRadius: '4px', verticalAlign: '-2px', marginRight: '6px' } }), 'You'),
     all.some((a) => a.median != null) ? h('span', {}, h('b', { style: { display: 'inline-block', width: '18px', borderTop: '2px dashed var(--charcoal)', verticalAlign: '4px', marginRight: '6px' } }), 'Median player') : null);
