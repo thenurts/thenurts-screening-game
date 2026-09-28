@@ -40,6 +40,10 @@ async function playRound(page, strategy = 't3') {
       const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
       if (!s) return 'gone';
       if (s.ended) return 'ending';
+      if (s.manifest.id === 'mamak-rush') {
+        if (s.shiftDone) { s.shiftDone(); return 'chose'; } // end-of-shift card
+        return s.botStep() ? 'chose' : 'wait'; // the reference's careful plan, through the same buttons
+      }
       if (s.manifest.id === 'fair-board') {
         if (s.waitingNext) { s.waitingNext(); return 'chose'; } // practice feedback
         if (s.recapDone) { s.recapDone(); return 'chose'; } // end recap
@@ -75,7 +79,7 @@ async function playRound(page, strategy = 't3') {
   }
   expect(await page.evaluate(() => window.__trayBad || [])).toEqual([]);
 }
-const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : 't3'; };
+const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : t.includes('Mamak') ? 'mk' : 't3'; };
 // From the post-game screen: play every remaining game for real, then land on the report.
 async function playRest(page) {
   for (;;) {
@@ -158,7 +162,7 @@ test('applicant: register → how to → practice → real round → report → 
   // Event policy v1.8: no navigation or round-lifecycle rows (rounds live in Rounds / RoundTraces)
   for (const ev of ['home_view', 'howto_page', 'pregame_view', 'round_start', 'round_complete', 'practice_start', 'postgame_view']) expect(rows).not.toContain(ev);
   expect(dbj.rounds.filter((r) => r.mode === 'practice')).toHaveLength(1);
-  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(3);
+  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(4);
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
   expect(dbj.traces.some((t) => t.items.length > 0 && t.partial)).toBeTruthy();
@@ -340,6 +344,7 @@ test('fair board: Form A first; perfect checker = 24 right / 100; Check outlines
   };
   await answerUpTo(11); // evidence: time:tug of war,header,note
   expect(await step('s.check(); return [s.checkShown, s.overlay.list.length > 0]')).toEqual([3, true]);
+  expect(await step('return s.doubtBtn.list[1].list[1].text')).toBe('Disagree'); // v1.1 label
   expect(await step('return s.rows.map((r) => r.y)')).toEqual([0, 64, 128, 192, 256]);
   await answerUpTo(13);
   // BUMP_ORDER [3,0,4,1,2]: face painting → slot 1, magic show → 3, tug of war → 4, band → 0, prize draw → 2
@@ -394,5 +399,94 @@ test('developer mode: PIN → Dev Test picker → chosen games + options → row
   await page.click('#dev-rb-exit');
   await expect(page.locator('#btn-apply')).toBeVisible();
   await expect(page.locator('#tn-dev-ribbon')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('the nurts mamak: careful plan = 98.4 on Form A; the clock moves only on actions; gas out 7:17–7:19', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/' + Q + 'speed=10&first=mamak-rush');
+  await reset(page);
+  await page.click('#btn-casual');
+  await page.click('#btn-start');
+  const S = (f) => page.evaluate(`(() => { const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:')); return (${f})(s); })()`);
+  await page.waitForFunction(() => window.__tnGame.scene.getScenes(true).some((x) => x.scene.key === 'mod:mamak-rush' && x.running && x.st), null, { timeout: 30_000 });
+  // thinking and selecting are free: no real-time clock
+  const t0 = await S('(s) => s.st.tick');
+  await S("(s) => s.selectTarget('o1')"); await S("(s) => s.selectTarget('o1')");
+  await page.waitForTimeout(3000);
+  expect(await S('(s) => s.st.tick')).toBe(t0);
+  const gas = [];
+  for (;;) {
+    const r = await S(`(s) => { if (!s || s.shiftDone) return 'end'; if (s.st.tick >= 18 && s.st.tick <= 21) { const g = s.stations.find((b) => b.station === 'griddle'); return 'g' + s.st.tick + (g.gasIcon.visible ? 'off' : 'on') + '|' + (s.botStep() ? 1 : 0); } return s.botStep() ? 'ok' : 'wait'; }`);
+    if (r === 'end') break;
+    if (r.startsWith('g')) gas.push(r.split('|')[0]);
+    await page.waitForTimeout(r === 'wait' ? 60 : 20);
+  }
+  expect([...new Set(gas)].sort()).toEqual(['g18off', 'g19off', 'g20off', 'g21on']);
+  await playRound(page, 'mk');
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
+  await page.waitForTimeout(1500);
+  const dbj = await backend(page);
+  const m = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[10] === 'completed' && x[7] === 'real').map((x) => JSON.parse(x[12])).at(-1)
+    : dbj.rounds.filter((x) => x.status === 'completed' && x.mode === 'real').map((x) => x.metrics).at(-1);
+  expect(m.form).toBe('A');
+  expect(m.orgScore).toBe(98.4);
+  expect(m.minutesPlayed).toBe(36);
+  expect(m.parkedReturn).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('torch talk how-to v3: the try-it steps catch a sentence writer, fail-safe after 2 tries, caveat carried to the real round', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'device-independent; run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/' + Q + 'speed=10&first=torch-talk');
+  await reset(page);
+  await page.click('#btn-casual');
+  await page.click('#btn-practice');
+  const S = (f) => page.evaluate(`(() => { const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:')); return s ? (${f})(s) : 'gone'; })()`);
+  // every step: send a wrong message twice (step 1: a full sentence), then take the fail-safe message
+  const wrong = { G1: 'the picnic is on Sunday now please bring a blanket', G2: 'tape school tomorrow', G3: 'drink plants before lunch', G4a: 'meet 4pm', G4b: 'meet Rocket 3pm', G5: 'swimming Tuesday 3pm' };
+  const tips = new Set();
+  await page.waitForFunction(() => window.__tnGame?.scene.getScenes(true).some((x) => x.scene.key === 'mod:torch-talk'), null, { timeout: 30_000 });
+  for (let i = 0; i < 600; i++) {
+    const r = await S(`(s) => { if (s.ended) return 'end'; if (!s.running || s.phase !== 'compose' || !s.item) return 'wait';
+      if (s.tries >= 2) { s.send(); return 'safe'; }
+      if (s.lastTip) window.__tips = [...(window.__tips || []), s.lastTip];
+      s.msg = ${JSON.stringify(wrong)}[s.item.id].split(' '); s.send(); return 'sent'; }`);
+    if (r === 'end' || r === 'gone') break;
+    await page.waitForTimeout(r === 'wait' ? 60 : 30);
+  }
+  (await page.evaluate(() => window.__tips || [])).forEach((t) => tips.add(t));
+  expect([...tips].join(' | ')).toContain('That took 10 flashes!');
+  expect([...tips].join(' | ')).toContain('Tape… and what do I do?');
+  expect([...tips].join(' | ')).toContain('Plants don’t drink juice!');
+  expect([...tips].join(' | ')).toContain('What’s the Rocket?');
+  await expect(page.locator('#btn-start')).toBeVisible({ timeout: 20_000 });
+  // request #15: during the real round, an ended turn's panel never shows again (frame check)
+  await page.evaluate(() => {
+    window.__frames = [];
+    const tick = () => { const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key === 'mod:torch-talk');
+      if (s && s.panel && s.item) { const vis = s.panel.y < s.drop - 20 && s.panel.x < s.W - 20; window.__frames.push(vis ? `${s.panelItemId}:${s.phase}` : '-'); }
+      requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  });
+  await page.click('#btn-start');
+  await playRound(page, 'ideal');
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+  const frames = await page.evaluate(() => window.__frames);
+  const runs = frames.filter((f, i) => f !== frames[i - 1]).map((f) => f.split(':')[0]).filter((f, i, a) => f !== a[i - 1]);
+  const shown = runs.filter((f) => f !== '-');
+  const reshown = shown.filter((id, i) => shown.indexOf(id) !== i && id !== 'A-06'); // A-06 (T6) comes back once for the fix
+  expect(reshown, runs.join(' ')).toEqual([]);
+  expect(shown.filter((x) => x === 'A-06').length).toBeLessThanOrEqual(2);
+  await page.waitForTimeout(1500);
+  const dbj = await backend(page);
+  const pick = (mode) => (LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[10] === 'completed' && x[7] === mode).map((x) => JSON.parse(x[12]))
+    : dbj.rounds.filter((x) => x.status === 'completed' && x.mode === mode).map((x) => x.metrics)).at(-1);
+  expect(pick('practice').failSafes).toBe(6);
+  expect(pick('practice').flags).toMatch(/tutorialStruggle/);
+  expect(pick('real').flags).toMatch(/tutorialStruggle/);
+  expect(pick('real').tutorialFailSafes).toBe(6);
   expect(errors).toEqual([]);
 });

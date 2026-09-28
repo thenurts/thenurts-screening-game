@@ -71,7 +71,7 @@ test('bots: perfect = 24 / 100-ish; always-agree and always-doubt ≈ 0 accuracy
     const agree = play(f, () => 'agree');
     assert.equal(agree.claimAccuracy, 0); assert.equal(agree.correct, 12); assert.match(agree.flags, /alwaysAgree/); assert.equal(agree.fbScore, 50);
     const doubt = play(f, () => 'doubt', () => 1);
-    assert.match(doubt.flags, /alwaysDoubt/); assert.match(doubt.flags, /checkAll/); assert.equal(doubt.checkCalibration, 0);
+    assert.match(doubt.flags, /alwaysDisagree/); assert.match(doubt.flags, /checkAll/); assert.equal(doubt.checkCalibration, 0);
     const fast = play(f, () => 'agree', () => 0, () => 400);
     assert.match(fast.flags, /disengaged/);
     const inverse = play(f, (c) => (c.truth === 'sound' ? 'doubt' : 'agree'));

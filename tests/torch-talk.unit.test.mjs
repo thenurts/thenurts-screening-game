@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { check, fixPasses, nicknames, points, pyRound } from '../src/modules/torch-talk/checker.js';
-import { buildRound, trayOrder, ITEMS, TAGS, QUESTIONS } from '../src/modules/torch-talk/forms.js';
+import { buildRound, trayOrder, ITEMS, TAGS, QUESTIONS, TUTORIAL } from '../src/modules/torch-talk/forms.js';
+import TUT from '../src/modules/torch-talk/tutorial.json' with { type: 'json' };
 import { score, turnPoints, repairOf, REACTIONS } from '../src/modules/torch-talk/scoring.js';
 
 const byId = Object.fromEntries(ITEMS.map((x) => [x.id, x]));
@@ -92,7 +93,7 @@ test('T6 fix rule', () => {
   assert.equal(repairOf(['a'], { words: ['movie'], pass: false }), 0);
 });
 
-test('form logic: first run = A, restart = B (flagged), later runs = slot-random without A, practice pool only', () => {
+test('form logic: first run = A, restart = B (flagged), later runs = slot-random without A, practice = try-it steps', () => {
   const a = buildRound({ mode: 'real', runNo: 1, attemptNo: 1 });
   assert.equal(a.form, 'A'); assert.deepEqual(a.items.map((x) => x.id), Array.from({ length: 10 }, (_, i) => `A-${String(i + 1).padStart(2, '0')}`));
   const b = buildRound({ mode: 'real', runNo: 1, attemptNo: 2 });
@@ -105,11 +106,7 @@ test('form logic: first run = A, restart = B (flagged), later runs = slot-random
     assert.equal(r.items[2].form, r.items[6].form, 'T3/T7 paired');
     assert.ok(r.items.every((x) => x.form !== 'A'));
     const p = buildRound({ mode: 'practice', rand: rnd });
-    assert.equal(p.items.length, 3); assert.equal(new Set(p.items.map((x) => x.id)).size, 3);
-    assert.ok(p.items.every((x) => x.pool === 'practice'));
-    assert.ok(!p.items[0].gap && !p.items[0].context, 'practice 1: normal');
-    assert.ok(p.items[1].context && TAGS[p.items[1].recipient] === 'Casual Acquaintance', 'practice 2: acquaintance nickname');
-    assert.ok(p.items[2].gap, 'practice 3: gap');
+    assert.deepEqual(p.items.map((x) => x.id), ['G1', 'G2', 'G3', 'G4a', 'G4b', 'G5'], 'practice = the try-it steps, same for everyone');
   }
 });
 
@@ -155,4 +152,22 @@ test('bots: ideal ≈ 100; always-cap scores less; 2-word messages score ≈ 0 o
   const told = playBot((it) => (it.id === 'A-02' ? { words: [...it.ideal, 'gate'] } : ideal(it)));
   assert.equal(told.knownSkip, 0); assert.equal(best.knownSkip, 1);
   assert.deepEqual(Object.keys(QUESTIONS), ['when', 'where', 'who', 'what', 'howmany']);
+});
+
+test('how-to v3 try-it steps: Python build check passes and the JS checker agrees on every persona message', (t) => {
+  let out;
+  try { out = execFileSync('python3', ['tools/tt_build_tutorial.py', '/tmp/tt-tutorial-check.json'], { encoding: 'utf8' }); }
+  catch (e) { if (e.code === 'ENOENT') return t.skip('python3 not installed'); throw e; }
+  assert.equal(out.trim(), 'TUTORIAL OK');
+  assert.deepEqual(JSON.parse(readFileSync('/tmp/tt-tutorial-check.json', 'utf8')), TUT, 'tutorial.json is up to date');
+  const by = Object.fromEntries(TUTORIAL.map((x) => [x.id, x]));
+  for (const [id, m, want, pts] of TUT.personas) {
+    assert.equal(check(m.split(' '), by[id]), want, `${id}: ${m}`);
+    if (pts != null) assert.equal(points(m.split(' '), by[id]), pts, `${id} points: ${m}`);
+  }
+  // step 1 catches sentence writers: the full sentence passes but is longer than maxWords
+  const g1 = by.G1, sentence = 'the picnic is on Sunday now please bring a blanket'.split(' ');
+  assert.equal(check(sentence, g1), 'pass'); assert.ok(sentence.length > g1.maxWords && sentence.length <= g1.cap);
+  assert.deepEqual(nicknames(by.G4a), ['rocket']); assert.deepEqual(nicknames(by.G4b), ['rocket']);
+  assert.ok(!trayOrder(by.G5).includes('4pm') && trayOrder(by.G5).includes(null), 'G5: the time only appears after asking');
 });
