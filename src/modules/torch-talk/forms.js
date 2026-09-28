@@ -1,23 +1,30 @@
 // Round composition (build pack §4). Pure: the scene passes its seeded rand().
 import DATA from './items.json' with { type: 'json' };
+import TUT from './tutorial.json' with { type: 'json' };
 
 export const CONFIG = { firstRunForm: 'A', restartForm: 'B' }; // tt.firstRunForm (keep on A until the 30+ play review)
 export const ITEMS = DATA.items;
 export const QUESTIONS = DATA.questions;
 export const TAGS = DATA.recipients; // liam/mia/zoey → Close Friend · raj/amira → Casual Acquaintance
 export const ITEM_BANK_VERSION = 3; // bank v2.2 (v2.1 rounds = 2, v1 rounds = 1 / absent)
+/** How-to v3 (request #17): the try-it steps G1–G5 replace the practice turns (P-01…P-08 stay in items.json, unused). */
+export const TUTORIAL = TUT.steps;
+export const TUTORIAL_VERSION = TUT.version;
+/** The latest tutorial on this page, so the real round can carry the tutorialStruggle caveat (≥ 3 fail-safes). */
+export const tutorialMemo = { done: false, failSafes: 0 };
 const REAL = ITEMS.filter((x) => x.pool === 'real');
 const PRACTICE = ITEMS.filter((x) => x.pool === 'practice');
 const bySlot = (form, slot) => REAL.find((x) => x.form === form && x.slot === slot);
 
 /**
- * mode 'practice' → 3 turns: a normal item, a Casual Acquaintance nickname item, then a gap item (build pack v2.1 §1).
+ * mode 'practice' → the 6 try-it steps of how-to v3 (G1, G2, G3, G4a, G4b, G5), the same for everyone.
  * real, first run, first attempt → Form A (identical for everyone: the official score).
  * real, first run, a restart after leaving the round → Form B, flagged restartedAfterSetback.
  * real, later runs → slot-wise random (T3 and T7 from the same form), from forms other than the first-run form.
  */
 export function buildRound({ mode, runNo = 1, attemptNo = 1, rand = Math.random, cfg = CONFIG, form = null }) {
-  if (mode === 'practice') {
+  if (mode === 'practice') return { form: 'T', restartedAfterSetback: false, items: TUTORIAL };
+  if (mode === 'practice-v2') { // the v2.1 practice turns, kept for reference only
     const pickOf = (list) => list[Math.floor(rand() * list.length)];
     const normal = PRACTICE.filter((x) => !x.gap && !x.context), nick = PRACTICE.filter((x) => x.context), gap = PRACTICE.filter((x) => x.gap);
     return { form: 'P', restartedAfterSetback: false, items: [pickOf(normal), pickOf(nick), pickOf(gap)] };

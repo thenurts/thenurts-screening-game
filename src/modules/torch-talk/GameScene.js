@@ -3,7 +3,7 @@ import { ModuleScene } from '../../core/ModuleScene.js';
 import { C, hex, FONT } from '../../core/theme.js';
 import { sfx } from '../../core/sfx.js';
 import { charImg } from '../../core/ui/dom.js';
-import { buildRound, trayOrder, QUESTIONS, TAGS, ITEM_BANK_VERSION } from './forms.js';
+import { buildRound, trayOrder, QUESTIONS, TAGS, ITEM_BANK_VERSION, TUTORIAL_VERSION, tutorialMemo } from './forms.js';
 import { check, fixPasses, slotsFor, nicknames, points, ratio } from './checker.js';
 import { score, turnPoints, REACTIONS } from './scoring.js';
 import bgUrl from './assets/bg-garden.webp';
@@ -26,6 +26,8 @@ const NAMES = { liam: 'Liam', mia: 'Mia', zoey: 'Zoey', noah: 'Noah', raj: 'Raj'
 const ICON = { when: '🕒', where: '📍', who: '👤', what: '📦', howmany: '🔢' };
 // Raj and Amira are supporting characters with busts only (no full-body 'front' pose): their resting pose is 'happy'.
 const REST = (who) => (who === 'raj' || who === 'amira' ? 'happy' : 'front');
+const HELP = '✂ Short   🎯 Say what to do   👤 Who’s reading?   ❓ Ask';
+const FAIL_TEXT = { missing: 'Hmm, something’s missing.', breaker: 'That’s not what the note says!', negated: 'That says the opposite!', order: 'The words are in a confusing order.', bind: 'Who does what? It’s mixed up.', between: 'The words are in a confusing order.' };
 const norm = (w) => w.replace(/[^A-Za-z0-9'’\-é]/g, '').replace('’', "'").toLowerCase();
 
 export default class GameScene extends ModuleScene {
@@ -44,8 +46,10 @@ export default class GameScene extends ModuleScene {
     this.panel = this.add.container(0, 0).setDepth(100);
     this.overlay = this.add.container(0, 0).setDepth(800);
     this.bubble = this.add.container(this.W / 2, 0).setAlpha(0).setDepth(850);
-    this.turnPill = this.pill(250, 64, 230, 'Turn 0 / 10');
-    this.scorePill = this.pill(480, 64, 190, 'Score 0');
+    this.tut = this.mode === 'practice'; // how-to v3: practice = the try-it steps
+    this.turnPill = this.pill(215, 64, 200, this.tut ? 'Step 1 / 5' : 'Turn 0 / 10');
+    this.scorePill = this.pill(420, 64, 180, 'Score 0');
+    this.helpBtn = this.roundIcon(560, 64, '?', () => this.openHelp()).setDepth(900); // reopens the recap card
     this.drawWorld();
     this.layout();
     const onResize = () => { this.drawWorld(); this.layout(); if (this.item) this.renderPanel(); };
@@ -112,7 +116,8 @@ export default class GameScene extends ModuleScene {
   layout() {
     const v = this.view();
     const touch = this.sys.game.device.input.touch;
-    const y0 = this.mode === 'practice' ? 165 : 112;
+    const helpY = this.mode === 'practice' ? 160 : 108, helpH = 50; // helper strip (real) / step headline (try-it steps)
+    const y0 = helpY + helpH + 34; // room for the note's tape strip
     const y1 = v.bottom - (touch ? 40 : 16) / v.z;
     const avail = y1 - y0;
     const gap = 10, sp = 12;
@@ -122,10 +127,10 @@ export default class GameScene extends ModuleScene {
     let noteH = 262, collapsed = false;
     while (need(noteH, tileH) > avail && tileH > Math.max(floor, 60)) tileH -= 2;
     if (need(noteH, tileH) > avail) { collapsed = true; noteH = 96; tileH = Math.max(84, 48 / v.z); while (need(noteH, tileH) > avail && tileH > 56) tileH -= 2; }
-    const L = { y0, y1, tileH, gap, noteH, collapsed };
+    const L = { y0, y1, tileH, gap, noteH, collapsed, helpY, helpH };
     L.noteY = y0; L.stripY = L.noteY + noteH + sp; L.barY = L.stripY + 84 + sp; L.trayY = L.barY + 158 + sp;
     L.btnY = L.trayY + 6 * tileH + 5 * gap + sp + tileH / 2;
-    L.panelTop = y0 - 8; L.panelBottom = v.bottom + 30;
+    L.panelTop = helpY - 8; L.panelBottom = v.bottom + 30;
     this.L = L;
     this.drop = v.bottom - L.panelTop + 40; // how far the panel slides to reveal the garden
     this.bubble.y = L.stripY + 40;
@@ -145,16 +150,18 @@ export default class GameScene extends ModuleScene {
     if (this.turnIdx >= this.items.length) return this.endRound();
     const it = (this.item = this.items[this.turnIdx]);
     this.msg = []; this.asks = []; this.answerShown = false; this.fix = null; this.phase = 'compose'; this.cap = it.cap;
+    this.tries = 0; this.firstMessage = null; this.usedFailSafe = false;
     this.tray = trayOrder(it);
     this.turnStartAt = performance.now();
-    this.turnPill.text.setText(`Turn ${this.turnIdx + 1} / ${this.items.length}`); this.pop(this.turnPill);
+    this.turnPill.text.setText(this.tut ? `Step ${it.step} / 5` : `Turn ${this.turnIdx + 1} / ${this.items.length}`); this.pop(this.turnPill);
     this.pose(this.friend, it.recipient, REST(it.recipient));
     this.trace('turn', { turn: this.turnIdx + 1, itemId: it.id, recipient: it.recipient });
     this.renderPanel();
-    this.panel.x = this.W; this.tweens.add({ targets: this.panel, x: 0, duration: ms('noteIn'), ease: 'Cubic.easeOut' });
+    this.panelItemId = it.id; // test hook: which item the panel shows (frame check for request #15)
+    this.tweens.killTweensOf(this.panel);
+    this.panel.setPosition(this.W, 0); this.tweens.add({ targets: this.panel, x: 0, duration: ms('noteIn'), ease: 'Cubic.easeOut' });
     sfx.play('whoosh');
     this.armIdle();
-    if (this.mode === 'practice' && it.gap && !this.coached) { this.coached = true; this.time.delayedCall(ms('noteIn') + 200, () => this.coach()); }
   }
 
   // ---------------------------------------------------------------- panel rendering
@@ -164,6 +171,7 @@ export default class GameScene extends ModuleScene {
     this.panel.removeAll(true); this.hideOverlay();
     const bg = this.add.graphics().fillStyle(hex(C.cream), 0.97).fillRoundedRect(14, L.panelTop, W - 28, L.panelBottom - L.panelTop, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(14, L.panelTop, W - 28, L.panelBottom - L.panelTop, 36);
     this.panel.add(bg);
+    this.panel.add(this.helperStrip(L.helpY, L.helpH));
     // note (always visible, or one tap away on short screens)
     if (L.collapsed) this.panel.add(this.noteCollapsed(L.noteY));
     else { const n = this.noteCard(W / 2, L.noteY, 660, L.noteH); this.panel.add(n); this.noteWords = n.words; }
@@ -178,6 +186,33 @@ export default class GameScene extends ModuleScene {
     this.sendBtn.list[1].add(this.add.image(this.phase === 'fix' ? -112 : -84, 0, 'tt-torch').setDisplaySize(58, 30));
     this.enable(this.askBtn, askOn); this.enable(this.sendBtn, this.msg.length > 0 && (this.phase === 'compose' || this.phase === 'fix'));
     this.panel.add([this.askBtn, this.sendBtn]);
+  }
+
+  /** Real round: the 4-rule helper strip. Try-it steps: this step's headline. */
+  helperStrip(y, h) {
+    const c = this.add.container(0, y); const it = this.item;
+    c.add(this.add.graphics().fillStyle(hex(this.tut ? C.sun : C.butter), 1).fillRoundedRect(40, 0, 640, h, h / 2).lineStyle(3, hex(C.ink), 1).strokeRoundedRect(40, 0, 640, h, h / 2));
+    const label = this.tut ? `Step ${it.step} of 5 · ${it.headline}${it.part ? ` (${it.part === 'a' ? 1 : 2} of 2)` : ''}` : HELP;
+    const t = this.txt(360, h / 2 + 1, label, { fontSize: this.tut ? '28px' : '23px', fontStyle: '800' });
+    if (t.width > 600) t.setScale(600 / t.width); // emoji widths vary by device font
+    c.add(t);
+    return c;
+  }
+
+  /** The recap card (how-to v3), reopened with the ? button. */
+  openHelp() {
+    if (this.ended) return;
+    this.hideOverlay(); this.trace('help_open', { turn: this.turnIdx + 1 });
+    const v = this.view(), W = this.W, top = Math.max(200, this.H / 2 - 330);
+    const dim = this.add.rectangle(W / 2, this.H / 2, v.vw + 40, v.vh + 40, 0x0b0b0b, 0.5).setInteractive();
+    const g = this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(70, top + 10, 580, 640, 36).fillStyle(hex(C.white), 1).fillRoundedRect(70, top, 580, 640, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(70, top, 580, 640, 36);
+    const rows = [['✂', 'Short', 'every word is 1 flash'], ['🎯', 'Clear', 'say what to do'], ['👤', 'Who’s reading?', 'Close Friends know nicknames'], ['❓', 'Ask', 'if something is missing']];
+    const items = rows.flatMap(([ic, a, b], i) => [this.txt(130, top + 130 + i * 96, ic, { fontSize: '44px' }),
+      this.txt(180, top + 116 + i * 96, a, { fontSize: '32px', align: 'left' }).setOrigin(0, 0.5), this.txt(180, top + 152 + i * 96, b, { fontSize: '24px', fontStyle: '600', color: C.charcoal, align: 'left' }).setOrigin(0, 0.5)]);
+    const foot = this.txt(W / 2, top + 520, 'No timer. Right but long = fewer points.\nWrong = 0.', { fontSize: '24px', fontStyle: '700' });
+    const close = this.btn(W / 2, top + 590, 'Got it', () => this.hideOverlay(), { w: 260, h: 72, size: 28, fill: C.sun });
+    this.overlay.add([dim, g, this.txt(W / 2, top + 56, 'Remember', { fontSize: '36px' }), ...items, foot, close]);
+    dim.on('pointerup', () => this.hideOverlay());
   }
 
   enable(b, on) { b.setAlpha(on ? 1 : 0.4); if (on) b.setInteractive({ useHandCursor: true }); else b.disableInteractive(); }
@@ -480,7 +515,11 @@ export default class GameScene extends ModuleScene {
         asks: this.asks.slice(), ms: Math.round(performance.now() - this.turnStartAt) };
       rec.base = points(words, it); rec.ratio = ratio(words, it); // v2.2: clarifiers count; asks are subtracted below
       rec.points = turnPoints(rec);
-      this.cur = rec; this.turns.push(rec);
+      if (this.tut) { // try-it step: the step is done only when the message passes (step 1 also needs ≤ maxWords)
+        this.tries++; if (!this.firstMessage) this.firstMessage = words.join(' ');
+        rec.stepOk = rec.pass && (!it.maxWords || words.length <= it.maxWords);
+      }
+      this.cur = rec; if (!this.tut || rec.stepOk) this.turns.push(rec);
       this.trace('comm_message', { turn: rec.turn, itemId: rec.itemId, tag: rec.tag, words, ideal: rec.ideal, used: rec.used, pass: rec.pass, failReason: rec.failReason, usedShorthand: rec.usedShorthand });
       outcome = it.mixup ? 'echo' : rec.pass ? 'pass' : 'fail';
     }
@@ -523,15 +562,62 @@ export default class GameScene extends ModuleScene {
     const s = this.add.image(0, 0, 'tt-slip'); s.setDisplaySize(300, 300 * s.height / s.width);
     const label = outcome === 'echo' ? `${it.mixup.echo}?` : outcome === 'pass' ? '✓' : '✗';
     this.slip.add([s, this.txt(10, 8, label, { fontSize: outcome === 'echo' ? '52px' : '84px', color: outcome === 'pass' ? C.green : outcome === 'fail' ? C.red : C.ink })]);
-    if (this.mode === 'practice' && this.phase === 'send' && !this.fix) this.slip.add(this.txt(0, 130, `Shortest: ${it.ideal.join(' ')}`, { fontSize: '24px', color: C.white, stroke: C.ink, strokeThickness: 6, wordWrap: { width: 420 } }));
     this.slip.setAlpha(1).setScale(0.3); this.tweens.add({ targets: this.slip, scale: 1, duration: 260, ease: 'Back.easeOut' });
-    const hold = ms('react') + (this.mode === 'practice' ? 1200 / SPEED : 0);
+    const hold = ms('react');
     this.time.delayedCall(hold, () => {
       this.slip.setAlpha(0); this.notebook.setAlpha(0); this.nbText.setAlpha(0);
       this.pose(this.noah, 'noah', 'happy'); this.pose(this.friend, it.recipient, REST(it.recipient));
       if (outcome === 'echo') { this.phase = 'fix'; this.cap = FIX_CAP; this.msg = []; this.renderPanel(); this.slideUp(); this.armIdle(); return; }
+      if (this.tut && !this.cur.stepOk) return this.retryStep(this.cur);
+      if (this.tut) this.trace('tt_tutorial', { step: it.step, itemId: it.id, tries: this.tries, firstMessage: this.firstMessage, usedFailSafe: this.usedFailSafe });
+      if (this.tut) (this.tutLog ||= []).push({ id: it.id, step: it.step, tries: this.tries, usedFailSafe: this.usedFailSafe });
       this.endTurn();
     });
+  }
+
+  /** Try-it step not done yet: the friend says what went wrong, then the same note comes back. After 2 tries, a fail-safe. */
+  retryStep(rec) {
+    const it = this.item, c = it.catch || {}, words = rec.words;
+    let say;
+    if (rec.pass && it.maxWords && words.length > it.maxWords) say = c.long.replace('{n}', words.length);
+    else if (c.word && words.includes(c.word)) say = c.text;
+    else if (c.missingSlot && rec.failReason === 'missing' && !it.slots.find((x) => x.id === c.missingSlot).accept.some((a) => a.split(' ').every((w) => words.includes(w)))) say = c.text;
+    else if (it.gap && !this.answerShown) say = c.text;
+    else say = FAIL_TEXT[rec.failReason] || 'Not quite. Try again!';
+    this.cur = null; this.phase = 'compose';
+    if (this.tries >= 2) { // fail-safe: show one right message; the player sends it to move on
+      this.usedFailSafe = true;
+      if (it.gap) this.answerShown = true;
+      this.msg = [...it.ideal];
+      say = `${say} Here’s one way. Tap Send.`;
+    }
+    this.renderPanel(); this.slideUp(); this.armIdle();
+    const who = rec.pass && it.maxWords && words.length > it.maxWords ? 'Noah' : NAMES[it.recipient];
+    this.tip(`${who}: “${say}”`);
+    if (!this.usedFailSafe && c.hint) this.time.delayedCall(ms('panel'), () => this.pulseTile(c.hint));
+    if (!this.usedFailSafe && it.gap && !this.answerShown) this.time.delayedCall(ms('panel'), () => this.tweens.add({ targets: this.askBtn, scale: 1.1, yoyo: true, repeat: 5, duration: 260 }));
+    if (this.usedFailSafe) this.time.delayedCall(ms('panel'), () => this.tweens.add({ targets: this.sendBtn, scale: 1.1, yoyo: true, repeat: 5, duration: 260 }));
+  }
+
+  /** A speech bubble over the recipient strip (stays until the next input or 4 s). */
+  tip(text) {
+    this.lastTip = text; // test hook
+    this.bubble.removeAll(true);
+    const t = this.txt(0, 0, text, { fontSize: '26px', wordWrap: { width: 560 } });
+    const h = Math.max(80, t.height + 30);
+    this.bubble.add([this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(-300, -h / 2, 600, h, 30).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(-300, -h / 2, 600, h, 30), t]);
+    this.bubble.setPosition(this.W / 2, this.L.stripY + 42).setAlpha(1).setScale(0.3);
+    this.tweens.killTweensOf(this.bubble);
+    this.tweens.add({ targets: this.bubble, scale: 1, duration: 260, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: this.bubble, alpha: 0, delay: 4000 / SPEED, duration: 300 });
+  }
+
+  pulseTile(word) {
+    const i = this.tray.indexOf(word); if (i < 0) return;
+    const tw = (640 - 24) / 3, x = 40 + (i % 3) * (tw + 12) + tw / 2, y = this.L.trayY + Math.floor(i / 3) * (this.L.tileH + this.L.gap) + this.L.tileH / 2;
+    const ring = this.add.graphics().lineStyle(6, hex(C.amber), 1).strokeRoundedRect(x - tw / 2 - 4, y - this.L.tileH / 2 - 4, tw + 8, this.L.tileH + 4, this.L.tileH / 2);
+    this.panel.add(ring);
+    this.tweens.add({ targets: ring, alpha: 0.2, yoyo: true, repeat: 5, duration: 300, onComplete: () => ring.destroy() });
   }
 
   slideUp() { this.tweens.add({ targets: this.panel, y: 0, duration: ms('panel'), ease: 'Cubic.easeOut' }); }
@@ -546,8 +632,9 @@ export default class GameScene extends ModuleScene {
     }
     this.cur = null;
     this.phase = 'between';
-    this.tweens.add({ targets: this.panel, y: 0, duration: ms('panel'), ease: 'Cubic.easeOut' });
-    this.time.delayedCall(ms('panel'), () => this.nextTurn());
+    // Request #15: the ended turn's panel never comes back. It stays hidden below the screen; nextTurn() swaps in the
+    // next note and tray first, then slides the new panel in from the side.
+    this.time.delayedCall(ms('panel') * 0.6, () => this.nextTurn());
   }
 
   endRound() {
@@ -560,14 +647,28 @@ export default class GameScene extends ModuleScene {
 
   // ---------------------------------------------------------------- results
   metrics() {
+    if (this.tut) return this.tutorialMetrics();
     const turns = this.turns || [];
     const s = score({ turns, idleNudges: this.idleNudges || 0, restartedAfterSetback: !!this.restarted, nTurns: (this.items || []).length || 10 });
+    const flags = [s.flags, tutorialMemo.done && tutorialMemo.failSafes >= 3 ? 'tutorialStruggle' : ''].filter(Boolean).join(' ');
     return {
-      ...s,
+      ...s, flags,
+      tutorialDone: tutorialMemo.done, tutorialFailSafes: tutorialMemo.done ? tutorialMemo.failSafes : '',
       itemBankVersion: ITEM_BANK_VERSION, form: this.form || '', itemIds: (this.items || []).map((x) => x.id).join(' '), turnsPlayed: turns.length, idleNudges: this.idleNudges || 0, idleMs: Math.round(this.idleMs || 0),
       // raw turns for re-scoring later: [turn, itemId, message, pass, failReason, asks (q+ right / q- other), points, fix (+ passed / - not)]
       turnLog: turns.map((t) => [t.turn, t.itemId, t.words.join(' '), t.pass ? 1 : 0, t.failReason, t.asks.map((a) => a.q + (a.correct ? '+' : '-')).join(','), t.points,
         t.fix ? t.fix.words.join(' ') + (t.fix.pass ? ' +' : ' -') : '', t.ms]),
     };
+  }
+
+  /** Try-it steps (practice): not scored for the trait; logged so staff can see who needed the fail-safe. */
+  tutorialMetrics() {
+    const log = this.tutLog || [], done = log.length === (this.items || []).length && log.length > 0;
+    const failSafes = log.filter((x) => x.usedFailSafe).length;
+    if (done) Object.assign(tutorialMemo, { done: true, failSafes });
+    const pts = (this.turns || []).reduce((a, t) => a + (t.base || 0), 0);
+    return { messageScore: pts, understood: log.filter((x) => !x.usedFailSafe && x.tries === 1).length, tutorialVersion: TUTORIAL_VERSION, steps: log.length,
+      failSafes, tries: log.map((x) => `${x.id}:${x.tries}${x.usedFailSafe ? '!' : ''}`).join(' '), idleMs: Math.round(this.idleMs || 0),
+      flags: failSafes >= 3 ? 'tutorialStruggle' : '' };
   }
 }

@@ -1,7 +1,7 @@
 // Fair Board · critical thinking (Zoey). Brief: ./README.md · build pack: 11-game-concepts.md (CT2 v1)
 export default {
   id: 'fair-board',
-  version: 1,
+  version: 2, // v1.1 patch: the button says Disagree (stored response stays 'doubt')
   title: 'Fair Board',
   tagline: 'Everyone at the fair is quoting the noticeboard. Are they right?',
   trait: 'critical',
@@ -13,7 +13,7 @@ export default {
   summaryKeys: ['fbScore', 'correct', 'claimAccuracy', 'checkCalibration', 'cueSway', 'postBumpDelta', 'form', 'flags'],
   howTo: [
     { title: 'Read the board', body: 'Everyone at the fair is quoting the noticeboard. Are they right?', icon: '📌' },
-    { title: 'Only if the board shows it', body: 'Agree only if the board shows it. If the board doesn’t say why, “because…” is a Doubt.', icon: '✅' },
+    { title: 'Only if the board shows it', body: 'Agree only if the board shows it. If the board doesn’t say why, disagree with “because…”.', icon: '✅' },
     { title: 'No rush. Check it', body: 'Tap Check to zoom in. “Next to” means side by side, not corner to corner.', icon: '🔍' },
   ],
   practice: { durationSec: null, showTimer: false, scored: false }, // 3 claims with feedback

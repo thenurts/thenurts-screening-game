@@ -1,5 +1,5 @@
 // Fair Board scoring (build pack CT2 v1 §5). Pure functions over the raw claim log, so the Sheet-side scoring layer can reuse them.
-// A claim entry: { n, id, board, type, truth: 'sound'|'flawed', cue: null|'sure'|'crowd', response: 'agree'|'doubt', checks: count, ms }
+// A claim entry: { n, id, board, type, truth: 'sound'|'flawed', cue: null|'sure'|'crowd', response: 'agree'|'doubt' (the Disagree button; the stored value stays 'doubt'), checks: count, ms }
 
 export const SCORING = { sameFlag: 22, disengagedMedianMs: 1000, disengagedSame: 20, checkAllFlag: 22, bumpAfter: 12 };
 
@@ -25,7 +25,7 @@ export function score(claims, cfg = SCORING) {
   const agrees = claims.filter((c) => c.response === 'agree').length, doubts = claims.length - agrees;
   const flags = [];
   if (agrees >= cfg.sameFlag) flags.push('alwaysAgree');
-  if (doubts >= cfg.sameFlag) flags.push('alwaysDoubt');
+  if (doubts >= cfg.sameFlag) flags.push('alwaysDisagree');
   if (claims.length && median(claims.map((c) => c.ms)) < cfg.disengagedMedianMs && Math.max(agrees, doubts) >= cfg.disengagedSame) flags.push('disengaged');
   if (claims.filter((c) => c.checks > 0).length >= cfg.checkAllFlag) flags.push('checkAll');
   return {

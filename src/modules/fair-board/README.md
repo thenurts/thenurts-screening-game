@@ -1,10 +1,10 @@
-# Fair Board (`fair-board`) · v1 (build pack CT2 v1) · built 2026-09-27
+# Fair Board (`fair-board`) · v2 (build pack CT2 v1.1) · built 2026-09-27, patched 2026-09-28
 
 **Trait:** `critical` (MIB 0–100) · **Host:** Zoey · **Sources:** Liam, Mia, Noah, Raj, Amira (busts) and the teacher (a code-drawn chalkboard icon). Passive hooks: `resilience` (the claim-12 bump), `learning` (practice → real).
 **Source:** Game Ideas build pack CT2 v1 (`11-game-concepts.md`) + `fair-board-content.json` v1.0 + `fair-board-stress-test.py`.
 
 ## How it plays
-A corkboard (Adrian's background, nine-sliced so the frame, bunting and grass keep their shape) shows one board at a time: **Stall sales** (claims 1–8) → **Timetable** (9–16) → **Fair map** (17–24), with a "Board 2 of 3" slide between boards. Each claim is a speech bubble from a source. The player taps **Agree** or **Doubt** (equal pills, fixed sides; nothing pre-selected). **🔍 Check** is free and logged: it zooms towards the claim's `evidence` cells and outlines them for 1.5 s; evidence on another board shows as a half-size inset copy of that board, placed away from the outlined cells. After claim 12, **"Oops! I bumped the board!"** (Liam): the timetable rows move to the fixed order `BUMP_ORDER` [3, 0, 4, 1, 2] (every row moves, same for everyone). No feedback and no timer in the real round; Zoey nudges after 20 s idle. The end recap shows "You called N of 24 right" + ✓/✗ per claim, then the usual results screen with the median.
+A corkboard (Adrian's background, nine-sliced so the frame, bunting and grass keep their shape) shows one board at a time: **Stall sales** (claims 1–8) → **Timetable** (9–16) → **Fair map** (17–24), with a "Board 2 of 3" slide between boards. Each claim is a speech bubble from a source. The player taps **Agree** or **Disagree** (v1.1; was Doubt) (equal pills, fixed sides; nothing pre-selected). **🔍 Check** is free and logged: it zooms towards the claim's `evidence` cells and outlines them for 1.5 s; evidence on another board shows as a half-size inset copy of that board, placed away from the outlined cells. After claim 12, **"Oops! I bumped the board!"** (Liam): the timetable rows move to the fixed order `BUMP_ORDER` [3, 0, 4, 1, 2] (every row moves, same for everyone). No feedback and no timer in the real round; Zoey nudges after 20 s idle. The end recap shows "You called N of 24 right" + ✓/✗ per claim, then the usual results screen with the median.
 
 **Practice:** the fruit stall, 3 claims, Zoey gives feedback after each (claim 3 teaches the "because…" rule).
 **Forms:** A = the first real attempt of run 1 (official); any restart and every later run = B (`repeatAttempt` flag on a run-1 restart). Developer mode can force A or B (`devOptions.form`).
@@ -19,10 +19,10 @@ A corkboard (Adrian's background, nine-sliced so the frame, bunting and grass ke
 | `assets/bg-cork.webp` | the corkboard background (1024 × 1536, q80) |
 
 ## Scoring (build pack §5)
-- `claimAccuracy` = Doubts on flawed ÷ 12 − Doubts on sound ÷ 12; `checkCalibration` = Check rate on flawed − Check rate on sound.
+- `claimAccuracy` = Disagrees on flawed ÷ 12 − Disagrees on sound ÷ 12 (stored `response` stays `doubt`); `checkCalibration` = Check rate on flawed − Check rate on sound.
 - **traitScore `fbScore`** = round(100 × (0.75 × (claimAccuracy + 1) ÷ 2 + 0.25 × (checkCalibration + 1) ÷ 2)). A perfect player who never Checks gets 88; perfect + Checks only the flawed claims = 100; always Agree = 50.
 - Logged only: `cueSway` (error rate on "I'm sure / Everyone says" claims − on plain ones), `typeAccuracy`, `postBumpDelta` (accuracy on 13–17 − on 8–12), `bumpNextMs`.
-- Flags: `alwaysAgree` / `alwaysDoubt` (≥ 22 the same), `disengaged` (median < 1 s and ≥ 20 the same), `checkAll` (≥ 22 checked), `repeatAttempt`.
+- Flags: `alwaysAgree` / `alwaysDisagree` (was `alwaysDoubt` in v1) (≥ 22 the same), `disengaged` (median < 1 s and ≥ 20 the same), `checkAll` (≥ 22 checked), `repeatAttempt`.
 
 ## Data recorded
 - **Rounds `metrics_json`:** all of the above + `form`, `contentVersion`, `claimLog` [n, id, A|D, checks, ms, correct 1|0], `idleNudges`, `idleMs`.

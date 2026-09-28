@@ -4,5 +4,6 @@ export default [
   'lucky-dip', // risk appetite (Mia)
   'torch-talk', // effective communication (Noah)
   'fair-board', // critical thinking (Zoey)
+  'mamak-rush', // organisation (Liam)
   // 'sample-tap' retired 2026-09-26 (test module; folder kept as a coding example)
 ];

@@ -1,0 +1,650 @@
+{
+ "version": "1.0",
+ "date": "2026-09-28",
+ "source": "build pack C1 v2.2 §1 (how-to v3)",
+ "steps": [
+  {
+   "id": "G1",
+   "pool": "tutorial",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "mia",
+   "tag": "Close Friend",
+   "type": "change-of-plan",
+   "topic": "picnic day",
+   "note": "Mia, the picnic is on Sunday now, not Saturday. Please bring a blanket.",
+   "slots": [
+    {
+     "id": "what",
+     "accept": [
+      "picnic"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Sunday"
+     ]
+    },
+    {
+     "id": "action",
+     "accept": [
+      "bring"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "blanket"
+     ]
+    }
+   ],
+   "clarifiers": [],
+   "breakers": [
+    "Saturday"
+   ],
+   "fillers": [
+    "the",
+    "is",
+    "on",
+    "now",
+    "not",
+    "please",
+    "a"
+   ],
+   "known": [],
+   "order": [],
+   "bind": [],
+   "between": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "ideal": [
+    "picnic",
+    "Sunday",
+    "bring",
+    "blanket"
+   ],
+   "tiles": [
+    "picnic",
+    "Sunday",
+    "bring",
+    "blanket",
+    "Saturday",
+    "the",
+    "is",
+    "on",
+    "now",
+    "not",
+    "please",
+    "a"
+   ],
+   "cap": 12,
+   "step": 1,
+   "headline": "Short wins",
+   "maxWords": 6,
+   "catch": {
+    "long": "That took {n} flashes! Try it shorter."
+   }
+  },
+  {
+   "id": "G2",
+   "pool": "tutorial",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "liam",
+   "tag": "Close Friend",
+   "type": "request",
+   "topic": "tent tape",
+   "note": "Liam, the tent has a rip. Can you bring some tape to school tomorrow?",
+   "slots": [
+    {
+     "id": "action",
+     "accept": [
+      "bring"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "tape"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "school"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "tomorrow"
+     ]
+    }
+   ],
+   "clarifiers": [],
+   "breakers": [
+    "glue",
+    "today"
+   ],
+   "fillers": [
+    "tent",
+    "rip",
+    "has",
+    "can",
+    "you",
+    "some",
+    "to",
+    "the",
+    "please"
+   ],
+   "known": [],
+   "order": [],
+   "bind": [],
+   "between": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "ideal": [
+    "bring",
+    "tape",
+    "school",
+    "tomorrow"
+   ],
+   "tiles": [
+    "bring",
+    "tape",
+    "school",
+    "tomorrow",
+    "glue",
+    "today",
+    "tent",
+    "rip",
+    "has",
+    "can",
+    "you",
+    "some",
+    "to",
+    "the",
+    "please"
+   ],
+   "cap": 8,
+   "step": 2,
+   "headline": "Say what to do",
+   "catch": {
+    "missingSlot": "action",
+    "text": "Tape… and what do I do?"
+   }
+  },
+  {
+   "id": "G3",
+   "pool": "tutorial",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "zoey",
+   "tag": "Close Friend",
+   "type": "request",
+   "topic": "water the plants",
+   "note": "Zoey, can you give the plants a drink before lunch?",
+   "slots": [
+    {
+     "id": "task",
+     "accept": [
+      "water"
+     ]
+    },
+    {
+     "id": "item",
+     "accept": [
+      "plants"
+     ]
+    },
+    {
+     "id": "w1",
+     "accept": [
+      "before"
+     ]
+    },
+    {
+     "id": "w2",
+     "accept": [
+      "lunch"
+     ]
+    }
+   ],
+   "clarifiers": [],
+   "breakers": [
+    "after",
+    "dinner"
+   ],
+   "fillers": [
+    "give",
+    "drink",
+    "the",
+    "a",
+    "can",
+    "you",
+    "please",
+    "some"
+   ],
+   "known": [],
+   "order": [
+    [
+     "w1",
+     "w2"
+    ]
+   ],
+   "bind": [],
+   "between": [],
+   "shorthand": null,
+   "context": null,
+   "gap": null,
+   "mixup": null,
+   "ideal": [
+    "water",
+    "plants",
+    "before",
+    "lunch"
+   ],
+   "tiles": [
+    "water",
+    "plants",
+    "before",
+    "lunch",
+    "after",
+    "dinner",
+    "give",
+    "drink",
+    "the",
+    "a",
+    "can",
+    "you",
+    "please",
+    "some"
+   ],
+   "cap": 8,
+   "step": 3,
+   "headline": "Your own words work",
+   "catch": {
+    "missingSlot": "task",
+    "text": "Plants don’t drink juice!",
+    "hint": "water"
+   }
+  },
+  {
+   "id": "G4a",
+   "pool": "tutorial",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "liam",
+   "tag": "Close Friend",
+   "type": "meeting",
+   "topic": "meet at the slide",
+   "note": "Liam, meet at the *Rocket* (our name for the big slide) at 3pm.",
+   "slots": [
+    {
+     "id": "action",
+     "accept": [
+      "meet"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "Rocket",
+      "big slide"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "3pm"
+     ]
+    }
+   ],
+   "clarifiers": [],
+   "breakers": [
+    "4pm",
+    "swings"
+   ],
+   "fillers": [
+    "at",
+    "the",
+    "our",
+    "name",
+    "for"
+   ],
+   "known": [],
+   "order": [],
+   "bind": [],
+   "between": [],
+   "shorthand": null,
+   "context": {
+    "tile": "Rocket",
+    "type": "nickname",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "ideal": [
+    "meet",
+    "Rocket",
+    "3pm"
+   ],
+   "tiles": [
+    "meet",
+    "Rocket",
+    "big",
+    "slide",
+    "3pm",
+    "4pm",
+    "swings",
+    "at",
+    "the",
+    "our",
+    "name",
+    "for"
+   ],
+   "cap": 7,
+   "step": 4,
+   "headline": "Who’s reading?",
+   "part": "a",
+   "catch": {
+    "text": "Close Friends know our nicknames."
+   }
+  },
+  {
+   "id": "G4b",
+   "pool": "tutorial",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "raj",
+   "tag": "Casual Acquaintance",
+   "type": "meeting",
+   "topic": "meet at the slide",
+   "note": "Raj, meet at the *Rocket* (our name for the big slide) at 3pm.",
+   "slots": [
+    {
+     "id": "action",
+     "accept": [
+      "meet"
+     ]
+    },
+    {
+     "id": "place",
+     "accept": [
+      "big slide"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "3pm"
+     ]
+    }
+   ],
+   "clarifiers": [],
+   "breakers": [
+    "4pm",
+    "swings"
+   ],
+   "fillers": [
+    "Rocket",
+    "at",
+    "the",
+    "our",
+    "name",
+    "for"
+   ],
+   "known": [],
+   "order": [],
+   "bind": [],
+   "between": [],
+   "shorthand": null,
+   "context": {
+    "tile": "Rocket",
+    "type": "nickname",
+    "slot": "place"
+   },
+   "gap": null,
+   "mixup": null,
+   "ideal": [
+    "meet",
+    "big",
+    "slide",
+    "3pm"
+   ],
+   "tiles": [
+    "meet",
+    "big",
+    "slide",
+    "3pm",
+    "4pm",
+    "swings",
+    "Rocket",
+    "at",
+    "the",
+    "our",
+    "name",
+    "for"
+   ],
+   "cap": 8,
+   "step": 4,
+   "headline": "Who’s reading?",
+   "part": "b",
+   "catch": {
+    "word": "Rocket",
+    "text": "What’s the Rocket?"
+   }
+  },
+  {
+   "id": "G5",
+   "pool": "tutorial",
+   "form": null,
+   "slot": null,
+   "tier": "E",
+   "recipient": "mia",
+   "tag": "Close Friend",
+   "type": "gap",
+   "topic": "swimming time",
+   "note": "Mia, swimming is on Tuesday. I forgot to ask the time.",
+   "slots": [
+    {
+     "id": "what",
+     "accept": [
+      "swimming"
+     ]
+    },
+    {
+     "id": "day",
+     "accept": [
+      "Tuesday"
+     ]
+    },
+    {
+     "id": "time",
+     "accept": [
+      "4pm"
+     ]
+    }
+   ],
+   "clarifiers": [],
+   "breakers": [
+    "3pm",
+    "5pm",
+    "Monday"
+   ],
+   "fillers": [
+    "is",
+    "on",
+    "the",
+    "forgot",
+    "ask",
+    "time",
+    "please"
+   ],
+   "known": [],
+   "order": [],
+   "bind": [],
+   "between": [],
+   "shorthand": null,
+   "context": null,
+   "gap": {
+    "slot": "time",
+    "question": "when",
+    "answerTile": "4pm",
+    "reply": "Mum says 4pm."
+   },
+   "mixup": null,
+   "ideal": [
+    "swimming",
+    "Tuesday",
+    "4pm"
+   ],
+   "tiles": [
+    "swimming",
+    "Tuesday",
+    "3pm",
+    "5pm",
+    "Monday",
+    "is",
+    "on",
+    "the",
+    "forgot",
+    "ask",
+    "time",
+    "please"
+   ],
+   "cap": 7,
+   "step": 5,
+   "headline": "Missing something? Ask",
+   "catch": {
+    "text": "That’s a guess! Something’s missing: tap Ask."
+   }
+  }
+ ],
+ "personas": [
+  [
+   "G1",
+   "the picnic is on Sunday now please bring a blanket",
+   "pass",
+   4
+  ],
+  [
+   "G1",
+   "picnic Sunday bring blanket",
+   "pass",
+   10
+  ],
+  [
+   "G1",
+   "picnic Sunday not Saturday bring blanket",
+   "pass",
+   7
+  ],
+  [
+   "G1",
+   "picnic Saturday bring blanket",
+   "breaker",
+   0
+  ],
+  [
+   "G1",
+   "picnic Sunday blanket",
+   "missing",
+   0
+  ],
+  [
+   "G2",
+   "tape school tomorrow",
+   "missing",
+   0
+  ],
+  [
+   "G2",
+   "bring tape school tomorrow",
+   "pass",
+   10
+  ],
+  [
+   "G2",
+   "bring glue school tomorrow",
+   "breaker",
+   0
+  ],
+  [
+   "G3",
+   "drink plants before lunch",
+   "missing",
+   0
+  ],
+  [
+   "G3",
+   "give plants a drink before lunch",
+   "missing",
+   0
+  ],
+  [
+   "G3",
+   "water plants before lunch",
+   "pass",
+   10
+  ],
+  [
+   "G3",
+   "water plants lunch before",
+   "order",
+   0
+  ],
+  [
+   "G4a",
+   "meet Rocket 3pm",
+   "pass",
+   10
+  ],
+  [
+   "G4a",
+   "meet big slide 3pm",
+   "pass",
+   8
+  ],
+  [
+   "G4b",
+   "meet Rocket 3pm",
+   "missing",
+   0
+  ],
+  [
+   "G4b",
+   "meet big slide 3pm",
+   "pass",
+   10
+  ],
+  [
+   "G5",
+   "swimming Tuesday 3pm",
+   "breaker",
+   0
+  ],
+  [
+   "G5",
+   "swimming Tuesday",
+   "missing",
+   0
+  ],
+  [
+   "G5",
+   "swimming Tuesday 4pm",
+   "pass",
+   10
+  ]
+ ]
+}

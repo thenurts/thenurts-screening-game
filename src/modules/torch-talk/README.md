@@ -1,4 +1,4 @@
-# Torch Talk (`torch-talk`) · v3 (build pack v2.2) · patched 2026-09-27
+# Torch Talk (`torch-talk`) · v4 (build pack v2.2 + how-to v3) · patched 2026-09-28
 
 **Trait:** `communication` (MIB 0–100) · **Host:** Noah · **Close Friends:** Liam, Mia, Zoey · **Casual Acquaintances:** Raj, Amira (busts only).
 **Source:** Game Ideas build pack C1 v2.2 (`11-game-concepts.md`) + item bank v2.2 (`items.json`, 38 items). `itemBankVersion`: absent/1 = v1 (update 8), 2 = v2.1 (update 9), 3 = v2.2 (update 10); versions aren't compared with each other.
@@ -8,7 +8,8 @@ Each of 10 turns: read Noah's note → tap words (18-tile tray, each used once; 
 
 **Points (v2.2):** a passing message scores min(10, round(10 × ideal ÷ (words used + 2.5 × missing clarifiers))), else 0; each Ask −1. Clarifiers are optional words that make a message clearer (e.g. *fair* in A-10), so the ideal (required words + every clarifier) scores 10 and dropping a clarifier costs about as much as 1.5 extra words. Rounding matches Python (halves to even).
 
-**How-to:** 6 cards with live examples (cards 2–3 need the player to tap the right tiles before Next unlocks; cards 4–5 use the how-to-only nickname *Rocket*; card 6 has tappable Ask chips). **Practice:** 3 turns (a normal item, a Casual Acquaintance nickname item, a gap item with a one-time "Something missing? Tap Ask." bubble); the ideal message is shown after each.
+**How-to v3 (request #17, v4):** the How to play button shows 2 cards (the opening picture and the recap). **Practice = 5 try-it steps** scored by the real checker (`tutorial.json`, built and persona-checked by `python3 tools/tt_build_tutorial.py`): 1 Short wins (a full sentence passes but needs a retry at ≤ 6 words) · 2 Say what to do (`tape school tomorrow` → "Tape… and what do I do?") · 3 Your own words work (`drink plants…` → "Plants don't drink juice!", the *water* tile pulses) · 4 Who's reading? (the *Rocket* note to Liam, then to Raj → "What's the Rocket?") · 5 Missing something? Ask (a guessed time fails; Ask pulses). After 2 wrong tries the ideal message is put in the bar and the player sends it. A yellow headline strip shows the step. In the real round a **helper strip** (✂ Short · 🎯 Say what to do · 👤 Who's reading? · ❓ Ask) sits above the note, and **?** reopens the recap. The v2.1 practice items P-01…P-08 stay in `items.json`, unused.
+**Fix (request #15, v4):** after a turn's reaction the ended panel no longer slides back up; the next note and tray are set first and slide in from the side (Playwright frame check).
 
 ## Files
 | File | What |
@@ -22,6 +23,8 @@ Each of 10 turns: read Noah's note → tap words (18-tile tray, each used once; 
 ## Data recorded
 - **Rounds `metrics_json`:** all scores, `itemBankVersion` (3), `idleMs`, `form`, `itemIds`, `turnLog` (turn, itemId, message, pass, failReason, asks, points, fix, ms).
 - **Summary columns:** commScore, meaningRate, efficiency, adaptation, askScore, repairQuality, form, flags.
+- **Practice rounds:** `tt_tutorial {step, itemId, tries, firstMessage, usedFailSafe}` per step; metrics `failSafes`, `tries`, `flags: tutorialStruggle` (≥ 3 fail-safes).
+- **Real round:** `tutorialDone`, `tutorialFailSafes`, and the `tutorialStruggle` flag when that page's practice needed ≥ 3 fail-safes (shown in the Candidate Summary's flags column, not to the player).
 - **RoundTraces:** `comm_message` (with `tag`), `ask`, `comm_repair`, `comm_setback_next`, `coach`, tile add/remove/reorder, note expands, idle nudges.
 
 ## Deviations from the build pack (for Adrian / Game Ideas thread)

@@ -62,9 +62,9 @@ export default class GameScene extends ModuleScene {
     this.nameText = this.txt(98, L.claimY + L.claimH - 4, '', { fontSize: '24px', color: C.white, stroke: C.ink, strokeThickness: 6 });
     this.claimC.add([g, this.claimText, this.avatar, this.nameText]).setAlpha(0);
 
-    // buttons: Agree · Doubt (equal pills, fixed sides) + Check
+    // buttons: Agree · Disagree (equal pills, fixed sides) + Check
     this.agreeBtn = this.btn(190, L.btnY, 'Agree', () => this.answer('agree'), { w: 300, h: 110, size: 40, fill: C.white });
-    this.doubtBtn = this.btn(530, L.btnY, 'Doubt', () => this.answer('doubt'), { w: 300, h: 110, size: 40, fill: C.white });
+    this.doubtBtn = this.btn(530, L.btnY, 'Disagree', () => this.answer('doubt'), { w: 300, h: 110, size: 38, fill: C.white });
     this.checkBtn = this.btn(W / 2, L.checkY, '🔍 Check', () => this.check(), { w: 280, h: 96, size: 32, fill: C.sun });
     [this.agreeBtn, this.doubtBtn, this.checkBtn].forEach((b) => b.setDepth(30));
     this.setButtons(false);
@@ -308,7 +308,7 @@ export default class GameScene extends ModuleScene {
       if (this.locked || this.ended) return;
       this.idleNudges++;
       this.trace('idle', { n: this.claim.n, count: this.idleNudges });
-      this.say('zoey', 'happy', 'No rush. Check the board, then Agree or Doubt.', 3200);
+      this.say('zoey', 'happy', 'No rush. Check the board, then Agree or Disagree.', 3200);
     });
   }
 
