@@ -12,9 +12,10 @@ export const BUMP_ORDER = [3, 0, 4, 1, 2];
  * Form A = the official first real attempt of run 1 (identical for everyone). Any restart and every later run = Form B.
  * `form` (developer mode) overrides. Practice always uses the practice board.
  */
-export function pickForm({ mode, runNo = 1, attemptNo = 1, form = null }) {
+export function pickForm({ mode, runNo = 1, attemptNo = 1, form = null, casual = false }) {
   if (mode === 'practice') return 'P';
   if (form === 'A' || form === 'B') return form;
+  if (casual) return 'B'; // play-for-fun never sees the official Form A (request #26)
   return Number(runNo) <= 1 && attemptNo <= 1 ? 'A' : 'B';
 }
 

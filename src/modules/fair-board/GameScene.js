@@ -44,7 +44,7 @@ export default class GameScene extends ModuleScene {
     fit(); this.scale.on('resize', fit); this.events.once('shutdown', () => this.scale.off('resize', fit));
 
     // state
-    this.form = pickForm({ mode: this.mode, runNo: this.runNo, attemptNo: this.attemptNo, form: this.options.form });
+    this.form = pickForm({ mode: this.mode, runNo: this.runNo, attemptNo: this.attemptNo, form: this.options.form, casual: this.casual });
     this.repeatAttempt = this.mode === 'real' && Number(this.runNo || 1) <= 1 && this.attemptNo > 1;
     this.setupContent();
     this.ptries = {}; this.pFailSafes = 0; this.failSafeFor = null;

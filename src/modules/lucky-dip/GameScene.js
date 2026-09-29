@@ -87,7 +87,7 @@ export default class GameScene extends ModuleScene {
   onStart() {
     // Official round (run 1, first attempt) = shared sequence A; a restart after leaving it, or any later run, gets a
     // freshly generated order of the same 15 bags (same maximum, same fixed-strategy totals).
-    const official = this.mode === 'real' && Number(this.runNo || 1) <= 1 && this.attemptNo <= 1 && !CONFIG.firstRunRandom;
+    const official = this.mode === 'real' && !this.casual && Number(this.runNo || 1) <= 1 && this.attemptNo <= 1 && !CONFIG.firstRunRandom;
     this.repeatAttempt = this.mode === 'real' && Number(this.runNo || 1) <= 1 && this.attemptNo > 1;
     this.sequenceId = this.mode === 'practice' ? 'P' : official ? 'A' : 'generated';
     if (this.mode === 'real' && this.options.sequence) this.sequenceId = this.options.sequence; // developer-mode override (manifest.devOptions)

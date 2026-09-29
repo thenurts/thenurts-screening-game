@@ -41,7 +41,7 @@ export default class GameScene extends ModuleScene {
     const fit = () => { const z = Math.min(this.scale.width / W, this.scale.height / H) || 1; this.bg.setScale(Math.max(Math.max(W, this.scale.width / z) / this.bg.width, Math.max(H, this.scale.height / z) / this.bg.height)); };
     fit(); this.scale.on('resize', fit); this.events.once('shutdown', () => this.scale.off('resize', fit));
     this.tut = this.mode === 'practice';
-    this.form = this.tut ? 'P' : this.options.form === 'A' || this.options.form === 'B' ? this.options.form : Number(this.runNo || 1) <= 1 && this.attemptNo <= 1 ? 'A' : 'B';
+    this.form = this.tut ? 'P' : this.options.form === 'A' || this.options.form === 'B' ? this.options.form : !this.casual && Number(this.runNo || 1) <= 1 && this.attemptNo <= 1 ? 'A' : 'B'; // play-for-fun never sees Form A (request #26)
     this.repeatAttempt = !this.tut && Number(this.runNo || 1) <= 1 && this.attemptNo > 1;
     this.calls = callsOf(this.form);
     this.log = []; this.points = 0; this.idleNudges = 0; this.idleMs = 0; this.firstUse = null; this.unlucky = null;
