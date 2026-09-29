@@ -6,7 +6,7 @@ import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, existsSync } from 'node:fs';
 const exe = existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined;
-const ids = process.argv.slice(2).length ? process.argv.slice(2) : ['lucky-dip', 'torch-talk', 'fair-board', 'mamak-rush', 'fix-it-kit'];
+const ids = process.argv.slice(2).length ? process.argv.slice(2) : ['lucky-dip', 'torch-talk', 'fair-board', 'mamak-rush', 'fix-it-kit', 'big-calls'];
 const tmp = 'test-results/howto-shots'; mkdirSync(tmp, { recursive: true });
 const b = await chromium.launch({ executablePath: exe });
 for (const id of ids) {

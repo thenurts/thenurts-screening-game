@@ -40,6 +40,9 @@ async function playRound(page, strategy = 't3') {
       const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
       if (!s) return 'gone';
       if (s.ended) return 'ending';
+      if (s.manifest.id === 'big-calls') { // the reference "wise" bot, through the same buttons
+        return s.botStep() ? 'chose' : 'wait';
+      }
       if (s.manifest.id === 'fix-it-kit') { // the reference explorer, through the same taps
         if (s.recapDone) { s.recapDone(); return 'chose'; }
         return s.botStep() ? 'chose' : 'wait';
@@ -83,7 +86,7 @@ async function playRound(page, strategy = 't3') {
   }
   expect(await page.evaluate(() => window.__trayBad || [])).toEqual([]);
 }
-const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : t.includes('Mamak') ? 'mk' : t.includes('Fix-It') ? 'fx' : 't3'; };
+const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : t.includes('Mamak') ? 'mk' : t.includes('Fix-It') ? 'fx' : t.includes('Big Calls') ? 'jd' : 't3'; };
 // From the post-game screen: play every remaining game for real, then land on the report.
 async function playRest(page) {
   for (;;) {
@@ -166,7 +169,7 @@ test('applicant: register → how to → practice → real round → report → 
   // Event policy v1.8: no navigation or round-lifecycle rows (rounds live in Rounds / RoundTraces)
   for (const ev of ['home_view', 'howto_page', 'pregame_view', 'round_start', 'round_complete', 'practice_start', 'postgame_view']) expect(rows).not.toContain(ev);
   expect(dbj.rounds.filter((r) => r.mode === 'practice')).toHaveLength(1);
-  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(5);
+  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(6);
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
   expect(dbj.traces.some((t) => t.items.length > 0 && t.partial)).toBeTruthy();
@@ -532,10 +535,45 @@ test('fix-it kit: explorer = 83.6 on Form A; chips come from the kit; how-to use
   expect(errors).toEqual([]);
 });
 
+test('big calls: wise = 100 on Form A; Check shows strength + cost and hides after 3; smart-call badge ignores luck; practice fail-safe', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/' + Q + 'speed=10&first=big-calls');
+  await reset(page);
+  await page.click('#btn-casual');
+  await page.click('#btn-practice');
+  const S = (f) => page.evaluate(`(() => { const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:')); return s ? (${f})(s) : null; })()`);
+  await page.waitForFunction(() => window.__tnGame.scene.getScenes(true).some((x) => x.scene.key === 'mod:big-calls' && x.running && x.cs), null, { timeout: 30_000 });
+  // practice P1: deciding without the (worth-it) strong check twice → fail-safe guides the player
+  await S('(s) => s.choose(1)'); await page.waitForTimeout(600);
+  await S('(s) => s.choose(1)'); await page.waitForTimeout(600);
+  expect(await S('(s) => [s.failSafe, s.lastSay]')).toEqual([true, 'Tap Check: this one is worth a look.']);
+  if (shots) await page.screenshot({ path: `test-results/${info.project.name}-jd-practice.png` });
+  await playRound(page, 'jd');
+  await expect(page.locator('#btn-start')).toBeVisible({ timeout: 30_000 });
+  await page.click('#btn-start');
+  await page.waitForFunction(() => window.__tnGame.scene.getScenes(true).some((x) => x.scene.key === 'mod:big-calls' && x.running && x.cs), null, { timeout: 30_000 });
+  // A01 (worth 20, not urgent): the button names the next clue's strength and cost, and hides after 3 checks
+  expect(await S('(s) => s.checkBtn.list[1].list[1].text')).toBe('Check · weak clue · −2');
+  if (shots) await page.screenshot({ path: `test-results/${info.project.name}-jd-call.png` });
+  await playRound(page, 'jd');
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });
+  await page.waitForTimeout(1500);
+  const dbj = await backend(page);
+  const m = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[10] === 'completed' && x[7] === 'real').map((x) => JSON.parse(x[12])).at(-1)
+    : dbj.rounds.filter((x) => x.status === 'completed' && x.mode === 'real').map((x) => x.metrics).at(-1);
+  expect(m.form).toBe('A');
+  expect([m.judgementScore, m.decisionAccuracy, m.infoValue, m.smartCalls]).toEqual([100, 1, 1, 10]);
+  expect(m.flags).toContain('tutorialStruggle');
+  expect(m.learn).toEqual({ firstUse: [1, 1], pickup: [2, 4] });
+  expect(m.unluckyNext).toBe('followed'); // A04 is an unlucky smart call; the wise bot keeps following the tally
+  expect(errors).toEqual([]);
+});
+
 test('how-to screenshots are staged from each game\'s real UI (standard #19b)', async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile', 'one device');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  for (const [id, cards] of [['lucky-dip', 3], ['torch-talk', 2], ['fair-board', 3], ['mamak-rush', 6], ['fix-it-kit', 4]]) {
+  for (const [id, cards] of [['lucky-dip', 3], ['torch-talk', 2], ['fair-board', 3], ['mamak-rush', 6], ['fix-it-kit', 4], ['big-calls', 5]]) {
     await page.goto('/' + Q + 'speed=10&first=' + id);
     await reset(page);
     await page.click('#btn-casual');
