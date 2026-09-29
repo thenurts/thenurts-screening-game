@@ -1,4 +1,4 @@
-// Consent notice v0.3 (claude/04-consent-notice-draft.md). DRAFT – pending HR/legal review and BM native check.
+// Consent notice v0.4 (claude/04-consent-notice-draft.md; v0.4 adds the game-design and device lines, requests #24/#26/#27). DRAFT – pending HR/legal review and BM native check.
 // Bump CONSENT_VERSION in config.js whenever this text changes.
 export const CONSENT = {
   en: `
@@ -9,7 +9,10 @@ export const CONSENT = {
 <li>The details you enter: name, email, mobile number, the type of role and function you're interested in, and your CV if you choose to upload one (optional).</li>
 <li>How you play: every action you take in the games, including viewing instructions, practice runs, starting, finishing or leaving a game, and your scores. This is recorded as you play, even if you close the page part-way.</li>
 <li>Basic technical details: device type, browser and screen size.</li>
+<li>We note on this device whether practice games were played, so results can be read fairly.</li>
 </ul>
+<h3>About the games</h3>
+<p>Some games are designed to be challenging or frustrating at times. That's intentional, and it's part of what we look at. We look at how you use everything in the app, including optional features.</p>
 <h3>How we recognise you</h3>
 <p>Your email and mobile number together are your player ID. We use them to save your progress, let you resume later, and make sure each person has one record. We do not collect any national ID number.</p>
 <h3>Why we collect it</h3>
@@ -33,7 +36,10 @@ export const CONSENT = {
 <li>Butiran yang anda masukkan: nama, e-mel, nombor telefon bimbit, jenis jawatan dan fungsi yang anda minati, serta CV anda jika anda memilih untuk memuat naiknya (pilihan).</li>
 <li>Cara anda bermain: setiap tindakan anda dalam permainan, termasuk melihat arahan, larian latihan, memulakan, menamatkan atau meninggalkan permainan, dan skor anda. Ini direkodkan semasa anda bermain, walaupun anda menutup halaman di pertengahan.</li>
 <li>Butiran teknikal asas: jenis peranti, pelayar dan saiz skrin.</li>
+<li>Kami merekodkan pada peranti ini sama ada permainan latihan telah dimainkan, supaya keputusan dapat dibaca dengan adil.</li>
 </ul>
+<h3>Tentang permainan</h3>
+<p>Sesetengah permainan direka supaya mencabar atau mengecewakan pada masa tertentu. Ini disengajakan, dan ia sebahagian daripada apa yang kami nilai. Kami melihat cara anda menggunakan semua bahagian aplikasi ini, termasuk ciri pilihan.</p>
 <h3>Cara kami mengenali anda</h3>
 <p>E-mel dan nombor telefon bimbit anda bersama-sama menjadi ID pemain anda. Kami menggunakannya untuk menyimpan kemajuan anda, membolehkan anda menyambung semula kemudian, dan memastikan setiap orang hanya mempunyai satu rekod. Kami tidak mengumpul sebarang nombor kad pengenalan.</p>
 <h3>Mengapa kami mengumpulkannya</h3>

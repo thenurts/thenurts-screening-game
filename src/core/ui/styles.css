@@ -164,3 +164,23 @@ html, body { margin: 0; height: 100%; background: var(--cream); }
 .tn-howto__art--shot { height: auto; min-height: 150px; background: var(--cream); padding: 0; }
 .tn-howto__art--shot img { max-height: 300px; width: 100%; object-fit: contain; display: block; }
 .tn-modal { pointer-events: auto; }
+
+/* Ethics meta-test (request #27): deliberately looks like a leftover internal tool, not like The Nurts UI. */
+.tn-eth { position: fixed; left: 10px; bottom: 10px; z-index: 60; font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .02em;
+  color: #ff6b6b; background: #1d1f21; border: 2px dashed #ff6b6b; border-radius: 3px; padding: 7px 10px; cursor: pointer; opacity: .92; pointer-events: auto; }
+.tn-eth:hover { opacity: 1; }
+.tn-eth__modal { background: rgba(0, 0, 0, .55); }
+.tn-eth__panel { width: min(440px, calc(100vw - 32px)); background: #1d1f21; color: #d6d6d6; border: 1px solid #3a3d41; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: left; }
+.tn-eth__bar { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #2b2e31; color: #9aa0a6; border-bottom: 1px solid #3a3d41; }
+.tn-eth__x { background: none; border: 0; color: #9aa0a6; font: inherit; font-size: 18px; cursor: pointer; }
+.tn-eth__body { padding: 12px; }
+.tn-eth__body p { margin: 0 0 10px; color: #8a9096; }
+.tn-eth__body table { width: 100%; border-collapse: collapse; }
+.tn-eth__body th, .tn-eth__body td { text-align: left; padding: 5px 4px; border-bottom: 1px solid #33363a; font-weight: 400; }
+.tn-eth__body th { color: #8a9096; }
+.tn-eth__in { width: 88px; font: inherit; color: #e8e8e8; background: #111; border: 1px solid #555; border-radius: 2px; padding: 3px 6px; }
+.tn-eth__row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.tn-eth__btn { font: inherit; color: #d6d6d6; background: #33363a; border: 1px solid #555; border-radius: 2px; padding: 6px 14px; cursor: pointer; }
+.tn-eth__btn--go { color: #111; background: #ff6b6b; border-color: #ff6b6b; }
+.tn-link { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: var(--charcoal); text-decoration: underline; cursor: pointer; }

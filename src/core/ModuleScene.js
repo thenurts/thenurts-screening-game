@@ -23,6 +23,7 @@ export class ModuleScene extends Phaser.Scene {
     this.playerKey = data.playerKey || ''; // stable per player (for counterbalancing, e.g. button side)
     this.attemptNo = data.attemptNo || 1;  // real attempts at this game in this run, counted on this device
     this.options = data.options || {};     // per-module options (manifest.devOptions), empty in normal play
+    this.casual = !!data.casual;           // "Just play for fun": never the official content, no one-shot surprises (request #26)
     this.showTimer = (this.mode === 'practice' ? this.manifest.practice : this.manifest.round).showTimer !== false;
     this.runNo = data.runNo;
     this.seed = data.seed >>> 0;

@@ -26,6 +26,8 @@ export const session = {
     });
   },
   get known() { return !!this.userId; },
+  /** "Just play for fun": a casual player (not a staff test identity). Never the official content or the one-shot tests. */
+  get playForFun() { return this.casual && !this.authExtra?.dev; },
   /** Routing key for queued log events: unique per registered user, or per casual session. */
   get key() { return !this.userId ? null : this.casual ? `casual:${this.sessionId}` : this.userId; },
   auth() {

@@ -7,5 +7,5 @@ export default [
   'mamak-rush', // organisation (Liam)
   'fix-it-kit', // creative problem solving (Mia)
   'big-calls', // judgement (Zoey)
-  // 'sample-tap' retired 2026-09-26 (test module; folder kept as a coding example)
+  'sunny-tap', // resilience (Liam); always played last (manifest playLast)
 ];

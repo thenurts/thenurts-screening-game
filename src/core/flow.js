@@ -7,7 +7,18 @@ import { hideUi, show, h, toast } from './ui/dom.js';
 import { friendly } from './errors.js';
 import { MOCK } from './config.js';
 import { homeScreen, applicantScreen, registerScreen, loginScreen } from './screens/entry.js';
-import { preGameScreen, howToModal, postGameScreen, reportScreen } from './screens/game.js';
+import { preGameScreen, howToModal, postGameScreen, reportScreen, debriefScreen } from './screens/game.js';
+import { resetEthics } from './ethics.js';
+
+// Casual-play safeguard C (request #26): a non-personal note on this device of which games were completed in play-for-fun
+// mode. Best-effort (a private window clears it); content separation is the main defence. Read when a candidate signs in.
+const PKEY = 'nurts.practisedModules';
+const practisedThisVisit = new Set();
+const readPractised = () => { try { const v = JSON.parse(localStorage.getItem(PKEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+function markPractised(id) {
+  practisedThisVisit.add(id);
+  try { localStorage.setItem(PKEY, JSON.stringify([...new Set([...readPractised(), id])])); } catch { /* storage blocked */ }
+}
 
 let game = null;
 const backdrop = () => game.scene.getScene('backdrop');
@@ -61,6 +72,9 @@ function login(email = '') {
   });
 }
 
+// Test hook (mock / localhost only): ?candidate=1 lets a casual session play like a candidate (official forms, wipeouts),
+// so the scoring tests can use the quick casual entry. Never available against the real backend.
+const TEST_CANDIDATE = (MOCK || location.hostname === 'localhost') && new URLSearchParams(location.search).get('candidate') === '1';
 const playerKey = () => (session.casual ? session.sessionId : session.userId);
 function setOrder() {
   session.order = runOrder(playerKey(), session.runNo);
@@ -74,9 +88,11 @@ async function enter(data, how) {
   session.set(data);
   claimAnonymous();
   setOrder();
+  session.priorCasual = session.playForFun ? [] : readPractised();
   const next = nextModule(session.completed, session.order);
   log('core', how, { runNo: session.runNo, completed: session.completed.length, resumeAt: next ? next.id : 'report', moduleOrder: session.order.map((m) => m.id).join('>') });
-  log('core', 'session_start', { ua: navigator.userAgent.slice(0, 160), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio, touch: navigator.maxTouchPoints > 0 });
+  log('core', 'session_start', { ua: navigator.userAgent.slice(0, 160), vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio, touch: navigator.maxTouchPoints > 0,
+    ...(session.priorCasual.length ? { priorCasualPlay: session.priorCasual, priorCasualSameVisit: session.priorCasual.filter((id) => practisedThisVisit.has(id)) } : {}) });
   if (how === 'casual_start') { next ? preGame(next) : report(); return; }
   next ? preGame(next) : report();
 }
@@ -126,7 +142,7 @@ async function play(manifest, mode) {
   if (mode === 'real') attempts[attemptKey] = (attempts[attemptKey] || 0) + 1;
   game.scene.add(key, SceneClass, true, {
     manifest, mode, roundUid, roundNo: null, runNo: session.runNo, seed,
-    playerKey: playerKey(), attemptNo: attempts[attemptKey] || 0, options: session.moduleOptions?.[manifest.id] || {},
+    playerKey: playerKey(), attemptNo: attempts[attemptKey] || 0, options: session.moduleOptions?.[manifest.id] || {}, casual: session.playForFun && !TEST_CANDIDATE,
     onDone: (res) => roundDone(manifest, mode, base, res, key),
   });
   scene = game.scene.getScene(key);
@@ -138,6 +154,14 @@ function roundDone(manifest, mode, base, res, key) {
   log(manifest.id, ev, res.status === 'completed' ? res.metrics : { elapsedMs: res.elapsedMs }, ctx);
   game.scene.remove(key);
   game.scene.wake('backdrop');
+  if (mode === 'real' && res.status === 'completed' && res.metrics) {
+    if (session.playForFun) markPractised(manifest.id);
+    else if (session.priorCasual?.includes(manifest.id)) { // practised in play-for-fun first: learning's pickup / firstUse are n/a here
+      const m = res.metrics; m.priorCasualPlay = true;
+      if (m.learn) { const { pickup, firstUse, ...rest } = m.learn; m.learn = { ...rest, priorPractice: true }; }
+      m.flags = [m.flags, 'priorCasualPlay'].filter(Boolean).join(',');
+    }
+  }
   const payload = { ...base, status: res.status, metrics: res.metrics || null, primary: res.metrics?.[manifest.metrics.find((m) => m.primary).key] ?? null, trace: takeTrace(base.roundUid) };
   // Staff-facing values for the Candidate Summary (manifest.summaryKeys), e.g. riskScore / riskBand / flags
   if (res.metrics && manifest.summaryKeys) payload.summary = Object.fromEntries(manifest.summaryKeys.map((k) => [k, res.metrics[k] ?? '']));
@@ -150,11 +174,18 @@ function roundDone(manifest, mode, base, res, key) {
     onContinue: () => {
       log(manifest.id, 'continue', '', ctx);
       const next = nextModule(session.completed, session.order);
-      next ? preGame(next) : report();
+      next ? preGame(next) : endOfSuite();
     },
   });
   // Results show immediately; the "vs median" comparison fills in when the server answers.
   ended.then((out) => scr.setBenchmark?.(out ? out.benchmark : {}));
+}
+
+/** After the last game: the high-level debrief (request #24; candidates only, since play-for-fun has no wipeouts), then the report. */
+function endOfSuite() {
+  // Only after the deliberately frustrating game (playLast) was actually played, so a partial dev test run skips it.
+  if (session.playForFun || !session.order.some((m) => m.playLast && session.completed.includes(m.id))) return report();
+  debriefScreen({ onContinue: () => report() });
 }
 
 async function report() {
@@ -168,6 +199,7 @@ async function report() {
     onApply: () => { Object.assign(session, { userId: null, casual: false, completed: [] }); register(); },
     onRestart: async () => {
       log('core', 'run_restart', { fromRun: session.runNo });
+      resetEthics();
       try {
         const d = await api.newRun();
         session.set(d);

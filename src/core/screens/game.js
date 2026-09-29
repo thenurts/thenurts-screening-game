@@ -6,6 +6,7 @@ import { modules, hostOf } from '../registry.js';
 import { TRAITS } from '../traits.js';
 import { HOSTS } from '../theme.js';
 import { BENCHMARK_MIN_N } from '../config.js';
+import { ethicsButton, displayed, onDisplayChange, reportProblemLink } from '../ethics.js';
 
 function progress(current, completed, order = modules) {
   return h('div', { class: 'tn-progress', 'aria-label': `Game ${order.indexOf(current) + 1} of ${order.length}` },
@@ -141,7 +142,10 @@ export function postGameScreen({ manifest, metrics, benchmark, completed, casual
   const rows = h('div', {});
   const hostBox = h('div', {});
   // benchmark === null → still loading (results are shown before the server answers)
+  const real = Number(metrics[primary.key]) || 0;
+  const shownMetrics = () => ({ ...metrics, [primary.key]: displayed(manifest.id, real) }); // the ethics tool can change what's displayed, never what's stored
   const render = (bm) => {
+    metrics = shownMetrics();
     const pb = bm?.[primary.key];
     const above = pb?.n >= BENCHMARK_MIN_N ? (metrics[primary.key] >= pb.median) === (primary.higherIsBetter !== false) : null;
     hostBox.replaceChildren(host(hid, above === false ? 'happy' : 'excited', above == null ? 'All done! Here’s how it went.' : above ? 'Great round!' : 'Nice work, that one’s tricky!'));
@@ -159,9 +163,12 @@ export function postGameScreen({ manifest, metrics, benchmark, completed, casual
         ? 'You’re playing for fun, so your progress isn’t saved if you leave. Carry on whenever you’re ready!'
         : 'You can stop here. Come back any time, choose “I’m a returning candidate” and enter your email and mobile number to pick up where you left off.'),
       button(isLast ? 'See my report' : 'Continue', onContinue, { icon: '▶', id: 'btn-continue' }),
-    )));
+    ),
+    ethicsButton({ screen: 'postgame', games: [{ id: manifest.id, title: manifest.title, label: primary.label, real }] })));
   countUp(num, Number(metrics[primary.key]) || 0, { decimals: primary.decimals ?? 0 });
-  scr.setBenchmark = (bm) => { if (scr.isConnected) render(bm || {}); };
+  let lastBm = benchmark;
+  scr.setBenchmark = (bm) => { lastBm = bm || {}; if (scr.isConnected) render(lastBm); };
+  const off = onDisplayChange(() => { if (!scr.isConnected) return off(); render(lastBm); num.textContent = fmtVal({ ...primary, unit: '' }, metrics[primary.key]); });
   return scr;
 }
 
@@ -225,6 +232,16 @@ export function reportScreen({ report, runNo, casual, onRestart, onApply }) {
   const legend = h('div', { class: 'tn-muted', style: { display: 'flex', gap: '14px', justifyContent: 'center', margin: '6px 0 12px' } },
     h('span', {}, h('b', { style: { display: 'inline-block', width: '14px', height: '14px', background: 'var(--sun)', border: '2px solid var(--ink)', borderRadius: '4px', verticalAlign: '-2px', marginRight: '6px' } }), 'You'),
     all.some((a) => a.median != null) ? h('span', {}, h('b', { style: { display: 'inline-block', width: '18px', borderTop: '2px dashed var(--charcoal)', verticalAlign: '4px', marginRight: '6px' } }), 'Median player') : null);
+  // The per-game results show the primary value (or what the ethics tool changed it to: display only, request #27).
+  const grid = h('div', { class: 'tn-report-grid' });
+  const drawGrid = () => grid.replaceChildren(...all.map((a) => {
+    const pm = a.m.metrics.find((x) => x.primary);
+    return h('div', { class: 'tn-modcard' }, h('img', { src: charImg(hostOf(a.m), 'happy'), alt: '' }),
+      h('div', {}, h('b', {}, a.m.title), h('span', {}, `${pm.label}: ${fmtVal(pm, displayed(a.id, Number(a.r.metrics[pm.key]) || 0))}${a.r.benchmark?.[pm.key]?.n >= BENCHMARK_MIN_N ? ` · median ${fmtVal(pm, a.r.benchmark[pm.key].median)}` : ''}`)));
+  }));
+  drawGrid();
+  const off = onDisplayChange(() => { if (!grid.isConnected) return off(); drawGrid(); });
+  const ethGames = all.map((a) => { const pm = a.m.metrics.find((x) => x.primary); return { id: a.id, title: a.m.title, label: pm.label, real: Number(a.r.metrics[pm.key]) || 0 }; });
   const confirmBox = h('div', { class: 'tn-notice', style: { display: 'none' } },
     h('p', { style: { margin: '0 0 10px' } }, 'Start a brand-new run from Game 1? Your previous results stay saved.'),
     h('div', { class: 'tn-row' }, button('Cancel', () => { confirmBox.style.display = 'none'; log('core', 'run_restart_cancel'); }, { kind: 'secondary' }),
@@ -237,14 +254,25 @@ export function reportScreen({ report, runNo, casual, onRestart, onApply }) {
       h('h1', {}, 'Your play profile'),
       h('p', { class: 'tn-muted' }, 'Each score is 0–100 on the trait that game looks at. The dashed line is the median player.'),
       chart, legend,
-      h('div', { class: 'tn-report-grid' }, all.map((a) => {
-        const pm = a.m.metrics.find((x) => x.primary);
-        return h('div', { class: 'tn-modcard' }, h('img', { src: charImg(hostOf(a.m), 'happy'), alt: '' }),
-          h('div', {}, h('b', {}, a.m.title), h('span', {}, `${pm.label}: ${fmtVal(pm, a.r.metrics[pm.key])}${a.r.benchmark?.[pm.key]?.n >= BENCHMARK_MIN_N ? ` · median ${fmtVal(pm, a.r.benchmark[pm.key].median)}` : ''}`)));
-      })),
+      grid,
       h('p', { class: 'tn-notice' }, casual ? 'Thanks for playing! Fancy joining us? You can apply and play as a candidate.' : 'Thanks for playing! The Nurts team will be in touch about next steps.'),
       casual ? button('Apply to join The Nurts', () => { log('core', 'casual_apply_cta'); onApply(); }, { icon: '💼', id: 'btn-casual-apply' }) : null,
       button('Start a new run', () => { confirmBox.style.display = 'block'; log('core', 'run_restart_prompt'); }, { kind: 'secondary', icon: '↻', id: 'btn-restart' }),
       confirmBox,
+      casual ? null : h('p', { style: { textAlign: 'center', margin: '14px 0 0' } }, reportProblemLink()),
+    ),
+    ethicsButton({ screen: 'report', games: ethGames })));
+}
+
+/** End-of-suite debrief (request #24): high-level, no mechanics. Candidates only (play-for-fun runs have no wipeouts). */
+export function debriefScreen({ onContinue }) {
+  log('core', 'debrief_view');
+  return show(h('div', { class: 'tn-screen' },
+    logo('horizontal-black', 'tn-logo--corner'),
+    card(
+      host('liam', 'happy', 'That’s all the games. Thanks for sticking with it!'),
+      h('h1', {}, 'Before your results'),
+      h('p', {}, 'One of today’s games was built to feel overwhelming at times. We looked at how you kept going, not at your score.'),
+      button('See my report', onContinue, { icon: '▶', id: 'btn-debrief' }),
     )));
 }
