@@ -158,7 +158,7 @@ export default class GameScene extends ModuleScene {
 
   // ---------------------------------------------------------------- round
   onStart() {
-    const r = buildRound({ mode: this.mode, runNo: this.runNo, attemptNo: this.attemptNo, rand: this.rand, form: this.options.form });
+    const r = buildRound({ mode: this.mode, runNo: this.runNo, attemptNo: this.attemptNo, rand: this.rand, form: this.options.form, casual: this.casual });
     this.form = r.form; this.items = r.items; this.restarted = r.restartedAfterSetback;
     this.trace('round_setup', { form: this.form, itemIds: this.items.map((x) => x.id), attemptNo: this.attemptNo, runNo: this.runNo });
     this.nextTurn();

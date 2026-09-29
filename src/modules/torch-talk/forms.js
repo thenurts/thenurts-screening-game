@@ -20,9 +20,10 @@ const bySlot = (form, slot) => REAL.find((x) => x.form === form && x.slot === sl
  * mode 'practice' → the 6 try-it steps of how-to v3 (G1, G2, G3, G4a, G4b, G5), the same for everyone.
  * real, first run, first attempt → Form A (identical for everyone: the official score).
  * real, first run, a restart after leaving the round → Form B, flagged restartedAfterSetback.
+ * real, play-for-fun (casual) → slot-wise random like later runs, so a casual player never sees Form A.
  * real, later runs → slot-wise random (T3 and T7 from the same form), from forms other than the first-run form.
  */
-export function buildRound({ mode, runNo = 1, attemptNo = 1, rand = Math.random, cfg = CONFIG, form = null }) {
+export function buildRound({ mode, runNo = 1, attemptNo = 1, rand = Math.random, cfg = CONFIG, form = null, casual = false }) {
   if (mode === 'practice') return { form: 'T', restartedAfterSetback: false, items: TUTORIAL };
   if (mode === 'practice-v2') { // the v2.1 practice turns, kept for reference only
     const pickOf = (list) => list[Math.floor(rand() * list.length)];
@@ -30,7 +31,7 @@ export function buildRound({ mode, runNo = 1, attemptNo = 1, rand = Math.random,
     return { form: 'P', restartedAfterSetback: false, items: [pickOf(normal), pickOf(nick), pickOf(gap)] };
   }
   if (['A', 'B', 'C'].includes(form)) return fixed(form, false); // developer-mode override (manifest.devOptions)
-  const first = form === 'random' ? false : Number(runNo) <= 1;
+  const first = form === 'random' || casual ? false : Number(runNo) <= 1; // play-for-fun: slot-random from B/C, never Form A (request #26)
   if (first && attemptNo <= 1) return fixed(cfg.firstRunForm, false);
   if (first) return fixed(cfg.restartForm, true);
   const pool = ['A', 'B', 'C'].filter((f) => f !== cfg.firstRunForm); // everyone saw the first-run form in run 1

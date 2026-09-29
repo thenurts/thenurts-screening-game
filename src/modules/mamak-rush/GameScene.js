@@ -53,7 +53,7 @@ export default class GameScene extends ModuleScene {
 
     this.tut = this.mode === 'practice';
     L = this.tut ? { ...L0, helpY: 160, liamY: 282, qTop: 362, maxCards: 4 } : L0; // room for the PRACTICE badge
-    this.form = this.tut ? 'T' : this.options.form === 'A' || this.options.form === 'B' ? this.options.form : Number(this.runNo || 1) <= 1 && this.attemptNo <= 1 ? 'A' : 'B';
+    this.form = this.tut ? 'T' : this.options.form === 'A' || this.options.form === 'B' ? this.options.form : !this.casual && Number(this.runNo || 1) <= 1 && this.attemptNo <= 1 ? 'A' : 'B'; // play-for-fun never sees Form A (request #26)
     this.repeatAttempt = !this.tut && Number(this.runNo || 1) <= 1 && this.attemptNo > 1;
     this.sel = null; this.pinned = []; this.scroll = 0; this.waits = 0; this.pins = 0; this.idleNudges = 0; this.idleMs = 0; this.acts = [];
     this.wrongKeys = []; this.firstDish = {}; this.wrongByOrder = {}; this.probes = [];
