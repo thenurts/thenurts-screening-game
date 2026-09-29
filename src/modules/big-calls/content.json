@@ -1,0 +1,726 @@
+{
+ "version": "1.1",
+ "date": "2026-09-27",
+ "model": {
+  "arrowWeight": 0.4895,
+  "checkCost": {
+   "normal": 2,
+   "urgent": 6
+  },
+  "neutralMargin": 0.5,
+  "worths": [
+   10,
+   20,
+   30
+  ],
+  "note": "One currency: points. A check reveals the next clue; its strength (weak = 1 arrow, strong = 2) is shown on the Check button first. Ex-ante best = the side with more arrows (live tally). A tie means either is fine."
+ },
+ "forms": {
+  "A": [
+   {
+    "id": "A01",
+    "situation": "Relay race today: field or hall?",
+    "options": {
+     "L": "Field",
+     "R": "Hall"
+    },
+    "worth": 20,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "L",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Mia heard",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Teacher",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Last year",
+      "strength": 2,
+      "points": "R"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "A02",
+    "situation": "Class party: 20 or 30 pizzas?",
+    "options": {
+     "L": "20 pizzas",
+     "R": "30 pizzas"
+    },
+    "worth": 10,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "L",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Teacher",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Weather app",
+      "strength": 2,
+      "points": "L"
+     },
+     {
+      "label": "Janitor",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "A03",
+    "situation": "Tour bus: North or South gate?",
+    "options": {
+     "L": "North",
+     "R": "South"
+    },
+    "worth": 10,
+    "urgent": true,
+    "firstClue": {
+     "arrows": 1,
+     "points": "R",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Mia heard",
+      "strength": 2,
+      "points": "R"
+     },
+     {
+      "label": "Office note",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Raj thinks",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "R"
+   },
+   {
+    "id": "A04",
+    "situation": "Bake sale: cupcakes or cookies first?",
+    "options": {
+     "L": "Cupcakes",
+     "R": "Cookies"
+    },
+    "worth": 30,
+    "urgent": true,
+    "firstClue": {
+     "arrows": 1,
+     "points": "R",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Class chat",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Office note",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Sign-up sheet",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "A05",
+    "situation": "Posters: print 50 or 100?",
+    "options": {
+     "L": "50",
+     "R": "100"
+    },
+    "worth": 10,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "L",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Weather app",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Teacher",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Poll",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "A06",
+    "situation": "Lost hall key: classroom or gym?",
+    "options": {
+     "L": "Classroom",
+     "R": "Gym"
+    },
+    "worth": 30,
+    "urgent": false,
+    "firstClue": null,
+    "clues": [
+     {
+      "label": "Teacher",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Raj thinks",
+      "strength": 2,
+      "points": "L"
+     },
+     {
+      "label": "Weather app",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "A07",
+    "situation": "Movie night: start at 7 or 8?",
+    "options": {
+     "L": "7 pm",
+     "R": "8 pm"
+    },
+    "worth": 30,
+    "urgent": false,
+    "firstClue": null,
+    "clues": [
+     {
+      "label": "Last year",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Survey",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Survey",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "R"
+   },
+   {
+    "id": "A08",
+    "situation": "Prize stall: books or games?",
+    "options": {
+     "L": "Books",
+     "R": "Games"
+    },
+    "worth": 30,
+    "urgent": true,
+    "firstClue": null,
+    "clues": [
+     {
+      "label": "Raj thinks",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Class chat",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Raj thinks",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "R"
+   },
+   {
+    "id": "A09",
+    "situation": "Photo day: morning or afternoon?",
+    "options": {
+     "L": "Morning",
+     "R": "Afternoon"
+    },
+    "worth": 30,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "R",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Mia heard",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Class chat",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Noah saw",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "R"
+   },
+   {
+    "id": "A10",
+    "situation": "Talent show opener: choir or band?",
+    "options": {
+     "L": "Choir",
+     "R": "Band"
+    },
+    "worth": 30,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "R",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Weather app",
+      "strength": 2,
+      "points": "R"
+     },
+     {
+      "label": "Weather app",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Sign-up sheet",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "R"
+   }
+  ],
+  "B": [
+   {
+    "id": "B01",
+    "situation": "Craft corner: paint or clay?",
+    "options": {
+     "L": "Paint",
+     "R": "Clay"
+    },
+    "worth": 30,
+    "urgent": true,
+    "firstClue": {
+     "arrows": 1,
+     "points": "L",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Class chat",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Office note",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Sign-up sheet",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "R"
+   },
+   {
+    "id": "B02",
+    "situation": "Class trip: museum or zoo?",
+    "options": {
+     "L": "Museum",
+     "R": "Zoo"
+    },
+    "worth": 30,
+    "urgent": true,
+    "firstClue": null,
+    "clues": [
+     {
+      "label": "Raj thinks",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Class chat",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Raj thinks",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "B03",
+    "situation": "Club snacks: buns or fruit?",
+    "options": {
+     "L": "Buns",
+     "R": "Fruit"
+    },
+    "worth": 10,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "R",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Teacher",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Weather app",
+      "strength": 2,
+      "points": "R"
+     },
+     {
+      "label": "Janitor",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "R"
+   },
+   {
+    "id": "B04",
+    "situation": "Fun fair ride: swings or slide first?",
+    "options": {
+     "L": "Swings",
+     "R": "Slide"
+    },
+    "worth": 30,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "L",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Weather app",
+      "strength": 2,
+      "points": "L"
+     },
+     {
+      "label": "Weather app",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Sign-up sheet",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "B05",
+    "situation": "Missing ball: store room or field?",
+    "options": {
+     "L": "Store room",
+     "R": "Field"
+    },
+    "worth": 30,
+    "urgent": false,
+    "firstClue": null,
+    "clues": [
+     {
+      "label": "Teacher",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Raj thinks",
+      "strength": 2,
+      "points": "R"
+     },
+     {
+      "label": "Weather app",
+      "strength": 1,
+      "points": "R"
+     }
+    ],
+    "outcome": "R"
+   },
+   {
+    "id": "B06",
+    "situation": "Sports day photo: field or steps?",
+    "options": {
+     "L": "Field",
+     "R": "Steps"
+    },
+    "worth": 20,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "R",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Mia heard",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Teacher",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Last year",
+      "strength": 2,
+      "points": "L"
+     }
+    ],
+    "outcome": "R"
+   },
+   {
+    "id": "B07",
+    "situation": "Choir practice: Monday or Tuesday?",
+    "options": {
+     "L": "Monday",
+     "R": "Tuesday"
+    },
+    "worth": 30,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "L",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Mia heard",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Class chat",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Noah saw",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "B08",
+    "situation": "Pick-up point: main or side door?",
+    "options": {
+     "L": "Main door",
+     "R": "Side door"
+    },
+    "worth": 10,
+    "urgent": true,
+    "firstClue": {
+     "arrows": 1,
+     "points": "L",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Mia heard",
+      "strength": 2,
+      "points": "L"
+     },
+     {
+      "label": "Office note",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Raj thinks",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "B09",
+    "situation": "Quiz night: 12 or 16 teams?",
+    "options": {
+     "L": "12 teams",
+     "R": "16 teams"
+    },
+    "worth": 30,
+    "urgent": false,
+    "firstClue": null,
+    "clues": [
+     {
+      "label": "Last year",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Survey",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Survey",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "L"
+   },
+   {
+    "id": "B10",
+    "situation": "Flyers: hand out or pin up?",
+    "options": {
+     "L": "Hand out",
+     "R": "Pin up"
+    },
+    "worth": 10,
+    "urgent": false,
+    "firstClue": {
+     "arrows": 1,
+     "points": "R",
+     "label": "First word"
+    },
+    "clues": [
+     {
+      "label": "Weather app",
+      "strength": 1,
+      "points": "R"
+     },
+     {
+      "label": "Teacher",
+      "strength": 1,
+      "points": "L"
+     },
+     {
+      "label": "Poll",
+      "strength": 1,
+      "points": "L"
+     }
+    ],
+    "outcome": "R"
+   }
+  ]
+ },
+ "practice": [
+  {
+   "id": "P1",
+   "situation": "Sports day relay: field or hall?",
+   "options": {
+    "L": "Field",
+    "R": "Hall"
+   },
+   "worth": 30,
+   "urgent": false,
+   "firstClue": null,
+   "clues": [
+    {
+     "label": "Weather app",
+     "strength": 2,
+     "points": "R"
+    },
+    {
+     "label": "Janitor",
+     "strength": 1,
+     "points": "R"
+    },
+    {
+     "label": "Sky",
+     "strength": 1,
+     "points": "L"
+    }
+   ],
+   "outcome": "R",
+   "teach": "Worth 30, a tie, strong clue next: checking is worth it."
+  },
+  {
+   "id": "P2",
+   "situation": "Snack table: left or right corner?",
+   "options": {
+    "L": "Left",
+    "R": "Right"
+   },
+   "worth": 10,
+   "urgent": true,
+   "firstClue": {
+    "arrows": 1,
+    "points": "L",
+    "label": "Mia thinks"
+   },
+   "clues": [
+    {
+     "label": "Class chat",
+     "strength": 1,
+     "points": "R"
+    },
+    {
+     "label": "Poll",
+     "strength": 1,
+     "points": "L"
+    },
+    {
+     "label": "Noah saw",
+     "strength": 1,
+     "points": "L"
+    }
+   ],
+   "outcome": "L",
+   "teach": "Worth 10, urgent (a check costs 6), weak clue next: checking costs more than it can win. Just decide."
+  }
+ ]
+}
