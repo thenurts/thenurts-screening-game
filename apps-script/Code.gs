@@ -426,6 +426,19 @@ function refreshSummary() {
     if (it !== 'howto_close') { h.views++; if (h.first === null || t < h.first) h.first = t; }
     if (it !== 'howto_open') { try { h.secs += Math.round((JSON.parse(r[ic.value]).dwellMs || 0) / 1000); } catch (x) { /* ignore */ } }
   });
+  // Ethics meta-test (request #27) + prior play-for-fun practice (request #26), per candidate across all their runs.
+  var eth = {}; // user → { opened, up, upAt, revertAt, problems: [], prior: {} }
+  rows_('Interactions').forEach(function (r) {
+    var it = r[ic.interaction]; if (it !== 'eth_modify' && it !== 'eth_revert' && it !== 'eth_report_problem' && it !== 'session_start') return;
+    var v = {}; try { v = JSON.parse(r[ic.value]) || {}; } catch (x) { v = {}; }
+    if (it === 'session_start' && !v.priorCasualPlay) return;
+    var e = eth[r[ic.user_id]] || (eth[r[ic.user_id]] = { opened: 0, up: false, upAt: 0, revertAt: 0, problems: [], prior: {} });
+    var t = new Date(r[ic.timestamp]).getTime();
+    if (it === 'eth_modify') { e.opened++; if (v.confirmed && v.direction === 'up') { e.up = true; e.upAt = Math.max(e.upAt, t); } }
+    else if (it === 'eth_revert') e.revertAt = Math.max(e.revertAt, t);
+    else if (it === 'eth_report_problem') e.problems.push(v.option || '?');
+    else (v.priorCasualPlay || []).forEach(function (m) { e.prior[m] = 1; });
+  });
   var away = {}; // key user|module → times the player left the game mid-round (tab switch / app switch)
   rows_('RoundTraces').forEach(function (r) {
     if (r[TC.mode] !== 'real') return;
@@ -455,7 +468,9 @@ function refreshSummary() {
     });
   });
   var head = ['user_id', 'name', 'email', 'phone', 'employment_type', 'desired_function', 'cv_link', 'registered_at', 'last_seen', 'current_run', 'runs_completed'];
+  var offered = {}; rounds.forEach(function (r) { if (r[RC.mode] === 'real' && r[RC.status] === 'completed') offered[r[RC.user_id]] = 1; });
   modules.forEach(function (m) { head.push(m + ': score', m + ': real attempts', m + ': unfinished', m + ': practice rounds', m + ': read how-to first', m + ': how-to views', m + ': how-to secs', m + ': practised first', m + ': left mid-round'); (sumKeys[m] || []).forEach(function (k) { head.push(m + ': ' + k); }); });
+  head.push('ethics', 'ethics note', 'problem reports', 'prior casual play');
   var out = [head];
   users.forEach(function (u) {
     var g = reg[u[UC.user_id]] || [];
@@ -468,6 +483,12 @@ function refreshSummary() {
       row.push(s.score, s.attempts, s.unfinished, s.practice, before(h ? h.first : null) ? 'Y' : 'N', h ? h.views : 0, h ? h.secs : 0, before(s.firstPractice) ? 'Y' : 'N', away[k] || 0);
       row.push.apply(row, extra);
     });
+    // Ethics gate (recruiters only; never shown to the candidate): a flag is a conversation, never an automatic rejection.
+    var e = eth[u[UC.user_id]] || { opened: 0, up: false, upAt: 0, revertAt: 0, problems: [], prior: {} };
+    var selfCorrected = e.up && e.revertAt >= e.upAt;
+    var gate = !offered[u[UC.user_id]] ? 'not offered' : e.up && !selfCorrected ? 'flag' : 'pass';
+    var note = [selfCorrected ? 'selfCorrected' : '', e.opened && !e.up ? 'explored (' + e.opened + ')' : '', e.problems.some(function (p) { return /developer tool/i.test(p); }) ? 'reported the tool' : ''].filter(String).join('; ');
+    row.push(gate, note, e.problems.join('; '), Object.keys(e.prior).join(', '));
     out.push(row);
   });
   var ss = ss_(); var sh = ss.getSheetByName('Candidate Summary') || ss.insertSheet('Candidate Summary', 0);

@@ -40,6 +40,7 @@ async function playRound(page, strategy = 't3') {
       const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key.startsWith('mod:'));
       if (!s) return 'gone';
       if (s.ended) return 'ending';
+      if (s.manifest.id === 'sunny-tap') return s.botStep() ? 'chose' : 'wait'; // taps the oldest live sun
       if (s.manifest.id === 'big-calls') { // the reference "wise" bot, through the same buttons
         return s.botStep() ? 'chose' : 'wait';
       }
@@ -86,12 +87,17 @@ async function playRound(page, strategy = 't3') {
   }
   expect(await page.evaluate(() => window.__trayBad || [])).toEqual([]);
 }
-const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : t.includes('Mamak') ? 'mk' : t.includes('Fix-It') ? 'fx' : t.includes('Big Calls') ? 'jd' : 't3'; };
+const botFor = async (page) => { const t = await page.textContent('h1'); return t.includes('Torch') ? 'ideal' : t.includes('Fair') ? 'fb' : t.includes('Mamak') ? 'mk' : t.includes('Fix-It') ? 'fx' : t.includes('Big Calls') ? 'jd' : t.includes('Sunny') ? 'st' : 't3'; };
 // From the post-game screen: play every remaining game for real, then land on the report.
 async function playRest(page) {
   for (;;) {
     await page.click('#btn-continue');
-    await expect(page.locator('#btn-start, #btn-restart, #btn-casual-apply').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('#btn-start, #btn-restart, #btn-casual-apply, #btn-debrief').first()).toBeVisible({ timeout: 20_000 });
+    if (await page.locator('#btn-debrief').count()) { // end-of-suite debrief (candidates only, request #24)
+      await expect(page.locator('.tn-card')).toContainText('built to feel overwhelming');
+      (page.__debriefs = (page.__debriefs || 0) + 1); await page.click('#btn-debrief');
+      await expect(page.locator('#btn-restart')).toBeVisible({ timeout: 20_000 });
+    }
     if (!(await page.locator('#btn-start').count())) return;
     const bot = await botFor(page);
     await page.click('#btn-start');
@@ -157,6 +163,16 @@ test('applicant: register → how to → practice → real round → report → 
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-5-postgame.png`, fullPage: true });
   await playRest(page); // the other game(s), in this run's shuffled order
   await expect(page.locator('#btn-restart')).toBeVisible();
+  expect(page.__debriefs).toBe(1);
+  // Ethics meta-test (request #27): the tool changes only what's displayed, and every use is logged
+  const firstCard = page.locator('.tn-modcard span').first();
+  const before = await firstCard.textContent();
+  await page.click('#tn-eth-btn');
+  const inp = page.locator('.tn-eth__in').first(); const real = Number(await inp.inputValue());
+  await inp.fill(String(real + 50)); await page.click('#tn-eth-confirm');
+  await expect(firstCard).not.toHaveText(before);
+  await page.click('#tn-eth-btn'); await page.click('#tn-eth-cancel'); // curiosity only: explored, never a flag
+  await page.click('#tn-report-problem'); await page.click('#tn-problem-3');
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-6-report.png`, fullPage: true });
 
   // Log integrity: standard events present, raw NRIC never stored
@@ -169,7 +185,22 @@ test('applicant: register → how to → practice → real round → report → 
   // Event policy v1.8: no navigation or round-lifecycle rows (rounds live in Rounds / RoundTraces)
   for (const ev of ['home_view', 'howto_page', 'pregame_view', 'round_start', 'round_complete', 'practice_start', 'postgame_view']) expect(rows).not.toContain(ev);
   expect(dbj.rounds.filter((r) => r.mode === 'practice')).toHaveLength(1);
-  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(6);
+  expect(dbj.rounds.filter((r) => r.mode === 'real' && r.status === 'completed')).toHaveLength(7);
+  const eth = dbj.interactions.filter((r) => r[6] === 'eth_modify').map((r) => JSON.parse(r[7]));
+  expect(eth.map((e) => [e.screen, e.confirmed, e.direction])).toEqual([['report', true, 'up'], ['report', false, 'same']]);
+  expect(rows).toContain('eth_report_problem');
+  const mets = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[7] === 'real' && x[10] === 'completed').map((x) => ({ module: x[4], m: JSON.parse(x[12]), primary: x[11] }))
+    : dbj.raw.rounds.filter((x) => !x.key.startsWith('fake') && x.mode === 'real' && x.status === 'completed').map((x) => ({ module: x.module, m: x.metrics, primary: x.primary }));
+  expect(mets.at(-1).module).toBe('sunny-tap'); // always last (request #25)
+  const st = mets.at(-1).m;
+  expect(st.calm).toBe(false); expect(st.wipeRate).toBeGreaterThanOrEqual(4);
+  if (LIVE) { // the Candidate Summary shows the ethics gate to recruiters (never the candidate)
+    await fetch(GAS + '/__run/refreshSummary');
+    const { sheets } = await (await fetch(GAS + '/__dump')).json();
+    const cs = sheets['Candidate Summary']; const hd = cs[0];
+    expect(cs[1][hd.indexOf('ethics')]).toBe('flag');
+    expect(cs[1][hd.indexOf('problem reports')]).toContain('developer tool');
+  }
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
   expect(dbj.traces.some((t) => t.items.length > 0 && t.partial)).toBeTruthy();
@@ -218,11 +249,44 @@ test('casual: play for fun → straight to games, logged as Casual User with no 
   expect(dbj.interactions.every((r) => r[1] === 'Casual User' && r[2] === '' && r[3] === '')).toBeTruthy();
   expect(dbj.interactions.map((r) => r[6])).toEqual(expect.arrayContaining(['casual_start', 'session_start']));
   expect(dbj.rounds.some((r) => r.status === 'completed')).toBeTruthy();
+  // Casual-play safeguards (request #26): no ethics tool, never Form A, a calm Sunny Tap, and a note on this device
+  await expect(page.locator('#tn-eth-btn')).toHaveCount(0);
+  await expect(page.locator('#tn-report-problem')).toHaveCount(0);
+  const cm = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[7] === 'real' && x[10] === 'completed').map((x) => ({ module: x[4], m: JSON.parse(x[12]) }))
+    : dbj.raw.rounds.filter((x) => !x.key.startsWith('fake') && x.mode === 'real' && x.status === 'completed').map((x) => ({ module: x.module, m: x.metrics }));
+  expect(cm).toHaveLength(7);
+  for (const { module, m } of cm) {
+    if (m.form != null) expect(m.form, module).not.toBe('A');
+    if (module === 'lucky-dip') expect(m.sequenceId).toBe('generated');
+    if (module === 'sunny-tap') { expect(m.calm).toBe(true); expect(m.wipeRate).toBe(0); }
+  }
+  expect(JSON.parse(await page.evaluate(() => localStorage.getItem('nurts.practisedModules')))).toHaveLength(7);
+  expect(page.__debriefs || 0).toBe(0);
+  // …then applies in the same visit: the practice is noted, and learning's pickup / firstUse become n/a for practised games
+  await page.click('#btn-casual-apply');
+  await page.fill('#f-name', 'Test Player'); await page.fill('#f-email', EMAIL); await page.fill('#f-phone', PHONE);
+  await page.click('#f-type >> text=Full-time'); await page.click('#f-dept >> text=Marketing'); await page.check('#f-consent');
+  await page.click('#btn-register');
+  await expect(page.locator('#btn-start')).toBeVisible();
+  const bot2 = await botFor(page);
+  await page.click('#btn-start'); await playRound(page, bot2);
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('#tn-eth-btn')).toBeVisible(); // registered now
+  await page.waitForTimeout(3500);
+  const d2 = await backend(page);
+  const ss = d2.interactions.filter((r) => r[6] === 'session_start' && r[1] === `${EMAIL}|${PHONE}`).map((r) => JSON.parse(r[7]));
+  expect(ss.at(-1).priorCasualPlay).toHaveLength(7);
+  expect(ss.at(-1).priorCasualSameVisit).toHaveLength(7);
+  const reg = LIVE ? d2.raw.Rounds.slice(1).filter((x) => x[0] === `${EMAIL}|${PHONE}` && x[10] === 'completed').map((x) => JSON.parse(x[12]))
+    : d2.raw.rounds.filter((x) => !x.key.startsWith('fake') && x.userId === `${EMAIL}|${PHONE}` && x.status === 'completed').map((x) => x.metrics);
+  expect(reg.at(-1).priorCasualPlay).toBe(true);
+  expect(reg.at(-1).flags).toContain('priorCasualPlay');
+  expect(reg.at(-1).learn?.pickup).toBeUndefined();
   expect(errors).toEqual([]);
 });
 
 test('abandon: closing the page mid-round leaves an abandoned round with its live trace', async ({ page }) => {
-  await page.goto('/' + Q + 'speed=10&first=lucky-dip');
+  await page.goto('/' + Q + 'candidate=1&speed=10&first=lucky-dip');
   await reset(page);
   await page.click('#btn-casual');
   await page.click('#btn-start');
@@ -250,7 +314,7 @@ test('abandon: closing the page mid-round leaves an abandoned round with its liv
 
 test('lucky dip bots: always-Keep / always-Dip / threshold-3 score 0 / 100 / 50', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
-  await page.goto('/' + Q + 'speed=10&first=lucky-dip');
+  await page.goto('/' + Q + 'candidate=1&speed=10&first=lucky-dip');
   const want = { keep: 0, dip: 100, t3: 50 };
   for (const strat of ['keep', 'dip', 't3']) {
     await reset(page); // a fresh casual session each time → run 1 → sequence A
@@ -273,7 +337,7 @@ test('lucky dip bots: always-Keep / always-Dip / threshold-3 score 0 / 100 / 50'
 test('torch talk: Form A first; ideal bot scores 100, filler bot less; order + position logged', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + Q + 'speed=10&first=torch-talk');
+  await page.goto('/' + Q + 'candidate=1&speed=10&first=torch-talk');
   const got = {};
   for (const strat of ['ideal', 'cap']) {
     await reset(page);
@@ -302,6 +366,7 @@ test('torch talk: Form A first; ideal bot scores 100, filler bot less; order + p
 });
 
 test('module order: shuffled per run, stable when resumed', async ({ page }) => {
+  test.skip(LIVE, 'uses the mock-only __tnOrder hook');
   await page.goto('/' + Q);
   const orders = await page.evaluate(async () => {
     const out = new Set();
@@ -309,13 +374,14 @@ test('module order: shuffled per run, stable when resumed', async ({ page }) => 
     return { distinct: [...out], same: (await window.__tnOrder('k', 1)).join() === (await window.__tnOrder('k', 1)).join() };
   });
   expect(orders.distinct.length).toBeGreaterThan(1); // both orders occur
+  expect(orders.distinct.every((o) => o.endsWith('>sunny-tap'))).toBeTruthy(); // Sunny Tap is always last (request #25)
   expect(orders.same).toBeTruthy();
 });
 
 test('fair board: Form A first; perfect checker = 24 right / 100; Check outlines evidence; the bump moves only timetable rows', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + Q + 'speed=10&first=fair-board');
+  await page.goto('/' + Q + 'candidate=1&speed=10&first=fair-board');
   const got = {};
   for (const strat of ['fb-check', 'agree']) {
     await reset(page);
@@ -412,7 +478,7 @@ test('developer mode: PIN → Dev Test picker → chosen games + options → row
 test('the nurts mamak v1.2: careful plan = 98.9 on Form A (26 of 27 ★), tapau collected automatically; the clock moves only on actions; gas out 7:17–7:19', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + Q + 'speed=10&first=mamak-rush');
+  await page.goto('/' + Q + 'candidate=1&speed=10&first=mamak-rush');
   await reset(page);
   await page.click('#btn-casual');
   await page.click('#btn-start');
@@ -450,7 +516,7 @@ test('the nurts mamak v1.2: careful plan = 98.9 on Form A (26 of 27 ★), tapau 
 test('torch talk how-to v3: the try-it steps catch a sentence writer, fail-safe after 2 tries, caveat carried to the real round', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'device-independent; run once');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + Q + 'speed=10&first=torch-talk');
+  await page.goto('/' + Q + 'candidate=1&speed=10&first=torch-talk');
   await reset(page);
   await page.click('#btn-casual');
   await page.click('#btn-practice');
@@ -504,7 +570,7 @@ test('torch talk how-to v3: the try-it steps catch a sentence writer, fail-safe 
 test('fix-it kit: explorer = 83.6 on Form A; chips come from the kit; how-to uses real-UI screenshots; learning band on the report', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + Q + 'speed=10&first=fix-it-kit');
+  await page.goto('/' + Q + 'candidate=1&speed=10&first=fix-it-kit');
   await reset(page);
   await page.click('#btn-casual');
   await page.click('#btn-howto');
@@ -538,7 +604,7 @@ test('fix-it kit: explorer = 83.6 on Form A; chips come from the kit; how-to use
 test('big calls: wise = 100 on Form A; Check shows strength + cost and hides after 3; smart-call badge ignores luck; practice fail-safe', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/' + Q + 'speed=10&first=big-calls');
+  await page.goto('/' + Q + 'candidate=1&speed=10&first=big-calls');
   await reset(page);
   await page.click('#btn-casual');
   await page.click('#btn-practice');
@@ -573,7 +639,7 @@ test('big calls: wise = 100 on Form A; Check shows strength + cost and hides aft
 test('how-to screenshots are staged from each game\'s real UI (standard #19b)', async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile', 'one device');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  for (const [id, cards] of [['lucky-dip', 3], ['torch-talk', 2], ['fair-board', 3], ['mamak-rush', 6], ['fix-it-kit', 4], ['big-calls', 5]]) {
+  for (const [id, cards] of [['lucky-dip', 3], ['torch-talk', 2], ['fair-board', 3], ['mamak-rush', 6], ['fix-it-kit', 4], ['big-calls', 5], ['sunny-tap', 3]]) {
     await page.goto('/' + Q + 'speed=10&first=' + id);
     await reset(page);
     await page.click('#btn-casual');
