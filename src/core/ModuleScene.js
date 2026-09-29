@@ -132,7 +132,7 @@ export class ModuleScene extends Phaser.Scene {
   }
 
   /** How-to screenshots (standard #19b): an amber ring + a label, drawn on the real UI. Returns the objects for cleanup. */
-  callout(x, y, r, label, lx = x, ly = y - r - 50, depth = 3000) {
+  callout(x, y, r, label, lx = x, ly = y - r - 50, depth = 3000, line = true) {
     const g = this.add.graphics().setDepth(depth);
     g.lineStyle(8, hex(C.amber), 1).strokeCircle(x, y, r);
     const t = this.txt(lx, ly, label, { fontSize: '28px', color: C.ink }).setDepth(depth + 1);
@@ -140,7 +140,7 @@ export class ModuleScene extends Phaser.Scene {
     const bg = this.add.graphics().setDepth(depth).fillStyle(hex(C.sun), 1).fillRoundedRect(lx - bw / 2, ly - bh / 2, bw, bh, bh / 2).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(lx - bw / 2, ly - bh / 2, bw, bh, bh / 2);
     // a short pointer from the label towards the ring
     const ang = Math.atan2(y - ly, x - lx), d = Math.hypot(x - lx, y - ly);
-    if (d > r + bh) g.lineStyle(6, hex(C.ink), 1).lineBetween(lx + Math.cos(ang) * (bh / 2 + 4), ly + Math.sin(ang) * (bh / 2 + 4), x - Math.cos(ang) * (r + 4), y - Math.sin(ang) * (r + 4));
+    if (line && d > r + bh) g.lineStyle(6, hex(C.ink), 1).lineBetween(lx + Math.cos(ang) * (bh / 2 + 4), ly + Math.sin(ang) * (bh / 2 + 4), x - Math.cos(ang) * (r + 4), y - Math.sin(ang) * (r + 4));
     (this.callouts ||= []).push(g, bg, t);
     return [g, bg, t];
   }

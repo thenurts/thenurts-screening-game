@@ -6,5 +6,6 @@ export default [
   'fair-board', // critical thinking (Zoey)
   'mamak-rush', // organisation (Liam)
   'fix-it-kit', // creative problem solving (Mia)
+  'big-calls', // judgement (Zoey)
   // 'sample-tap' retired 2026-09-26 (test module; folder kept as a coding example)
 ];
