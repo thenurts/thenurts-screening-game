@@ -72,7 +72,14 @@ function out_(obj) {
 
 /** Adds a "The Nurts" menu to the Sheet. */
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('The Nurts').addItem('Refresh Candidate Summary', 'refreshSummary').addItem('Delete Dev Test rows', 'deleteDevRows').addToUi();
+  SpreadsheetApp.getUi().createMenu('The Nurts')
+    .addItem('Refresh Candidate Summary', 'refreshSummary')
+    .addItem('Rescore all', 'rescoreAll')
+    .addItem('Make a one-pager for the selected candidate', 'onePager')
+    .addSeparator()
+    .addItem('Delete Dev Test rows', 'deleteDevRows')
+    .addItem('Archive and purge…', 'archiveAndPurge')
+    .addToUi();
 }
 
 // ---------------------------------------------------------------- helpers
@@ -426,19 +433,6 @@ function refreshSummary() {
     if (it !== 'howto_close') { h.views++; if (h.first === null || t < h.first) h.first = t; }
     if (it !== 'howto_open') { try { h.secs += Math.round((JSON.parse(r[ic.value]).dwellMs || 0) / 1000); } catch (x) { /* ignore */ } }
   });
-  // Ethics meta-test (request #27) + prior play-for-fun practice (request #26), per candidate across all their runs.
-  var eth = {}; // user → { opened, up, upAt, revertAt, problems: [], prior: {} }
-  rows_('Interactions').forEach(function (r) {
-    var it = r[ic.interaction]; if (it !== 'eth_modify' && it !== 'eth_revert' && it !== 'eth_report_problem' && it !== 'session_start') return;
-    var v = {}; try { v = JSON.parse(r[ic.value]) || {}; } catch (x) { v = {}; }
-    if (it === 'session_start' && !v.priorCasualPlay) return;
-    var e = eth[r[ic.user_id]] || (eth[r[ic.user_id]] = { opened: 0, up: false, upAt: 0, revertAt: 0, problems: [], prior: {} });
-    var t = new Date(r[ic.timestamp]).getTime();
-    if (it === 'eth_modify') { e.opened++; if (v.confirmed && v.direction === 'up') { e.up = true; e.upAt = Math.max(e.upAt, t); } }
-    else if (it === 'eth_revert') e.revertAt = Math.max(e.revertAt, t);
-    else if (it === 'eth_report_problem') e.problems.push(v.option || '?');
-    else (v.priorCasualPlay || []).forEach(function (m) { e.prior[m] = 1; });
-  });
   var away = {}; // key user|module → times the player left the game mid-round (tab switch / app switch)
   rows_('RoundTraces').forEach(function (r) {
     if (r[TC.mode] !== 'real') return;
@@ -468,9 +462,14 @@ function refreshSummary() {
     });
   });
   var head = ['user_id', 'name', 'email', 'phone', 'employment_type', 'desired_function', 'cv_link', 'registered_at', 'last_seen', 'current_run', 'runs_completed'];
-  var offered = {}; rounds.forEach(function (r) { if (r[RC.mode] === 'real' && r[RC.status] === 'completed') offered[r[RC.user_id]] = 1; });
   modules.forEach(function (m) { head.push(m + ': score', m + ': real attempts', m + ': unfinished', m + ': practice rounds', m + ': read how-to first', m + ': how-to views', m + ': how-to secs', m + ': practised first', m + ': left mid-round'); (sumKeys[m] || []).forEach(function (k) { head.push(m + ': ' + k); }); });
-  head.push('ethics', 'ethics note', 'problem reports', 'prior casual play');
+  // Scoring layer (requests #28–31): the same pipeline builds the Scores / Norms / Insights / Validity tabs; the Summary
+  // shows its headline columns next to the raw per-game ones.
+  var scored = runScoring_(users, regs, rounds, away);
+  var byUser = {}; scored.scores.forEach(function (x) { byUser[x.user_id] = x; });
+  var SUMMARY_SCORE_KEYS = ['stage'].concat([].concat.apply([], NurtsScoring.TRAITS_OUT.map(function (t) { return [t, t + ' band']; })))
+    .concat(['roleFit', 'fitJunior', 'fitMid', 'fitLead', 'bestFitFunction', 'autonomy', 'ethicsGate', 'ethicsDetail', 'redFlags', 'notes', 'positives', 'caveats', 'practisedNote', 'scoringVersion']);
+  SUMMARY_SCORE_KEYS.forEach(function (k) { head.push(k); });
   var out = [head];
   users.forEach(function (u) {
     var g = reg[u[UC.user_id]] || [];
@@ -483,12 +482,8 @@ function refreshSummary() {
       row.push(s.score, s.attempts, s.unfinished, s.practice, before(h ? h.first : null) ? 'Y' : 'N', h ? h.views : 0, h ? h.secs : 0, before(s.firstPractice) ? 'Y' : 'N', away[k] || 0);
       row.push.apply(row, extra);
     });
-    // Ethics gate (recruiters only; never shown to the candidate): a flag is a conversation, never an automatic rejection.
-    var e = eth[u[UC.user_id]] || { opened: 0, up: false, upAt: 0, revertAt: 0, problems: [], prior: {} };
-    var selfCorrected = e.up && e.revertAt >= e.upAt;
-    var gate = !offered[u[UC.user_id]] ? 'not offered' : e.up && !selfCorrected ? 'flag' : 'pass';
-    var note = [selfCorrected ? 'selfCorrected' : '', e.opened && !e.up ? 'explored (' + e.opened + ')' : '', e.problems.some(function (p) { return /developer tool/i.test(p); }) ? 'reported the tool' : ''].filter(String).join('; ');
-    row.push(gate, note, e.problems.join('; '), Object.keys(e.prior).join(', '));
+    var sc = byUser[u[UC.user_id]] || {};
+    SUMMARY_SCORE_KEYS.forEach(function (k) { row.push(cell_(sc[k])); });
     out.push(row);
   });
   var ss = ss_(); var sh = ss.getSheetByName('Candidate Summary') || ss.insertSheet('Candidate Summary', 0);
@@ -498,6 +493,169 @@ function refreshSummary() {
   sh.getRange(1, 1, out.length, head.length).setValues(out);
   sh.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#FED33C');
   sh.setFrozenRows(1); sh.setFrozenColumns(2);
+}
+
+// ---------------------------------------------------------------- scoring layer (requests #28–31; claude/13-scoring-layer-design.md)
+// The formulas live in scoring.gs (a build of src/scoring/, the same code the tests run). Raw tabs are never changed here:
+// every derived tab is rebuilt from them and stamped with scoringVersion + stage.
+var SCORING_TABS = { config: 'ScoringConfig', scores: 'Scores', norms: 'Norms', insights: 'Insights', calibration: 'Calibration', validity: 'Validity', purges: 'Purges', onePager: 'One-pager' };
+
+/** A cell value: numbers stay numbers, text is made formula-safe. */
+function cell_(v) { return v == null ? '' : typeof v === 'number' || typeof v === 'boolean' ? v : safe_(v); }
+
+/** ScoringConfig tab → { key: value } (JSON values, or plain text). Missing keys use the defaults in scoring.gs. */
+function readConfig_() {
+  var sh = ss_().getSheetByName(SCORING_TABS.config); if (!sh || sh.getLastRow() < 2) return {};
+  var o = {};
+  sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(function (r) {
+    var k = String(r[0] || '').trim(); if (!k) return;
+    var v = r[1]; if (typeof v === 'string') { try { v = JSON.parse(v); } catch (x) { /* plain text, e.g. alpha */ } }
+    o[k] = v;
+  });
+  return o;
+}
+
+/** Rewrites a derived tab: a header row from `keys`, then one row per object. */
+function writeTab_(name, keys, objs, note) {
+  var ss = ss_(); var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clear();
+  var out = [keys].concat(objs.map(function (o) { return keys.map(function (k) { return cell_(o[k]); }); }));
+  sh.getRange(1, 1, out.length, keys.length).setValues(out);
+  sh.getRange(1, 1, 1, keys.length).setFontWeight('bold').setBackground(note ? '#F1D5FA' : '#FED33C');
+  sh.setFrozenRows(1);
+  return sh;
+}
+
+function tabObjects_(name) {
+  var sh = ss_().getSheetByName(name); if (!sh || sh.getLastRow() < 2) return [];
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, head.length).getValues().map(function (r) { var o = {}; head.forEach(function (h, i) { o[h] = r[i]; }); return o; }).filter(function (o) { return o.user_id; });
+}
+
+/** Builds the pipeline input from the raw tabs, runs it, and writes Scores / Norms / Insights / Validity. */
+function runScoring_(users, regs, rounds, away) {
+  setupScoringTabs_(); // existing Sheets get the new tabs on their first rescore
+  var ic = idx_('Interactions');
+  var reg = {}; regs.forEach(function (r) { reg[r[1]] = { employmentType: r[5], desiredFunction: r[6] }; });
+  var input = {
+    config: readConfig_(), now: Date.now(), away: away || {}, registrations: reg,
+    users: users.map(function (u) { return { userId: u[UC.user_id], name: u[UC.name], currentRun: Number(u[UC.current_run]) || 1, runsCompleted: Number(u[UC.runs_completed]) || 0 }; }),
+    rounds: rounds.map(function (r) {
+      var m = null; try { m = r[RC.metrics_json] ? JSON.parse(r[RC.metrics_json]) : null; } catch (x) { m = null; }
+      return { userId: r[RC.user_id], isCasual: r[RC.is_casual] === true || r[RC.is_casual] === 'TRUE' || r[RC.user_id] === CASUAL_ID || r[RC.user_id] === DEV_ID, runNo: Number(r[RC.run_no]) || 1, module: r[RC.module], moduleVersion: String(r[RC.module_version]), mode: r[RC.mode], status: r[RC.status], startedAt: new Date(r[RC.started_at]).getTime() || 0, metrics: m };
+    }),
+    interactions: rows_('Interactions').filter(function (r) { return /^eth_/.test(r[ic.interaction]); }).map(function (r) {
+      var v = {}; try { v = JSON.parse(r[ic.value]) || {}; } catch (x) { v = {}; }
+      return { userId: r[ic.user_id], runNo: Number(r[ic.run_no]) || 1, interaction: r[ic.interaction], value: v, t: Number(r[ic.client_ts]) || new Date(r[ic.timestamp]).getTime() };
+    }),
+  };
+  var res = NurtsScoring.scoreAll(input);
+  // keep the previous version's scores when the version changes (so old and new can be compared)
+  var old = ss_().getSheetByName(SCORING_TABS.scores);
+  if (old && old.getLastRow() > 1) {
+    var h = old.getRange(1, 1, 1, old.getLastColumn()).getValues()[0], vi = h.indexOf('scoringVersion');
+    var was = vi >= 0 ? old.getRange(2, vi + 1).getValue() : '';
+    if (was && was !== res.scoringVersion && !ss_().getSheetByName('Scores ' + was)) {
+      var snap = ss_().insertSheet('Scores ' + was); var vals = old.getRange(1, 1, old.getLastRow(), old.getLastColumn()).getValues();
+      snap.getRange(1, 1, vals.length, vals[0].length).setValues(vals);
+    }
+  }
+  var keys = res.scores.length ? Object.keys(res.scores[0]) : ['stage', 'scoringVersion', 'scoredAt', 'user_id'];
+  writeTab_(SCORING_TABS.scores, keys, res.scores);
+  writeTab_(SCORING_TABS.norms, ['module', 'moduleVersion', 'trait', 'n', 'p20', 'p50', 'p70', 'status', 'stage', 'scoringVersion'], res.norms);
+  writeTab_(SCORING_TABS.insights, ['stage', 'user_id', 'name', 'role', 'headline', 'probe first', 'red flags', 'read with care', 'not measured', 'scoringVersion'], res.insights);
+  var val = NurtsScoring.validity(res.scores, tabObjects_(SCORING_TABS.calibration), res.config);
+  writeTab_(SCORING_TABS.validity, ['trait', 'rater item', 'n', 'AUC', 'mean score Y', 'mean score N', 'band × answer', 'rater agreement', 'note', 'status'], val);
+  return res;
+}
+
+/** Menu → The Nurts → Rescore all: rebuilds every derived tab from the raw data with the current ScoringConfig. */
+function rescoreAll() {
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try { refreshSummary(); } finally { lock.releaseLock(); }
+  try { SpreadsheetApp.getUi().alert('Rescored everyone with ScoringConfig ' + (readConfig_().scoringVersion || NurtsScoring.DEFAULTS.scoringVersion) + '.'); } catch (x) { /* run from the editor or a trigger */ }
+}
+
+/** Creates the staff input tabs once (ScoringConfig with the defaults, Calibration with dropdowns) and the Purges log. */
+function setupScoringTabs_() {
+  var ss = ss_();
+  if (!ss.getSheetByName(SCORING_TABS.config)) {
+    var sh = ss.insertSheet(SCORING_TABS.config); var d = NurtsScoring.DEFAULTS;
+    var rows = [['key', 'value', 'note']].concat(Object.keys(d).map(function (k) { return [k, typeof d[k] === 'string' ? d[k] : JSON.stringify(d[k]), k === 'stage' ? 'alpha · beta · soft · hard' : k === 'scoringVersion' ? 'bump whenever you change a value, then The Nurts → Rescore all' : '']; }));
+    sh.getRange(1, 1, rows.length, 3).setValues(rows); sh.getRange(1, 1, 1, 3).setFontWeight('bold').setBackground('#FED33C'); sh.setFrozenRows(1);
+    sh.getRange(2, 1, rows.length - 1, 2).setNumberFormat('@');
+  }
+  if (!ss.getSheetByName(SCORING_TABS.calibration)) {
+    var cal = ss.insertSheet(SCORING_TABS.calibration); var cols = NurtsScoring.CALIBRATION_COLUMNS;
+    cal.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold').setBackground('#F1D5FA'); cal.setFrozenRows(1);
+    cal.getRange(1, 1, cal.getMaxRows(), 1).setNumberFormat('@');
+    try {
+      cols.forEach(function (c, i) {
+        var choices = NurtsScoring.CALIBRATION_CHOICES[c]; if (!choices) return;
+        cal.getRange(2, i + 1, cal.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(choices, true).setAllowInvalid(false).build());
+      });
+    } catch (x) { /* no data validation in the test harness */ }
+  }
+  if (!ss.getSheetByName(SCORING_TABS.purges)) {
+    var pg = ss.insertSheet(SCORING_TABS.purges); pg.getRange(1, 1, 1, 6).setValues([['date', 'stage', 'reason', 'archive copy', 'rows cleared', 'by']]).setFontWeight('bold'); pg.setFrozenRows(1);
+  }
+}
+
+/** Menu → Make a one-pager: the Insights card of the selected row (or a user_id you type), laid out for printing. */
+function onePager() {
+  var ui = SpreadsheetApp.getUi(), sh = SpreadsheetApp.getActiveSheet(), id = '';
+  if (sh.getName() === SCORING_TABS.insights || sh.getName() === SCORING_TABS.scores || sh.getName() === 'Candidate Summary') {
+    var r = sh.getActiveRange().getRow(); var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    if (r > 1) id = sh.getRange(r, head.indexOf('user_id') + 1).getValue();
+  }
+  if (!id) { var p = ui.prompt('One-pager', 'Type the candidate’s user_id (email|phone):', ui.ButtonSet.OK_CANCEL); if (p.getSelectedButton() !== ui.Button.OK) return; id = p.getResponseText().trim(); }
+  if (!makeOnePager_(id)) ui.alert('No insight card for ' + id + '. Run The Nurts → Rescore all first.');
+}
+function makeOnePager_(userId) {
+  var card = tabObjects_(SCORING_TABS.insights).filter(function (o) { return o.user_id === userId; })[0]; if (!card) return false;
+  var ss = ss_(); var sh = ss.getSheetByName(SCORING_TABS.onePager) || ss.insertSheet(SCORING_TABS.onePager); sh.clear();
+  var rows = [['The Nurts · candidate insight card', ''], [card.name + '  ·  ' + card.role, card.stage], ['', ''],
+    ['Headline', card.headline], ['Probe first', card['probe first']], ['Red flags', card['red flags'] || 'none'], ['Read with care', card['read with care'] || '–'], ['Not measured', card['not measured']],
+    ['', ''], ['How to use this', 'One input, reviewed by a person, alongside the CV, a structured interview and a work trial. Never an automatic rejection.'], ['Scoring', card.scoringVersion]];
+  sh.getRange(1, 1, rows.length, 2).setValues(rows.map(function (r) { return [cell_(r[0]), cell_(r[1])]; }));
+  sh.getRange(1, 1, rows.length, 1).setFontWeight('bold');
+  try { sh.setColumnWidth(1, 140); sh.setColumnWidth(2, 620); sh.getRange(1, 2, rows.length, 1).setWrap(true); } catch (x) { /* harness */ }
+  return true;
+}
+
+/** Menu → Archive and purge… (request #31): only after typing PURGE. Copies the whole spreadsheet to a private archive
+ * folder, then clears the raw and derived tabs, resets the norms and logs it. ScoringConfig is kept; CV files stay in Drive. */
+function archiveAndPurge() {
+  var ui = SpreadsheetApp.getUi();
+  var a = ui.prompt('Archive and purge', 'This copies the whole spreadsheet to an archive, then CLEARS all candidate and game data. Type PURGE to continue:', ui.ButtonSet.OK_CANCEL);
+  if (a.getSelectedButton() !== ui.Button.OK || a.getResponseText().trim() !== 'PURGE') { ui.alert('Nothing was changed.'); return; }
+  var b = ui.prompt('Archive and purge', 'Why? (e.g. "end of Alpha")', ui.ButtonSet.OK_CANCEL);
+  if (b.getSelectedButton() !== ui.Button.OK) { ui.alert('Nothing was changed.'); return; }
+  var res = purge_(b.getResponseText().trim(), 'PURGE');
+  ui.alert('Archived to ' + res.url + ' and cleared ' + res.rows + ' rows.');
+}
+function activeEmail_() { try { return Session.getActiveUser().getEmail() || ''; } catch (x) { return ''; } }
+function purge_(reason, confirm) {
+  if (confirm !== 'PURGE') fail_('purge_not_confirmed');
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var ss = ss_(), props = PropertiesService.getScriptProperties();
+    var folderId = props.getProperty('ARCHIVE_FOLDER_ID');
+    if (!folderId) { folderId = DriveApp.createFolder('The Nurts – results archives (private)').getId(); props.setProperty('ARCHIVE_FOLDER_ID', folderId); }
+    var stage = readConfig_().stage || NurtsScoring.DEFAULTS.stage;
+    var copy = DriveApp.getFileById(ss.getId()).makeCopy('The Nurts results archive ' + Utilities.formatDate(now_(), 'Asia/Kuala_Lumpur', 'yyyy-MM-dd HHmm') + ' (' + stage + ')', DriveApp.getFolderById(folderId));
+    var n = 0;
+    ['Interactions', 'Registrations', 'Users', 'Casual', 'Rounds', 'RoundTraces', SCORING_TABS.calibration].forEach(function (tab) {
+      var sh = ss.getSheetByName(tab); if (!sh || sh.getLastRow() < 2) return;
+      n += sh.getLastRow() - 1; sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
+    });
+    ss.getSheets().forEach(function (sh) { if (/^Scores /.test(sh.getName())) ss.deleteSheet(sh); });
+    ['Candidate Summary', SCORING_TABS.scores, SCORING_TABS.norms, SCORING_TABS.insights, SCORING_TABS.validity, SCORING_TABS.onePager].forEach(function (tab) { var sh = ss.getSheetByName(tab); if (sh) sh.clear(); });
+    var pg = ss.getSheetByName(SCORING_TABS.purges);
+    pg.getRange(pg.getLastRow() + 1, 1, 1, 6).setValues([[now_(), stage, safe_(reason || ''), copy.getUrl(), n, safe_(activeEmail_())]]);
+    refreshSummary();
+    return { url: copy.getUrl(), rows: n };
+  } finally { lock.releaseLock(); }
 }
 
 // ---------------------------------------------------------------- setup & maintenance
@@ -536,6 +694,7 @@ function setup() {
   if (!ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'markStaleRounds'; })) {
     ScriptApp.newTrigger('markStaleRounds').timeBased().everyHours(1).create();
   }
+  setupScoringTabs_();
   refreshSummary();
   console.log('Setup complete. CV folder: https://drive.google.com/drive/folders/' + props.getProperty('CV_FOLDER_ID'));
 }

@@ -191,6 +191,10 @@ test('applicant: register → how to → practice → real round → report → 
   expect(rows).toContain('eth_report_problem');
   const mets = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[7] === 'real' && x[10] === 'completed').map((x) => ({ module: x[4], m: JSON.parse(x[12]), primary: x[11] }))
     : dbj.raw.rounds.filter((x) => !x.key.startsWith('fake') && x.mode === 'real' && x.status === 'completed').map((x) => ({ module: x.module, m: x.metrics, primary: x.primary }));
+  if (process.env.SAVE_ROUNDS && !LIVE) { // a realistic fixture for the scoring-layer tests (synthetic identity, bot play)
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync('tests/fixtures/scoring-rounds.json', JSON.stringify({ rounds: dbj.raw.rounds.filter((x) => !x.key.startsWith('fake')), interactions: dbj.interactions }));
+  }
   expect(mets.at(-1).module).toBe('sunny-tap'); // always last (request #25)
   const st = mets.at(-1).m;
   expect(st.calm).toBe(false); expect(st.wipeRate).toBeGreaterThanOrEqual(4);
@@ -198,8 +202,16 @@ test('applicant: register → how to → practice → real round → report → 
     await fetch(GAS + '/__run/refreshSummary');
     const { sheets } = await (await fetch(GAS + '/__dump')).json();
     const cs = sheets['Candidate Summary']; const hd = cs[0];
-    expect(cs[1][hd.indexOf('ethics')]).toBe('flag');
-    expect(cs[1][hd.indexOf('problem reports')]).toContain('developer tool');
+    // raised a score, then reported the tool in the same run → self-corrected: a note (Framework gate table)
+    expect(cs[1][hd.indexOf('ethicsGate')]).toBe('note');
+    expect(cs[1][hd.indexOf('ethicsDetail')]).toContain('reported Y');
+    // the scoring layer's tabs (requests #28–31), rebuilt from the raw tabs
+    const sc = sheets.Scores, ins = sheets.Insights;
+    expect(sc[1][sc[0].indexOf('stage')]).toBe('ALPHA: test data');
+    expect(sc[1][sc[0].indexOf('l1Check')]).not.toContain('mismatch');
+    expect(ins[1][ins[0].indexOf('headline')]).toMatch(/fit: Junior/);
+    expect(sheets.Norms.slice(1).every((r) => r[7] === 'off (alpha)')).toBeTruthy();
+    expect(sheets.ScoringConfig.length).toBeGreaterThan(10);
   }
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
@@ -223,6 +235,15 @@ test('applicant: register → how to → practice → real round → report → 
   const users = (await backend(page)).users;
   expect(users[0].currentRun).toBe(2);
   expect(users[0].phone).toBe(PHONE); // stays text in Sheets, '+' kept
+  if (LIVE) {
+    const cfgRows = (await (await fetch(GAS + '/__dump')).json()).sheets.ScoringConfig.length;
+      // Archive and purge (request #31): archive copy → clear → Purges log; ScoringConfig is kept
+      const pr = await (await fetch(GAS + '/__call/purge_?' + encodeURIComponent(JSON.stringify(['end of Alpha test', 'PURGE'])))).json();
+      expect(pr.result.rows).toBeGreaterThan(10);
+      const after = (await (await fetch(GAS + '/__dump')).json()).sheets;
+      expect(after.Rounds).toHaveLength(1); expect(after.Interactions).toHaveLength(1); expect(after.Users).toHaveLength(1);
+      expect(after.Purges[1][2]).toBe('end of Alpha test'); expect(after.ScoringConfig.length).toBe(cfgRows);
+  }
 
   expect(errors).toEqual([]);
 });

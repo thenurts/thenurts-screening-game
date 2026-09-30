@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
 const PORT = Number(process.env.GAS_PORT || 8787);
-const code = readFileSync(new URL('../../apps-script/Code.gs', import.meta.url), 'utf8');
+// Both Apps Script files share one global scope, as in the real project: the scoring layer (a build of src/scoring/) and Code.gs.
+const code = readFileSync(new URL('../../apps-script/scoring.gs', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../../apps-script/Code.gs', import.meta.url), 'utf8');
 
 function coerce(v, textFmt) {
   if (v instanceof Date || typeof v === 'boolean' || typeof v === 'number' || v == null) return v ?? '';
@@ -27,6 +28,7 @@ class Sheet {
   getMaxRows() { return 1000; }
   setFrozenRows() { return this; }
   setFrozenColumns() { return this; }
+  setColumnWidth() { return this; }
   clear() { this.data = []; this.fmt = {}; return this; }
   getRange(r, c, nr = 1, nc = 1) { return new Range(this, r, c, nr, nc); }
 }
@@ -55,6 +57,8 @@ class Range {
   setNumberFormat(f) { for (let j = 0; j < this.nc; j++) this.sh.fmt[this.c - 1 + j] = f; return this; }
   setFontWeight() { return this; }
   setBackground() { return this; }
+  setWrap() { return this; }
+  setDataValidation() { return this; }
 }
 
 let state;
@@ -68,6 +72,7 @@ function fresh() {
     getSheets: () => sheets.slice(),
     deleteSheet: (s) => sheets.splice(sheets.indexOf(s), 1),
     setSpreadsheetTimeZone() {},
+    getId: () => 'sheet-1',
   };
   const ctx = {
     console, Date, JSON, Math, Object, String, Number, Array, Error, RegExp,
@@ -84,7 +89,9 @@ function fresh() {
       base64Decode: (b) => [...Buffer.from(b, 'base64')], getUuid: () => randomUUID(),
       formatDate: (d) => d.toISOString().replace(/[-:T]/g, '').slice(0, 15), newBlob: (bytes, type, name) => ({ bytes, type, name }),
     },
+    Session: { getActiveUser: () => ({ getEmail: () => 'staff@example.com' }) },
     DriveApp: {
+      getFileById: () => ({ makeCopy: (name) => { files.push('archive:' + name); return { getUrl: () => 'https://drive.example/archive' }; } }),
       createFolder: () => ({ getId: () => 'folder-1' }),
       getFolderById: () => ({ createFile: (blob) => { if (process.env.GAS_FAIL_DRIVE) throw new Error('Simulated Drive failure'); files.push(blob.name); return { getUrl: () => 'https://drive.example/' + blob.name }; } }),
     },
@@ -109,6 +116,7 @@ http.createServer((req, res) => {
     if (req.url.startsWith('/__dump')) return res.end(JSON.stringify({ sheets: dump(), files: state.files }));
     if (req.url.startsWith('/__prop/')) { const [k, v] = decodeURIComponent(req.url.slice(8)).split('='); state.ctx.PropertiesService.getScriptProperties().setProperty(k, v || null); return res.end('{"ok":true}'); } // e.g. /__prop/DEV_PIN= (unset)
     if (req.url.startsWith('/__reset')) { fresh(); return res.end('{"ok":true}'); }
+    if (req.url.startsWith('/__call/')) { const [fn, q] = req.url.slice(8).split('?'); const args = q ? JSON.parse(decodeURIComponent(q)) : []; return res.end(JSON.stringify({ ok: true, result: state.ctx[fn](...args) ?? null })); } // e.g. /__call/purge_?["reason","PURGE"]
     if (req.url.startsWith('/__run/')) { state.ctx[req.url.slice(7)](); return res.end('{"ok":true}'); } // e.g. /__run/refreshSummary
     if (req.method === 'GET') return res.end(state.ctx.doGet().content);
     if (!/^text\/plain/.test(req.headers['content-type'] || '')) { res.statusCode = 415; return res.end('{"ok":false,"error":"client must send text/plain"}'); }

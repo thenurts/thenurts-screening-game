@@ -1,30 +1,39 @@
-// Suite learning score (request #20): parts, weights, n/a rules and the minimum-data rule. Run: npm run test:unit
+// Learning v2 (request #28; Framework v0.4–v0.5): weights 30/20/20/15/15, n/a parts drop and the rest rescale, prior casual
+// play removes a module, ≥ 2 parts from ≥ 2 games, bands Low / Typical / High. Run: npm run test:unit
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { learningScore, LEARN } from '../src/core/learning.js';
+import { learningComposite, learningFromMetrics } from '../src/scoring/learning.js';
+import { learningFactsFromV1 } from '../src/scoring/learnFacts.js';
+import { DEFAULTS } from '../src/scoring/config.js';
 
-test('weights are the v1.1 ones and adaptation stays off until item norms exist', () => {
-  assert.deepEqual(LEARN.weights, { firstUse: 0.25, pickup: 0.25, noRepeat: 0.20, trapPairs: 0.15, adaptation: 0.15 });
-  assert.equal(LEARN.itemNormsReady, false);
+const R = {
+  'torch-talk': { learn: { firstUse: [2, 3], noRepeat: [1, 2], pickup: [2, 12] } },
+  'mamak-rush': { learn: { firstUse: [4, 4], noRepeat: [0, 3], trapPairs: [1, 1], pickup: [0, 6], probes: 'valueFirst+ tapauReady+ gasPlanned+ steps:teh+' } },
+};
+test('weights 30/20/20/15/15 over the parts that exist', () => {
+  const r = learningFromMetrics(R);
+  const parts = { firstUse: 6 / 7, pickup: 1 - 2 / 18, noRepeat: 1 - 1 / 5, trapPairs: 1 };
+  const w = DEFAULTS['learn.weights'];
+  const want = Math.round((100 * Object.entries(parts).reduce((a, [k, v]) => a + w[k] * v, 0)) / (0.3 + 0.2 + 0.2 + 0.15));
+  assert.equal(r.score, want); assert.equal(r.nParts, 4); assert.deepEqual(r.games.sort(), ['mamak-rush', 'torch-talk']);
+  assert.equal(r.band, want >= 70 ? 'High' : want < 40 ? 'Low' : 'Typical');
 });
-test('flawless first-time player: high learning; noRepeat is n/a (no errors to learn from)', () => {
-  const r = learningScore({
-    'torch-talk': { learn: { firstUse: [3, 3], noRepeat: [0, 0], pickup: [0, 12] } },
-    'mamak-rush': { learn: { firstUse: [9, 9], noRepeat: [0, 0], trapPairs: [0, 0], pickup: [0, 6] } },
-  });
-  assert.equal(r.score, 100); assert.equal(r.band, 'quick'); assert.ok(r.noErrors); assert.ok(!('noRepeat' in r.parts));
+test('minimum data: ≥ 2 parts from ≥ 2 games; otherwise Not enough evidence', () => {
+  assert.equal(learningFromMetrics({ 'torch-talk': R['torch-talk'] }).band, 'Not enough evidence');
+  assert.equal(learningFromMetrics({ 'lucky-dip': { points: 5 } }).score, null);
 });
-test('weighted mean of the available parts', () => {
-  const r = learningScore({
-    'torch-talk': { learn: { firstUse: [1, 3], noRepeat: [2, 4], pickup: [6, 12] } },
-    'mamak-rush': { learn: { firstUse: [3, 3], noRepeat: [0, 0], trapPairs: [1, 2], pickup: [0, 6] } },
-  });
-  // firstUse 4/6, pickup 1 − 6/18, noRepeat 1 − 2/4, trapPairs 1/2
-  const want = Math.round(100 * (0.25 * (4 / 6) + 0.25 * (1 - 6 / 18) + 0.20 * 0.5 + 0.15 * 0.5) / 0.85);
-  assert.equal(r.score, want); assert.equal(r.band, 'steady');
+test('a module played for fun first contributes nothing (priorCasualPlay)', () => {
+  const r = learningFromMetrics({ ...R, 'mamak-rush': { ...R['mamak-rush'], priorCasualPlay: true } });
+  assert.equal(r.band, 'Not enough evidence'); assert.deepEqual(r.practised, ['mamak-rush']);
 });
-test('fewer than 2 parts, or parts from only 1 game → Not enough evidence', () => {
-  assert.equal(learningScore({ 'torch-talk': { learn: { firstUse: [3, 3], pickup: [0, 12] } } }).reason, 'Not enough evidence');
-  assert.equal(learningScore({ 'lucky-dip': { points: 5 } }).score, null);
-  assert.equal(learningScore({ 'torch-talk': { learn: { firstUse: [3, 3] } }, 'fix-it-kit': { learn: { pickup: [1, 2] } } }).score, Math.round(100 * (0.25 * 1 + 0.25 * 0.5) / 0.5));
+test('a skipped tutorial means pickup is n/a (never 0), so skipping costs nothing', () => {
+  const noTut = { 'torch-talk': { learn: { firstUse: [3, 3], noRepeat: [0, 1] } }, 'mamak-rush': { learn: { firstUse: [4, 4], trapPairs: [1, 1] } } };
+  const r = learningFromMetrics(noTut);
+  assert.ok(!('pickup' in r.parts)); assert.equal(r.score, 100);
+});
+test('v1 counts convert to the learning v2 contract; named Mamak probes are kept', () => {
+  const f = learningFactsFromV1(R['mamak-rush']);
+  assert.deepEqual(f.firstUse.map((p) => p.probe), ['valueFirst', 'tapauReady', 'gasPlanned', 'steps:teh']);
+  assert.deepEqual(f.repeats, { opportunities: 3, repeated: 0 }); assert.equal(f.trapPairs.length, 1);
+  assert.equal(learningComposite([], DEFAULTS).band, 'Not enough evidence');
 });
