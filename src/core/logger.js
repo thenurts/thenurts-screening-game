@@ -43,7 +43,7 @@ function schedule(now = false) {
 //   core: who/when/which device + each How-to-play viewing (count = re-reads, dwell = actually read it)
 //   modules: tier B decision events ("g:*") whitelisted in the module manifest's logEvents
 //   ethics meta-test (request #27): every use of the score tool, reverts, and real problem reports
-export const ROW_EVENTS = new Set(['session_start', 'register', 'login_ok', 'casual_start', 'howto', 'eth_modify', 'eth_revert', 'eth_report_problem']);
+export const ROW_EVENTS = new Set(['session_start', 'register', 'login_ok', 'casual_start', 'howto', 'eth_offer', 'eth_modify', 'eth_revert', 'eth_report_problem']);
 const isRowEvent = (interaction) => interaction.startsWith('g:') || ROW_EVENTS.has(interaction);
 
 /** log('core', 'register', value, { roundNo, roundUid, moduleVersion }). Non-policy events go to the debug panel only. */

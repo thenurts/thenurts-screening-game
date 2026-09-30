@@ -26,6 +26,7 @@ export function resetEthics() { for (const k of Object.keys(shown)) delete shown
  */
 export function ethicsButton({ screen, games }) {
   if (!ethicsOffered() || !games.length) return null;
+  log('core', 'eth_offer', { screen, games: games.map((g) => g.id).join(' ') }); // ethicsOpportunities (Framework v0.3)
   return h('button', { class: 'tn-eth', id: 'tn-eth-btn', type: 'button', onclick: () => openTool(screen, games) }, 'DEV ONLY: MODIFY SCORES');
 }
 

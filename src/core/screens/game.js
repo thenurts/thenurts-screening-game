@@ -1,6 +1,6 @@
 // Pre-game (how to play / practice / start), post-game results and the end-of-run report.
 import { h, show, button, host, card, logo, countUp, charImg } from '../ui/dom.js';
-import { learningScore } from '../learning.js';
+import { learningFromMetrics } from '../../scoring/learning.js';
 import { log, flushBeacon } from '../logger.js';
 import { modules, hostOf } from '../registry.js';
 import { TRAITS } from '../traits.js';
@@ -222,9 +222,9 @@ export function reportScreen({ report, runNo, casual, onRestart, onApply }) {
       h('div', { class: 'tn-muted', style: { display: 'flex', justifyContent: 'space-between' } }, h('span', {}, a.poles[0]), h('span', {}, a.poles[1]))));
   });
   // Learning (request #20): no game of its own; a band built from evidence across the games, or "Not enough evidence".
-  const learn = learningScore(Object.fromEntries(Object.entries(report.results || {}).map(([k, r]) => [k, r.metrics])));
+  const learn = learningFromMetrics(Object.fromEntries(Object.entries(report.results || {}).map(([k, r]) => [k, r.metrics]))); // learning v2 (#28)
   if (Object.keys(learn.parts).length) {
-    const text = { quick: 'Picks up new rules quickly', steady: 'Picks up new rules steadily', slow: 'Took a few tries to pick up new rules', none: 'Not enough evidence yet' }[learn.band];
+    const text = { High: 'Picks up new rules quickly', Typical: 'Picks up new rules steadily', Low: 'Took a few tries to pick up new rules', 'Not enough evidence': 'Not enough evidence yet' }[learn.band];
     chart.append(h('div', { class: 'tn-metric', id: 'tn-learning' },
       h('div', { class: 'tn-metric__top' }, h('span', {}, TRAITS.learning.label), h('b', {}, text)),
       h('div', { class: 'tn-muted' }, learn.score == null ? 'We need a little more play to say.' : 'From how quickly you used each game’s new rules.')));
