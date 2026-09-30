@@ -2,7 +2,7 @@
 // (one row per key, JSON value); every derived number is stamped with `scoringVersion`. Change a value → bump the
 // version → The Nurts → Rescore all.
 export const DEFAULTS = {
-  scoringVersion: 'sc-1',
+  scoringVersion: 'sc-2', // sc-2: autonomy measured (#32–34)
   stage: 'alpha', // alpha · beta · soft · hard (request #31)
   // L4 norms
   'norms.minProvisional': 5, 'norms.minBands': 30, 'bands.strongTop': 0.30, 'bands.probeBottom': 0.20,
@@ -34,7 +34,12 @@ export const DEFAULTS = {
   },
   levelAdjust: { Junior: {}, Mid: {}, Lead: { judgement: 1, critical: 1 } },
   'weights.floor': { organisation: 2, learning: 2 }, 'weights.cap': 3,
-  autonomyFactor: { Junior: 1, Mid: 1, Lead: 1 }, // autonomy not yet measured (design §6)
+  // L5 autonomy (request #34; Framework v0.7): two finales → a level → autonomyFactor per suitability level
+  'autonomy.enabled': true, // false = probe-only (factor 1), e.g. if the Validity AUC vs "needed little hand-holding" is below 0.6
+  'autonomy.rules': { tipBeforeL1: 0.5, coherenceL1: 0.55, coherenceL3: 0.70, outcomeL3: 0.5, freezeRatio: 3, freezeMinMs: 10000, idleNaMs: 120000 },
+  'autonomy.targets': { Junior: 1, Mid: 2, Lead: 3 }, 'autonomy.typeMax': { Intern: 1 }, 'autonomy.typeMin': { Freelance: 2 },
+  'autonomy.shortFactor': [1, 0.8, 0.6], // meets the target · one level short · two short
+  'autonomy.validAuc': 0.6, // Validity: below this vs "needed little hand-holding" → switch the factor off until fixed
   // Validity (request #30)
   'validity.descriptiveBelow': 20,
 };
@@ -49,3 +54,4 @@ export function mergeConfig(over = {}) {
 export const MIB = ['organisation', 'learning', 'resilience', 'judgement', 'critical', 'creative', 'communication'];
 export const STAGE_LABEL = { alpha: 'ALPHA: test data', beta: 'Beta, not for decisions', soft: 'Calibration', hard: '' };
 export const STAGE_NO_NORMS = { alpha: true };
+export const OBSOLETE_KEYS = ['autonomyFactor']; // removed from the Sheet's ScoringConfig on the next rescore

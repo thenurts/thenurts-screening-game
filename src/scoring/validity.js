@@ -36,6 +36,17 @@ export function validity(scores, ratings, cfg = DEFAULTS) {
       'band × answer': Object.entries(table).map(([k, n]) => `${k}: ${n}`).join(' · '), 'rater agreement': agreement(ratings, item),
       note: A == null ? 'needs both Y and N answers' : A < 0.55 ? 'mismatch: near chance or inverted' : '', status: label });
   }
+  // autonomy (Framework v0.7): the combined level vs "needed little hand-holding"; AUC < 0.6 → back to probe-only (autonomy.enabled = false)
+  { const yes = [], no = [], table = {};
+    for (const r of ratings) {
+      const s = byUser[r.user_id], a = r['needed little hand-holding']; const v = Number(s?.autonomyLevel);
+      if (!s || s.autonomyLevel === '' || s.autonomyLevel == null || Number.isNaN(v) || (a !== 'Y' && a !== 'N')) continue;
+      (a === 'Y' ? yes : no).push(v); const k = `L${v}${/provisional/.test(s.autonomy) ? ' (provisional)' : ''} × ${a}`; table[k] = (table[k] || 0) + 1;
+    }
+    const A = auc(yes, no);
+    rows.push({ trait: 'autonomy', 'rater item': 'needed little hand-holding', n: yes.length + no.length, AUC: A ?? '', 'mean score Y': r1(mean(yes)) ?? '', 'mean score N': r1(mean(no)) ?? '',
+      'band × answer': Object.entries(table).map(([k, n]) => `${k}: ${n}`).join(' · '), 'rater agreement': agreement(ratings, 'needed little hand-holding'),
+      note: A == null ? 'needs both Y and N answers (scores = level 1–3; the 90-day hand-holding check comes with the Outcomes tab)' : A < cfg['autonomy.validAuc'] ? `AUC below ${cfg['autonomy.validAuc']}: consider autonomy.enabled = false (probe-only) until it is fixed` : '', status: label }); }
   // ethics: the gate vs "any integrity concerns"; risk: the game band vs the rater's style
   const eth = {}; let riskSame = 0, riskN = 0;
   for (const r of ratings) {

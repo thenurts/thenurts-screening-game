@@ -7,7 +7,8 @@ import { traitOf, setbackHook, RELIABILITY, SINGLE_SOURCE, TRAIT_LABEL } from '.
 import { learningComposite } from './learning.js';
 import { learningFactsFromV1 } from './learnFacts.js';
 import { ethicsGate } from './ethicsGate.js';
-import { spectrum, weightsFor } from './fit.js';
+import { spectrum, weightsFor, LEVELS } from './fit.js';
+import { finaleRead, combineAutonomy, FINALES, AUTONOMY_PROBES } from './autonomy.js';
 import { percentile, quantile, flagsOf, num, r1 } from './util.js';
 
 export const TRAITS_OUT = [...MIB, 'risk'];
@@ -33,7 +34,9 @@ const CAVEAT_TEXT = {
   notEnoughEvidence: (g) => `${g} ended early: not enough evidence for a score.`,
 };
 
-const official = (rs) => rs.filter((r) => r.mode === 'real' && r.status === 'completed').sort((a, b) => a.startedAt - b.startedAt);
+// Official = a completed real round, or one closed during an autonomy finale after its scored part was done (metrics.mainDone).
+const leftInFinale = (r) => (r.status === 'quit' || r.status === 'abandoned') && !!r.metrics?.mainDone;
+const official = (rs) => rs.filter((r) => r.mode === 'real' && (r.status === 'completed' || leftInFinale(r))).sort((a, b) => a.startedAt - b.startedAt);
 
 /** L1: re-derive a round's metrics from its raw logs with the game's own code; compare with what the client stored. */
 export function rederiveRound(r) {
@@ -97,11 +100,12 @@ export function scoreAll(input) {
     if (learn.score != null) learnPool.push(learn.score);
     const ev = (evByUser[u.userId] || []).filter((e) => Number(e.runNo) === run).sort((a, b) => a.t - b.t);
     const eth = ethicsGate(ev, Object.keys(off).length > 0);
-    return { u, run, inRun, off, traits, learn, eth, entries };
+    const auto = combineAutonomy(Object.keys(FINALES).filter((m) => off[m]).map((m) => finaleRead(m, off[m].metrics, ADAPTERS[m], cfg)), cfg);
+    return { u, run, inRun, off, traits, learn, eth, entries, auto };
   });
 
   for (const p of perUser) {
-    const { u, run, inRun, off, traits, learn, eth } = p;
+    const { u, run, inRun, off, traits, learn, eth, auto } = p;
     const reg = regs[u.userId] || {}, fn = reg.desiredFunction || 'Other', type = reg.employmentType || 'Full-time';
     // learning band against the learning pool once it is big enough
     const lpct = !noNorms && learnPool.length >= cfg['norms.minBands'] && learn.score != null ? percentile(learn.score, learnPool) : null;
@@ -109,7 +113,8 @@ export function scoreAll(input) {
     const allNormed = MIB.every((t) => t === 'learning' || !traits[t] || traits[t].n >= cfg['norms.minBands']) && !noNorms;
     const values = {}; for (const t of MIB) if (t === 'learning') values.learning = learnOut.score; else if (traits[t]) values[t] = allNormed && traits[t].pct != null ? traits[t].pct : traits[t].score;
     const risk = traits.risk?.score ?? null;
-    const spec = spectrum(values, risk, fn, type, cfg);
+    const autoOn = cfg['autonomy.enabled'] && auto.factorLevel != null;
+    const spec = spectrum(values, risk, fn, type, cfg, autoOn ? auto.factorLevel : null);
 
     // ---- L6 flags (always discussed, never auto-reject)
     const red = [], notes = [], positives = [], caveats = [];
@@ -122,11 +127,15 @@ export function scoreAll(input) {
     const ldFlags = flagsOf(traits.risk?.metrics);
     if (ldFlags.includes('reckless')) red.push('risk: reckless (kept pushing after losses)');
     if (ldFlags.includes('frozen')) red.push('risk: frozen (banked almost nothing)');
+    if (auto.red) red.push('autonomy: L1 in both finales (matters when considering Mid or Lead)');
+    notes.push(...auto.notes);
     const realTries = {}; inRun.filter((r) => r.mode === 'real').forEach((r) => { realTries[r.module] = (realTries[r.module] || 0) + 1; });
     const multi = Object.entries(realTries).filter(([, n]) => n > 1).map(([m]) => ADAPTERS[m]?.title || m);
     if (run > 1 || multi.length) red.push(`brute-force pattern: ${run > 1 ? `run ${run}` : ''}${run > 1 && multi.length ? '; ' : ''}${multi.length ? `restarted ${multi.join(', ')}` : ''}`);
-    const unfinished = inRun.filter((r) => r.mode === 'real' && (r.status === 'quit' || r.status === 'abandoned')).map((r) => ADAPTERS[r.module]?.title || r.module);
+    const unfinished = inRun.filter((r) => r.mode === 'real' && (r.status === 'quit' || r.status === 'abandoned') && !leftInFinale(r)).map((r) => ADAPTERS[r.module]?.title || r.module);
     if (unfinished.length) notes.push(`left unfinished: ${[...new Set(unfinished)].join(', ')}`);
+    const finaleLeft = inRun.filter((r) => r.mode === 'real' && leftInFinale(r)).map((r) => FINALES[r.module] || r.module);
+    if (finaleLeft.length) notes.push(`left during the ${[...new Set(finaleLeft)].join(' and ')} finale (the scored part counts)`);
     const tabs = input.away?.[`${u.userId}|fair-board`] || 0;
     if (tabs) notes.push(`switched tabs ${tabs}× during Fair Board`);
     for (const [module, s] of Object.entries(off)) for (const f of flagsOf(s.metrics)) if (CAVEAT_TEXT[f]) caveats.push(CAVEAT_TEXT[f](ADAPTERS[module]?.title || module));
@@ -151,7 +160,8 @@ export function scoreAll(input) {
       ethicsGate: eth.gate, ethicsDetail: eth.detail, ethicsOpportunities: eth.opportunities,
       fitBasis: allNormed ? 'percentiles' : 'raw scores (no benchmark yet)', roleFit: spec.fit.Mid ?? '',
       fitJunior: spec.fit.Junior ?? '', fitMid: spec.fit.Mid ?? '', fitLead: spec.fit.Lead ?? '', suggestedLevel: '', bestFitFunction: spec.bestFitFunction,
-      autonomy: 'not yet measured (autonomyFactor 1; traits only)',
+      autonomy: auto.label, autonomyLevel: auto.level ?? '', 'autonomy detail': auto.detail,
+      'autonomy factor': !cfg['autonomy.enabled'] ? 'off (autonomy.enabled = false): traits only' : autoOn ? `applied (L${auto.factorLevel} vs each level’s target)` : 'not applied (not measured, provisional or n/a): traits only',
       redFlags: red.join('; '), notes: notes.join('; '), positives: positives.join('; '), caveats: caveats.join(' '),
       'secondary: paraphraseRate': traits.communication?.extra.paraphraseRate ?? '', 'secondary: askScore': traits.communication?.extra.askScore ?? '',
       'secondary: setback hooks': Object.entries(off).map(([m, s]) => [m, setbackHook(m, s.metrics)]).filter(([, v]) => v != null).map(([m, v]) => `${m} ${v}`).join(' · '),
@@ -166,11 +176,14 @@ export function scoreAll(input) {
     const strongest = [...scoredTraits].sort((a, b) => values[b] - values[a]).slice(0, 2);
     const lowest = scoredTraits.filter((t) => weights[t] >= 2).sort((a, b) => values[a] - values[b]).slice(0, 2);
     const fitTxt = ['Junior', 'Mid', 'Lead'].map((L) => `${L} ${spec.fit[L] ?? '–'}`).join(' · ');
-    const headline = scoredTraits.length ? `${fn} fit: ${fitTxt} (${allNormed ? 'vs other candidates' : 'raw, no benchmark yet'}). Strongest: ${strongest.map(tl).join(', ')}.` : 'No completed games yet.';
-    const probes = [...lowest.map((t) => `${TRAIT_LABEL[t]}: “${PROBES[t]}”`), ...(eth.gate === 'flag' ? [`integrity: “${PROBES.ethics}”`] : []), ...(red.some((x) => x.startsWith('brute')) ? [`repeat plays: “${PROBES.bruteForce}”`] : [])];
-    insights.push({ stage: row.stage, user_id: u.userId, name: u.name || '', role: `${fn} · ${type}`, headline, 'probe first': probes.join('\n'),
+    const headline = scoredTraits.length ? `${fn} fit: ${fitTxt} (${allNormed ? 'vs other candidates' : 'raw, no benchmark yet'}${autoOn ? '' : '; traits only'}). Strongest: ${strongest.map(tl).join(', ')}.` : 'No completed games yet.';
+    // autonomy probe (Framework v0.7): when the read is a range, inconsistent, provisional or missing, matched to the best-fitting level
+    const bestLevel = LEVELS.filter((L) => spec.fit[L] != null).sort((a, b) => spec.fit[b] - spec.fit[a])[0] || 'Mid';
+    const autoProbe = auto.kind !== 'agree' && scoredTraits.length ? [`autonomy (${auto.label}; ${bestLevel}): “${AUTONOMY_PROBES[bestLevel]}”`] : [];
+    const probes = [...lowest.map((t) => `${TRAIT_LABEL[t]}: “${PROBES[t]}”`), ...(eth.gate === 'flag' ? [`integrity: “${PROBES.ethics}”`] : []), ...(red.some((x) => x.startsWith('brute')) ? [`repeat plays: “${PROBES.bruteForce}”`] : []), ...autoProbe];
+    insights.push({ stage: row.stage, user_id: u.userId, name: u.name || '', role: `${fn} · ${type}`, headline, autonomy: auto.label, 'probe first': probes.join('\n'),
       'red flags': red.join('\n'), 'read with care': caveats.join('\n'),
-      'not measured': 'Autonomy (for now), domain skills, motivation for this role, and culture beyond integrity.', scoringVersion: cfg.scoringVersion });
+      'not measured': `${auto.level == null ? 'Autonomy (no finale read yet), domain' : 'Domain'} skills, motivation for this role, and culture beyond integrity.`, scoringVersion: cfg.scoringVersion });
   }
 
   // ---- the Norms tab

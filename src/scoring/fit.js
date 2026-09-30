@@ -1,6 +1,7 @@
 // L5 role fit and the suitability spectrum (Framework "Role profiles"; design §6). Pure.
 import { DEFAULTS, MIB } from './config.js';
 import { r1 } from './util.js';
+import { autonomyFactor } from './autonomy.js';
 
 /** Role weights for a function × employment type × level, with the caps, floors and the Intern caps applied. */
 export function weightsFor(fn, type, level, cfg = DEFAULTS) {
@@ -23,22 +24,23 @@ export function riskFactor(risk, band, cfg = DEFAULTS) {
   return 1 - (1 - cfg['risk.outsideFloor']) * Math.min(1, out / cfg['risk.outsideSpan']);
 }
 
-/** values: { trait: 0–100 } (percentiles once norms exist, raw before). Missing traits drop out and the rest rescale. */
-export function roleFit(values, risk, fn, type, level, cfg = DEFAULTS) {
+/** values: { trait: 0–100 } (percentiles once norms exist, raw before). Missing traits drop out and the rest rescale.
+ * autoLevel: the combined autonomy level used for the factor (null = not measured / provisional → factor 1). */
+export function roleFit(values, risk, fn, type, level, cfg = DEFAULTS, autoLevel = null) {
   const { weights, riskBand } = weightsFor(fn, type, level, cfg);
   let sw = 0, s = 0;
   for (const t of MIB) if (values[t] != null && weights[t] > 0) { sw += weights[t]; s += weights[t] * values[t]; }
   if (!sw) return null;
-  return r1((s / sw) * riskFactor(risk, riskBand, cfg) * (cfg.autonomyFactor[level] ?? 1));
+  return r1((s / sw) * riskFactor(risk, riskBand, cfg) * autonomyFactor(autoLevel, level, type, cfg));
 }
 
 export const LEVELS = ['Junior', 'Mid', 'Lead'];
 export const FUNCTIONS = ['Events', 'Marketing', 'Sales', 'Product', 'Creative', 'Other'];
 
 /** The suitability spectrum for the registered function and type, plus the best-fit function (at Mid). */
-export function spectrum(values, risk, fn, type, cfg = DEFAULTS) {
-  const fit = Object.fromEntries(LEVELS.map((L) => [L, roleFit(values, risk, fn, type, L, cfg)]));
+export function spectrum(values, risk, fn, type, cfg = DEFAULTS, autoLevel = null) {
+  const fit = Object.fromEntries(LEVELS.map((L) => [L, roleFit(values, risk, fn, type, L, cfg, autoLevel)]));
   let best = null;
-  for (const f of FUNCTIONS) { const v = roleFit(values, risk, f, type, 'Mid', cfg); if (v != null && (!best || v > best.fit)) best = { fn: f, fit: v }; }
+  for (const f of FUNCTIONS) { const v = roleFit(values, risk, f, type, 'Mid', cfg, autoLevel); if (v != null && (!best || v > best.fit)) best = { fn: f, fit: v }; }
   return { fit, bestFitFunction: best ? `${best.fn} (${best.fit})` : '' };
 }

@@ -22,3 +22,11 @@ export function auc(yes, no) {
   return r3(w / (yes.length * no.length));
 }
 export const flagsOf = (m) => String(m?.flags || '').split(/[ ,]+/).filter((f) => f && f !== 'none');
+/** Python-style max(): the FIRST key with the largest f(k); arrays compare element by element (like tuples). */
+export function argmax(keys, f) {
+  let best = null, bv = null;
+  for (const k of keys) { const v = [].concat(f(k)); if (bv === null || cmpTuple(v, bv) > 0) { best = k; bv = v; } }
+  return best;
+}
+const cmpTuple = (a, b) => { for (let i = 0; i < a.length; i++) { if (a[i] > b[i]) return 1; if (a[i] < b[i]) return -1; } return 0; };
+export const argmin = (keys, f) => argmax(keys, (k) => -f(k));
