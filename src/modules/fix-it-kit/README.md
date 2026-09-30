@@ -33,3 +33,9 @@ Logged only: `unusualUseShare`, `doneEarly`, `invalidTries`, `triesUsed`, `tryLo
 2. Objects can be **tapped** as well as dragged into the tray (easier on small phones; both are logged as `cr_add {how}`).
 3. The primary number shown to the player is **different ideas found**; creativeScore is staff-facing.
 4. Open question 1 (the rejected-ideas list) is still yours to review: `rejectedForReview` in `content.json`.
+
+## v3 changes: the "Free Fix" autonomy finale (request #33, 2026-09-30)
+- After the recap card, a brief card: Mia, *"Sports day starts in an hour. Here are some little things that could be better. Your kit, your call."* + "Tips are free: use them whenever you like."
+- 5 problem cards (how many kids each helps, two listed fixes each); tapping a fix uses those objects up (crossed out in the kit strip). Up to 6 tries, **Done** stops early (keeping kit is legitimate). Three equal gauges (kids helped · problems fixed · kit left for tomorrow), no total. A free **Tip** suggests one fix that serves one gauge. Rules in `freefix.js` (a port of Part B of `tests/autonomy-reference.py`).
+- The creative score is untouched. `metrics.mainDone = true` after the 3 problems; `metrics.autonomy = {log "p:i:tip;…|done:tip", done, tips, firstActionMs, medianActionMs, idleMs, stoppedEarly, gauges}`; replayed by `rescore.js autonomyFacts`.
+- Trace events: `au_brief_start`, `au_action`, `au_tip`, `au_end`.

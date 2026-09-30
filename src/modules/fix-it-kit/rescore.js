@@ -32,3 +32,10 @@ export function repeatsOf(tryLog) {
   return opp ? [rep, opp] : null;
 }
 export { learningFactsFromV1 as learningFacts };
+
+// Autonomy (request #34): replays the "Free Fix" log with the finale's own rules → the facts the level rules read.
+import { replay, readFacts } from './freefix.js';
+export function autonomyFacts(m) {
+  const a = m?.autonomy; if (!a || typeof a.log !== 'string' || !a.done) return null;
+  return { ...readFacts(replay(a.log)), tips: a.tips, firstActionMs: a.firstActionMs, medianActionMs: a.medianActionMs, idleMs: a.idleMs, stoppedEarly: !!a.stoppedEarly };
+}

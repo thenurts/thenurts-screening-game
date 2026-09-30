@@ -6,6 +6,7 @@ import { sfx } from '../../core/sfx.js';
 import { charImg } from '../../core/ui/dom.js';
 import { CONTENT, KIT, TRIES, problemsOf, newProblem, tryFix, result, metrics, lookup, explorerChoice } from './rules.js';
 import { repeatsOf } from './rescore.js';
+import * as FF from './freefix.js';
 import bgUrl from './assets/bg-sports.webp';
 
 const q = new URLSearchParams(location.search);
@@ -188,9 +189,115 @@ export default class GameScene extends ModuleScene {
       const ideas = Object.keys(r.found);
       c.add(this.txt(110, y, ideas.length ? ideas.map((x) => `✓ ${x}`).join('   ') : '(no fix found)', { fontSize: '22px', fontStyle: '600', color: C.charcoal, align: 'left', wordWrap: { width: 520 } }).setOrigin(0, 0)); y += 90;
     });
-    const fin = () => { this.recapDone = null; c.destroy(true); this.finish(this.metrics()); };
+    const fin = () => { this.recapDone = null; c.destroy(true); this.startFreeFix(); }; // then the autonomy finale (#33)
     c.add(this.btn(W / 2, 930, 'Done', fin, { w: 300, h: 96, size: 36 }));
     this.recapDone = fin; // test hook
+  }
+
+  // ---------------------------------------------------------------- "Free Fix": the autonomy finale (request #33)
+  // After the 3 scored problems, so the creative score is untouched. Three equal gauges, objects get used up, a free Tip.
+  startFreeFix() {
+    this.mainDone = true; this.snapshot(); // the scored problems are complete even if the page closes during the finale
+    this.ff = FF.newFreeFix(); this.ffTips = 0; this.ffTipNow = null; this.ffTipBefore = false; this.ffTimes = []; this.ffIdleMs = 0;
+    this.probC.removeAll(true); this.trayC.removeAll(true); this.kitC.removeAll(true); this.overlay.removeAll(true);
+    for (const o of [this.tryBtn, this.doneBtn]) { o.setVisible(false); o.disableInteractive(); }
+    for (const o of [this.bubble, this.mia]) o.setVisible(false);
+    this.counter.text.setText('Free Fix');
+    this.ffC = this.add.container(0, 0).setDepth(40);
+    const W = this.W, c = this.add.container(0, 0).setDepth(1150); this.ffBriefOpen = true;
+    c.add(this.add.rectangle(W / 2, this.H / 2, W * 4, this.H * 4, 0x0b0b0b, 0.5).setInteractive());
+    c.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(60, 300, 600, 640, 36).fillStyle(hex(C.cream), 1).fillRoundedRect(60, 290, 600, 640, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(60, 290, 600, 640, 36));
+    c.add(this.fitImg(this.add.image(W / 2, 400, 'mia-excited'), 150));
+    c.add(this.txt(W / 2, 520, 'Free Fix', { fontSize: '40px' }));
+    c.add(this.txt(W / 2, 620, '“Sports day starts in an hour. Here are some little things that could be better. Your kit, your call.”', { fontSize: '28px', fontStyle: '700', wordWrap: { width: 520 } }));
+    c.add(this.txt(W / 2, 750, 'Tap a fix to use those things up. Tap Done any time.\nTips are free: use them whenever you like.', { fontSize: '24px', fontStyle: '600', color: C.charcoal, wordWrap: { width: 520 } }));
+    const go = () => { this.ffBriefGo = null; this.ffBriefOpen = false; c.destroy(true); this.ffLast = performance.now(); this.trace('au_brief_start', { game: 'fix-it-kit', t: 0 }); this.renderFreeFix(); this.ffArmIdle(); };
+    c.add(this.btn(W / 2, 860, 'Start', go, { w: 280, h: 92, size: 34 }));
+    this.ffBriefGo = go; // test hook
+  }
+
+  ffArmIdle() {
+    const now = performance.now(); if (this.ffLastIn) this.ffIdleMs += Math.max(0, now - this.ffLastIn - IDLE_MS); this.ffLastIn = now;
+    this.idleTimer?.remove(); this.idleTimer = this.time.delayedCall(IDLE_MS, () => { if (!this.ff || this.ff.over) return; this.ffNote('No rush. It’s your call.'); });
+  }
+  ffNote(text, color = C.ink) { this.ffNoteText = text; this.ffNoteColor = color; this.renderFreeFix(); }
+
+  freeFixMove(choice) { // "p:i", or null = Done
+    const st = this.ff; if (!st || st.over || this.ffBriefOpen) return;
+    if (choice != null && !(choice in FF.options(st))) return;
+    const now = performance.now(); this.ffTimes.push(Math.round(now - this.ffLast)); this.ffLast = now;
+    FF.apply(st, choice, this.ffTipBefore);
+    const e = st.log[st.log.length - 1];
+    this.trace('au_action', { game: 'fix-it-kit', t: st.log.length, choice: choice ?? 'done', options: Object.keys(e.options), tipBefore: this.ffTipBefore, gauges: FF.measures(st) });
+    this.ffTipBefore = false; this.ffTipNow = null;
+    if (choice) { sfx.play('good'); const [p] = choice.split(':'); this.ffNote(`✓ ${FF.PROBLEMS[p][2]}: fixed!`, C.green); } else sfx.play('click');
+    this.ffArmIdle();
+    if (st.over) this.endFreeFix(choice == null); else this.renderFreeFix();
+  }
+
+  freeFixTip() {
+    const st = this.ff; if (!st || st.over || this.ffBriefOpen) return;
+    const tp = FF.tip(st, this.ffTips); if (!tp) return;
+    this.ffTips++; this.ffTipBefore = true; this.ffTipNow = tp.choice; sfx.play('pop');
+    this.trace('au_tip', { game: 'fix-it-kit', t: st.log.length + 1, suggestion: tp.choice, aim: tp.aim });
+    const [p, i] = tp.choice.split(':');
+    this.ffNote(`Tip: ${FF.PROBLEMS[p][1][Number(i)].map((k) => KIT[k].name).join(' + ')} for “${FF.PROBLEMS[p][2]}” helps “${FF.AIM_LABEL[tp.aim]}”.`, C.blue); this.ffArmIdle();
+  }
+
+  renderFreeFix() {
+    const c = this.ffC; if (!c || !this.ff) return; c.removeAll(true);
+    const st = this.ff, m = FF.measures(st), opts = FF.options(st);
+    FF.AIMS.forEach((a, i) => { // three equal gauges, no total and no "score"
+      const x = 30 + i * 224, y = 118, w = 212;
+      c.add(this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(x, y, w, 76, 18).lineStyle(3, hex(C.ink), 1).strokeRoundedRect(x, y, w, 76, 18)
+        .fillStyle(hex(C.butter), 1).fillRoundedRect(x + 12, y + 48, w - 24, 16, 8).fillStyle(hex(C.teal), 1).fillRoundedRect(x + 12, y + 48, Math.max(0, (w - 24) * m[a]), 16, 8).lineStyle(2, hex(C.ink), 1).strokeRoundedRect(x + 12, y + 48, w - 24, 16, 8));
+      const t = this.txt(x + w / 2, y + 24, FF.AIM_LABEL[a], { fontSize: '21px' }); if (t.width > w - 16) t.setScale((w - 16) / t.width); c.add(t);
+    });
+    // the kit (used-up things are crossed out)
+    Object.keys(KIT).forEach((k, i) => {
+      const x = 30 + 42 + i * 83, y = 250, used = st.used.has(k);
+      c.add(this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(x - 38, y - 38, 76, 76, 14).lineStyle(3, hex(C.ink), 1).strokeRoundedRect(x - 38, y - 38, 76, 76, 14));
+      const im = this.fitImg(this.add.image(x, y, `fx-kit-${k}`), 62); c.add(im);
+      if (used) { im.setAlpha(0.3); c.add(this.txt(x, y, '✕', { fontSize: '48px', color: C.red })); }
+    });
+    c.add(this.txt(360, 320, this.ffNoteText || 'Your kit, your call. Each fix uses those things up.', { fontSize: '24px', fontStyle: '700', color: this.ffNoteColor || C.ink, wordWrap: { width: 640 } }));
+    FF.PIDS.forEach((p, i) => {
+      const y = 356 + i * 150, [kids, fixes, title] = FF.PROBLEMS[p], fixed = st.fixed.has(p);
+      c.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(30, y + 6, 660, 136, 22).fillStyle(hex(fixed ? C.mint : C.white), 1).fillRoundedRect(30, y, 660, 136, 22).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(30, y, 660, 136, 22));
+      c.add(this.txt(54, y + 30, title, { fontSize: '26px', align: 'left' }).setOrigin(0, 0.5));
+      c.add(this.txt(666, y + 30, `helps ${kids} kid${kids > 1 ? 's' : ''} ${'●'.repeat(kids)}`, { fontSize: '22px', fontStyle: '700', color: C.charcoal, align: 'right' }).setOrigin(1, 0.5));
+      if (fixed) { c.add(this.txt(360, y + 94, '✓ Fixed', { fontSize: '28px', color: C.green })); return; }
+      fixes.forEach((f, j) => {
+        const key = FF.keyOf(p, j), ok = key in opts, tipped = this.ffTipNow === key;
+        const b = this.btn(200 + j * 320, y + 94, f.map((k) => KIT[k].name).join(' + '), () => this.freeFixMove(key), { w: 300, h: 64, size: 20, fill: tipped ? C.sun : ok ? C.butter : C.white });
+        if (!ok) { b.setAlpha(0.4); b.disableInteractive?.(); }
+        c.add(b);
+      });
+    });
+    const used = st.log.filter((e) => e.choice != null).length;
+    c.add(this.txt(60, 1130, 'Tries', { fontSize: '22px', color: C.charcoal, align: 'left' }).setOrigin(0, 0.5));
+    for (let i = 0; i < FF.TRIES; i++) c.add(this.add.graphics().fillStyle(hex(i < used ? C.green : C.white), 1).fillCircle(150 + i * 40, 1130, 14).lineStyle(3, hex(C.ink), 1).strokeCircle(150 + i * 40, 1130, 14));
+    c.add(this.btn(250, 1200, '💡 Tip (free)', () => this.freeFixTip(), { w: 280, h: 80, size: 26, fill: C.white }));
+    c.add(this.btn(560, 1200, 'Done', () => this.freeFixMove(null), { w: 200, h: 80, size: 30, fill: C.sun }));
+  }
+
+  endFreeFix(stoppedEarly) {
+    if (this.ffEnding) return; this.ffEnding = true; this.idleTimer?.remove(); this.renderFreeFix();
+    this.trace('au_end', { game: 'fix-it-kit', gauges: FF.measures(this.ff), stoppedEarly, firstActionLatency: this.ffTimes[0] ?? null });
+    const W = this.W, c = this.add.container(0, 0).setDepth(1150);
+    c.add(this.add.rectangle(W / 2, this.H / 2, W * 4, this.H * 4, 0x0b0b0b, 0.45).setInteractive());
+    c.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(80, 430, 560, 420, 36).fillStyle(hex(C.cream), 1).fillRoundedRect(80, 420, 560, 420, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(80, 420, 560, 420, 36));
+    c.add(this.fitImg(this.add.image(W / 2, 510, 'mia-happy'), 130));
+    c.add(this.txt(W / 2, 630, 'Sports day is ready. Thanks for your help!', { fontSize: '30px', wordWrap: { width: 480 } }));
+    const fin = () => { this.freeFixDone = null; c.destroy(true); this.finish(this.metrics()); };
+    c.add(this.btn(W / 2, 760, 'Done', fin, { w: 280, h: 92, size: 34 }));
+    this.freeFixDone = fin; // test hook
+  }
+
+  freeFixMetrics() {
+    if (!this.ff) return null;
+    const gaps = this.ffTimes.slice(1).sort((a, b) => a - b), med = gaps.length ? gaps[gaps.length >> 1] : null;
+    return { game: 'free-fix', v: 1, log: FF.encodeLog(this.ff), done: this.ff.over, tips: this.ffTips, firstActionMs: this.ffTimes[0] ?? null, medianActionMs: med, idleMs: Math.round(this.ffIdleMs), stoppedEarly: this.ff.log.some((e) => e.choice == null), gauges: Object.fromEntries(Object.entries(FF.measures(this.ff)).map(([k, v]) => [k, Math.round(v * 1000) / 1000])) };
   }
 
   // ---------------------------------------------------------------- rendering
@@ -286,7 +393,11 @@ export default class GameScene extends ModuleScene {
 
   /** Test hook: the reference explorer's next try, through the same taps a player makes. */
   botStep() {
-    if (this.busy || this.ended || !this.running || !this.ps) return false;
+    if (this.ended || !this.running) return false;
+    if (this.freeFixDone) { this.freeFixDone(); return true; }
+    if (this.ffBriefGo) { this.ffBriefGo(); return true; }
+    if (this.ff && !this.ff.over) { const c = FF.balancerMove(this.ff); if (c !== undefined) this.freeFixMove(c); return true; } // a purpose-setter fix
+    if (this.busy || !this.ps) return false;
     if (this.recapDone) { this.recapDone(); return true; }
     if (this.ps.over) return false;
     const c = explorerChoice(this.ps.pid, this.ps.avail, new Set(Object.keys(this.ps.found)), null, this.cfg.fixes);
@@ -311,6 +422,7 @@ export default class GameScene extends ModuleScene {
       tryLog,
       learn: (() => { const L = {}; if (practiceMemo.done) L.pickup = [practiceMemo.failSafe ? 2 : Math.min(2, Math.max(0, practiceMemo.tries - 2)), 2]; const r = repeatsOf(tryLog); if (r) L.noRepeat = r; return Object.keys(L).length ? L : null; })(), // learning v2 (#28)
       idleNudges: this.idleNudges, idleMs: Math.round(this.idleMs), flags: flags.join(','),
+      ...(this.mainDone ? { mainDone: true } : {}), ...(this.ff ? { autonomy: this.freeFixMetrics() } : {}),
     };
   }
 
