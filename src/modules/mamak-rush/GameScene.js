@@ -110,7 +110,7 @@ export default class GameScene extends ModuleScene {
   nextStep() {
     this.tutIdx++;
     if (this.tutIdx >= TUTORIAL.length) {
-      Object.assign(tutorialMemo, { done: true, failSafes: this.tutLog.filter((x) => x.failSafe).length, steps: this.tutLog.map((x) => ({ tries: x.tries, failSafe: x.failSafe })) });
+      if (!tutorialMemo.done) Object.assign(tutorialMemo, { done: true, failSafes: this.tutLog.filter((x) => x.failSafe).length, steps: this.tutLog.map((x) => ({ tries: x.tries, failSafe: x.failSafe })) }); // only the first completed tutorial counts (Framework v0.5)
       return this.finish(this.metrics());
     }
     this.step = TUTORIAL[this.tutIdx]; this.tries = 0; this.failSafe = false;

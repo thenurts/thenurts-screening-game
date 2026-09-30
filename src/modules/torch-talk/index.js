@@ -4,7 +4,7 @@ import h1 from './assets/howto-1.webp';
 
 export default {
   id: 'torch-talk',
-  version: 4, // how-to v3 (try-it steps) + no flashback; v3 = the v2.2 patch: item bank v2.2 with clarifier points, no round cap (itemBankVersion 3)
+  version: 5, // v5: learning v2 (#28: first completed tutorial only); v4 = how-to v3 (try-it steps) + no flashback; v3 = the v2.2 patch: item bank v2.2 with clarifier points, no round cap (itemBankVersion 3)
   title: 'Torch Talk',
   tagline: 'Flash Noah’s messages across the garden. Every word costs a flash!',
   trait: 'communication',

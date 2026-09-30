@@ -663,7 +663,7 @@ export default class GameScene extends ModuleScene {
     return {
       ...s, flags,
       paraphraseRate: passed.length ? Math.round((passed.filter((t) => t.paraphrase).length / passed.length) * 1000) / 1000 : '', // secondary creative signal (#21)
-      learn: learnParts(turns, tutorialMemo), // learning parts (#20); the suite score is computed in src/core/learning.js
+      learn: learnParts(turns, tutorialMemo), // learning parts (#20); the suite score is computed in src/scoring/learning.js (v2)
       tutorialDone: tutorialMemo.done, tutorialFailSafes: tutorialMemo.done ? tutorialMemo.failSafes : '',
       itemBankVersion: ITEM_BANK_VERSION, form: this.form || '', itemIds: (this.items || []).map((x) => x.id).join(' '), turnsPlayed: turns.length, idleNudges: this.idleNudges || 0, idleMs: Math.round(this.idleMs || 0),
       // raw turns for re-scoring later: [turn, itemId, message, pass, failReason, asks (q+ right / q- other), points, fix (+ passed / - not)]
@@ -676,7 +676,7 @@ export default class GameScene extends ModuleScene {
   tutorialMetrics() {
     const log = this.tutLog || [], done = log.length === (this.items || []).length && log.length > 0;
     const failSafes = log.filter((x) => x.usedFailSafe).length;
-    if (done) Object.assign(tutorialMemo, { done: true, failSafes, steps: log.map((x) => ({ tries: x.tries, failSafe: x.usedFailSafe })) });
+    if (done && !tutorialMemo.done) Object.assign(tutorialMemo, { done: true, failSafes, steps: log.map((x) => ({ tries: x.tries, failSafe: x.usedFailSafe })) }); // only the first completed tutorial counts (Framework v0.5)
     const pts = (this.turns || []).reduce((a, t) => a + (t.base || 0), 0);
     return { messageScore: pts, understood: log.filter((x) => !x.usedFailSafe && x.tries === 1).length, tutorialVersion: TUTORIAL_VERSION, steps: log.length,
       failSafes, tries: log.map((x) => `${x.id}:${x.tries}${x.usedFailSafe ? '!' : ''}`).join(' '), idleMs: Math.round(this.idleMs || 0),
