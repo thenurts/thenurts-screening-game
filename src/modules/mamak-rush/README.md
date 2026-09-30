@@ -45,3 +45,10 @@ A 7:00–7:36 pm shift on a wall clock that moves **one minute per action** and 
 - **Manglish bubbles** from a seeded line bank (`lines.js`), flavour only.
 - **Learning evidence (request #20):** `learn = {firstUse, noRepeat, trapPairs, pickup, probes}` in metrics; probes are also traced as `learn_probe {probe: "firstUse:<rule>", pass}` (valueFirst, tapauReady, gasPlanned, steps:<dish>); `o1_action` now carries `{item, stepIndex, wrong}`.
 - Deviation 4 above (early hand-over) no longer applies.
+
+## v4 changes: the "Closing Time" autonomy finale (request #32, 2026-09-30)
+- After the end-of-shift card, a brief card: Liam, *"Boss has gone home. The last 12 minutes are yours. Make it a good close."* + "Tips are free: use them whenever you like." Then 12 minutes, the 9-order stream in `closing.js` (a port of Part A of `tests/autonomy-reference.py`).
+- Tap an order card = one step (1 min); no stations. Four equal gauges (★ earned · happy customers · regulars served · nothing wasted); no total; the ★ counter is hidden. A free **Tip** suggests one move that serves one gauge (the gauges take turns). Quiet minutes pass by themselves.
+- The organisation score is untouched (it's computed from the shift). `metrics.mainDone = true` once the shift is over, so closing the page during the finale still leaves an official shift.
+- `metrics.autonomy = {log "t:choice:tip;…", done, tips, firstActionMs (from the brief card's Start), medianActionMs, idleMs, gauges}`. The scoring layer replays the log (`rescore.js autonomyFacts`) and applies the level rules; the level is never shown to the player.
+- Trace events: `au_brief_start`, `au_action`, `au_tip`, `au_end`.

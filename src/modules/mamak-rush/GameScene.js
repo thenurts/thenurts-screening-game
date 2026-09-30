@@ -8,6 +8,7 @@ import { charImg } from '../../core/ui/dom.js';
 import { FORMS, MENU, STATIONS, newState, act, active, blocked, nextStation, metrics, orgScore, facets, clock, shiftOver, careful } from './rules.js';
 import { TUTORIAL, tutorialMemo } from './tutorial.js';
 import { LINES, pickLine } from './lines.js';
+import * as CL from './closing.js';
 import bgUrl from './assets/bg-mamak.webp';
 import teh from './assets/teh.webp';
 import kopi from './assets/kopi.webp';
@@ -431,7 +432,11 @@ export default class GameScene extends ModuleScene {
 
   /** Test hook: one move of the reference's careful plan, made through the same buttons a player taps. */
   botStep() {
-    if (this.busy || this.ended || !this.running || !this.st) return false;
+    if (this.ended || !this.running) return false;
+    if (this.closingDone) { this.closingDone(); return true; }
+    if (this.clBriefGo) { this.clBriefGo(); return true; }
+    if (this.cl && !this.cl.over) { const id = CL.balancerMove(this.cl); if (id) this.closingMove(id); return true; } // a purpose-setter close
+    if (this.busy || !this.st) return false;
     const [tg, sta] = careful(this.st);
     if (tg === null) this.onWait();
     else { this.sel = tg; this.onStation(sta); }
@@ -451,9 +456,123 @@ export default class GameScene extends ModuleScene {
     c.add(this.txt(W / 2, 600, `You served ${m.starsServed} ★ of a possible ${m.bestPossible} ★`, { fontSize: '30px', fontStyle: '700' }));
     const miss = this.missed || [];
     c.add(this.txt(W / 2, 700, miss.length ? `Missed: ${miss.slice(0, 6).join(', ')}${miss.length > 6 ? '…' : ''}` : 'No customer left without their order!', { fontSize: '24px', fontStyle: '600', color: C.charcoal, wordWrap: { width: 520 } }));
-    const done = () => { this.shiftDone = null; c.destroy(true); this.finish(this.metrics()); };
+    const done = () => { this.shiftDone = null; c.destroy(true); this.startClosing(); }; // then the autonomy finale (#32)
     c.add(this.btn(W / 2, 840, 'Done', done, { w: 300, h: 96, size: 36 }));
     this.shiftDone = done; // test hook
+  }
+
+  // ---------------------------------------------------------------- "Closing Time": the autonomy finale (request #32)
+  // After the scored shift, so the organisation score is untouched. No points counter, four equal gauges, a free Tip.
+  startClosing() {
+    this.mainDone = true; this.snapshot(); // the scored shift is complete even if the page closes during the finale
+    this.cl = CL.newClosing(); this.clTips = 0; this.clTipNow = null; this.clTipBefore = false; this.clTimes = []; this.clIdleMs = 0;
+    this.queue.removeAll(true); this.row.removeAll(true);
+    for (const o of [this.starPill, this.bubble, this.strip]) o.setVisible(false);
+    for (const b of this.stations) { b.setVisible(false); b.disableInteractive(); }
+    this.liam.setVisible(false); this.clockPill.text.setText('Closing · 12 min left');
+    this.clC = this.add.container(0, 0).setDepth(40);
+    const W = this.W, c = this.add.container(0, 0).setDepth(1100); this.clBriefOpen = true;
+    c.add(this.add.rectangle(W / 2, this.H / 2, W * 4, this.H * 4, 0x0b0b0b, 0.5).setInteractive());
+    c.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(60, 300, 600, 640, 36).fillStyle(hex(C.cream), 1).fillRoundedRect(60, 290, 600, 640, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(60, 290, 600, 640, 36));
+    c.add(this.fitImg(this.add.image(W / 2, 400, 'liam-excited'), 150));
+    c.add(this.txt(W / 2, 520, 'Closing time', { fontSize: '40px' }));
+    c.add(this.txt(W / 2, 620, '“Boss has gone home. The last 12 minutes are yours. Make it a good close.”', { fontSize: '30px', fontStyle: '700', wordWrap: { width: 520 } }));
+    c.add(this.txt(W / 2, 740, 'Tap an order to cook its next step (1 min).\nTips are free: use them whenever you like.', { fontSize: '24px', fontStyle: '600', color: C.charcoal, wordWrap: { width: 520 } }));
+    const go = () => { this.clBriefGo = null; this.clBriefOpen = false; c.destroy(true); this.clT0 = performance.now(); this.clLast = this.clT0; this.trace('au_brief_start', { game: 'mamak-rush', t: 0 }); this.renderClosing(); this.clArmIdle(); };
+    c.add(this.btn(W / 2, 860, 'Start', go, { w: 280, h: 92, size: 34 }));
+    this.clBriefGo = go; // test hook
+  }
+
+  clArmIdle() {
+    const now = performance.now(); if (this.clLastIn) this.clIdleMs += Math.max(0, now - this.clLastIn - IDLE_MS); this.clLastIn = now;
+    this.clIdle?.remove(); this.clIdle = this.time.delayedCall(IDLE_MS, () => { if (!this.cl || this.cl.over) return; this.clNote('Take your time. It’s your call.'); });
+  }
+
+  clNote(text, color = C.ink) { this.clNoteText = text; this.clNoteColor = color; this.renderClosing(); }
+
+  closingMove(id) {
+    const st = this.cl; if (!st || st.over || this.clBriefOpen || this.clBusy) return;
+    if (!CL.openOrders(st).some((o) => o[0] === id)) return;
+    const now = performance.now(); this.clTimes.push(Math.round(now - this.clLast)); this.clLast = now;
+    const doneBefore = { ...st.done }, leftBefore = { ...st.left }, t = st.t;
+    CL.step(st, id, this.clTipBefore);
+    const e = st.log[st.log.length - 1];
+    this.trace('au_action', { game: 'mamak-rush', t, choice: id, options: Object.keys(e.options || {}), tipBefore: this.clTipBefore, gauges: CL.measures(st) });
+    this.clTipBefore = false; this.clTipNow = null; sfx.play('click');
+    const o = CL.orderOf(id);
+    if (st.done[id] && !doneBefore[id]) { sfx.play('coin'); this.clNote(`${MENU[o[6]][0]} served! +${'★'.repeat(o[3])}`, C.green); } else this.clNote('1 min', C.ink);
+    this.clAfter(leftBefore); this.clArmIdle();
+  }
+
+  clAfter(leftBefore) {
+    const st = this.cl;
+    while (!st.over && !CL.openOrders(st).length) CL.step(st, null); // a quiet minute passes by itself
+    const gone = CL.ORDERS.filter((o) => st.left[o[0]] && !leftBefore[o[0]]);
+    if (gone.length) this.clNote(`${gone.map((o) => NAMES[o[7]]).join(' and ')} left without their order`, C.red);
+    this.renderClosing();
+    if (st.over) this.endClosing();
+  }
+
+  closingTip() {
+    const st = this.cl; if (!st || st.over || this.clBriefOpen) return;
+    const tp = CL.tip(st, this.clTips); if (!tp) return;
+    this.clTips++; this.clTipBefore = true; this.clTipNow = tp.id; sfx.play('pop');
+    this.trace('au_tip', { game: 'mamak-rush', t: st.t, suggestion: tp.id, aim: tp.aim });
+    const o = CL.orderOf(tp.id); this.clNote(`Tip: ${NAMES[o[7]]}’s ${MENU[o[6]][0]} helps “${CL.AIM_LABEL[tp.aim]}”.`, C.blue); this.clArmIdle();
+  }
+
+  renderClosing() {
+    const c = this.clC; if (!c || !this.cl) return; c.removeAll(true);
+    const st = this.cl, m = CL.measures(st);
+    this.clockPill.text.setText(st.over ? 'Closed!' : `Closing · ${CL.TICKS - st.t + 1} min left`); this.clockPill.text.setScale(Math.min(1, 300 / this.clockPill.text.width));
+    // four equal gauges, no total and no "score"
+    CL.AIMS.forEach((a, i) => {
+      const x = 30 + (i % 2) * 336, y = 118 + Math.floor(i / 2) * 84, w = 324;
+      c.add(this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(x, y, w, 72, 18).lineStyle(3, hex(C.ink), 1).strokeRoundedRect(x, y, w, 72, 18)
+        .fillStyle(hex(C.butter), 1).fillRoundedRect(x + 14, y + 44, w - 28, 16, 8).fillStyle(hex(C.teal), 1).fillRoundedRect(x + 14, y + 44, Math.max(0, (w - 28) * m[a]), 16, 8).lineStyle(2, hex(C.ink), 1).strokeRoundedRect(x + 14, y + 44, w - 28, 16, 8));
+      c.add(this.txt(x + w / 2, y + 22, CL.AIM_LABEL[a], { fontSize: '23px' }));
+    });
+    const note = this.clNoteText || 'Your call. Tap an order to cook its next step.';
+    const nt = this.txt(360, 308, note, { fontSize: '25px', fontStyle: '700', color: this.clNoteColor || C.ink, wordWrap: { width: 640 } }); c.add(nt);
+    CL.openOrders(st).forEach((o, i) => c.add(this.closingCard(o, 350 + i * 116)));
+    if (!st.over) c.add(this.btn(360, 1170, '💡 Tip (free)', () => this.closingTip(), { w: 300, h: 84, size: 28, fill: C.white }));
+  }
+
+  closingCard(o, y) {
+    const st = this.cl, id = o[0], x0 = 30, w = 660, h = 104, tipped = this.clTipNow === id;
+    const c = this.add.container(0, y), left = CL.minutesLeft(o, st.t), urgent = left <= 2, prog = st.prog[id] || 0;
+    c.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(x0, 6, w, h, 22).fillStyle(hex(tipped ? C.sun : C.white), 1).fillRoundedRect(x0, 0, w, h, 22).lineStyle(tipped ? 7 : 4, hex(C.ink), 1).strokeRoundedRect(x0, 0, w, h, 22));
+    c.add(this.add.graphics().fillStyle(hex(C.butter), 1).fillCircle(x0 + 50, h / 2, 38).lineStyle(3, hex(C.ink), 1).strokeCircle(x0 + 50, h / 2, 38));
+    c.add(this.fitImg(this.add.image(x0 + 50, h / 2 + 2, `${o[7]}-happy`), 72));
+    c.add(this.fitImg(this.add.image(x0 + 140, h / 2, `mk-${o[6]}`), 84));
+    const nt = this.txt(x0 + 196, 30, MENU[o[6]][0], { fontSize: '27px', align: 'left' }).setOrigin(0, 0.5); c.add(nt);
+    c.add(this.txt(nt.x + nt.width + 10, 29, '★'.repeat(o[3]), { fontSize: '25px', color: C.amber, stroke: C.ink, strokeThickness: 3, align: 'left' }).setOrigin(0, 0.5));
+    if (o[5]) c.add([this.add.graphics().fillStyle(hex(C.peach), 1).fillRoundedRect(x0 + 196, 58, 118, 36, 18).lineStyle(2, hex(C.ink), 1).strokeRoundedRect(x0 + 196, 58, 118, 36, 18), this.txt(x0 + 255, 76, '♥ Regular', { fontSize: '20px' })]);
+    for (let k = 0; k < o[2]; k++) { const x = x0 + (o[5] ? 346 : 214) + k * 40; c.add(this.add.graphics().fillStyle(hex(k < prog ? C.mint : C.white), 1).fillCircle(x, 76, 14).lineStyle(3, hex(C.ink), 1).strokeCircle(x, 76, 14)); }
+    const cw = 128, cx = x0 + w - cw - 16;
+    c.add([this.add.graphics().fillStyle(hex(urgent ? C.amber : C.mint), 1).fillRoundedRect(cx, 30, cw, 44, 22).lineStyle(3, hex(C.ink), 1).strokeRoundedRect(cx, 30, cw, 44, 22), this.txt(cx + cw / 2, 52, `⏳ ${left} min${urgent ? ' !' : ''}`, { fontSize: '22px' })]);
+    const hit = this.add.rectangle(x0 + w / 2, h / 2, w, h, 0, 0).setInteractive({ useHandCursor: true }); hit.on('pointerup', () => this.closingMove(id)); c.addAt(hit, 0);
+    return c;
+  }
+
+  endClosing() {
+    if (this.clEnding) return; this.clEnding = true; this.clIdle?.remove();
+    const m = CL.measures(this.cl);
+    this.trace('au_end', { game: 'mamak-rush', gauges: m, stoppedEarly: false, firstActionLatency: this.clTimes[0] ?? null });
+    const W = this.W, c = this.add.container(0, 0).setDepth(1100);
+    c.add(this.add.rectangle(W / 2, this.H / 2, W * 4, this.H * 4, 0x0b0b0b, 0.45).setInteractive());
+    c.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(80, 430, 560, 420, 36).fillStyle(hex(C.cream), 1).fillRoundedRect(80, 420, 560, 420, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(80, 420, 560, 420, 36));
+    c.add(this.fitImg(this.add.image(W / 2, 510, 'liam-happy'), 130));
+    c.add(this.txt(W / 2, 630, 'Shutters down. Thanks for closing up!', { fontSize: '30px', wordWrap: { width: 480 } }));
+    const fin = () => { this.closingDone = null; c.destroy(true); this.finish(this.metrics()); };
+    c.add(this.btn(W / 2, 760, 'Done', fin, { w: 280, h: 92, size: 34 }));
+    this.closingDone = fin; // test hook
+  }
+
+  closingMetrics() {
+    if (!this.cl) return null;
+    const gaps = this.clTimes.slice(1).sort((a, b) => a - b), med = gaps.length ? gaps[gaps.length >> 1] : null;
+    return { game: 'closing-time', v: 1, log: CL.encodeLog(this.cl), done: this.cl.over, tips: this.clTips, firstActionMs: this.clTimes[0] ?? null, medianActionMs: med, idleMs: Math.round(this.clIdleMs), gauges: Object.fromEntries(Object.entries(CL.measures(this.cl)).map(([k, v]) => [k, Math.round(v * 1000) / 1000])) };
   }
 
   learnParts() {
@@ -503,6 +622,7 @@ export default class GameScene extends ModuleScene {
       learn: this.learnParts(),
       tutorialDone: tutorialMemo.done, tutorialFailSafes: tutorialMemo.done ? tutorialMemo.failSafes : '',
       idleNudges: this.idleNudges, idleMs: Math.round(this.idleMs), flags: flags.join(','),
+      ...(this.mainDone ? { mainDone: true } : {}), ...(this.cl ? { autonomy: this.closingMetrics() } : {}),
     };
   }
 

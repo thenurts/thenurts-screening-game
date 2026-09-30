@@ -10,7 +10,7 @@ import s5 from './assets/howto-5.webp';
 import { orgScoreV2 } from '../../scoring/traits.js';
 export default {
   id: 'mamak-rush',
-  version: 3, // v3: learning v2 (#28: first completed tutorial only) + staff score = organisation 60/40 (Framework v0.4); v2 = v1.2: auto-collected tapau (Later tray), announced gas outage, score vs best possible 27 ★, how-to v2, UI clarity kit
+  version: 4, // v4: the "Closing Time" autonomy finale after the shift (#32; organisation scoring unchanged); v3: learning v2 (#28: first completed tutorial only) + staff score = organisation 60/40 (Framework v0.4); v2 = v1.2: auto-collected tapau (Later tray), announced gas outage, score vs best possible 27 ★, how-to v2, UI clarity kit
   title: 'The Nurts Mamak',
   tagline: 'Liam’s working the counter at The Nurts Mamak. Can you keep the evening rush happy?',
   trait: 'organisation',
