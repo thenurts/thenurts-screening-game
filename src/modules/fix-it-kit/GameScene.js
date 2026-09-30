@@ -5,6 +5,7 @@ import { C, hex } from '../../core/theme.js';
 import { sfx } from '../../core/sfx.js';
 import { charImg } from '../../core/ui/dom.js';
 import { CONTENT, KIT, TRIES, problemsOf, newProblem, tryFix, result, metrics, lookup, explorerChoice } from './rules.js';
+import { repeatsOf } from './rescore.js';
 import bgUrl from './assets/bg-sports.webp';
 
 const q = new URLSearchParams(location.search);
@@ -140,7 +141,8 @@ export default class GameScene extends ModuleScene {
   checkPractice() {
     const found = Object.keys(this.ps.found).length;
     if (found >= CONTENT.practice.target) {
-      Object.assign(practiceMemo, { done: true, tries: this.ps.log.length, failSafe: !!this.failSafe });
+      if (!practiceMemo.done) Object.assign(practiceMemo, { done: true, tries: // only the first completed practice counts (Framework v0.5)
+       this.ps.log.length, failSafe: !!this.failSafe });
       this.trace('cr_tutorial', { tries: this.ps.log.length, usedFailSafe: !!this.failSafe });
       this.busy = true; this.time.delayedCall(ms(1200), () => this.endProblem('done'));
       return;
@@ -301,12 +303,13 @@ export default class GameScene extends ModuleScene {
     const flags = [];
     if (this.repeatAttempt) flags.push('repeatAttempt');
     if (practiceMemo.done && practiceMemo.failSafe) flags.push('tutorialStruggle');
+    const tryLog = this.tryLog.map((t) => `${t.pid}.${t.n} ${Object.entries(t.choice).map(([k, c]) => `${k}:${c}`).join('+')} ${t.isNew ? 'new' : t.works ? 'same' : 'no'}`).join(';');
     return {
       ...m, ideasFound: res.reduce((a, r) => a + Object.keys(r.found).length, 0), form: this.form,
       unusualUseShare: hits.length ? Math.round((unusual / hits.length) * 1000) / 1000 : '', doneEarly: this.doneEarly,
       invalidTries: this.tryLog.filter((t) => !t.works).length, triesUsed: this.tryLog.length,
-      tryLog: this.tryLog.map((t) => `${t.pid}.${t.n} ${Object.entries(t.choice).map(([k, c]) => `${k}:${c}`).join('+')} ${t.isNew ? 'new' : t.works ? 'same' : 'no'}`).join(';'),
-      learn: practiceMemo.done ? { pickup: [practiceMemo.failSafe ? 2 : Math.min(2, Math.max(0, practiceMemo.tries - 2)), 2] } : null,
+      tryLog,
+      learn: (() => { const L = {}; if (practiceMemo.done) L.pickup = [practiceMemo.failSafe ? 2 : Math.min(2, Math.max(0, practiceMemo.tries - 2)), 2]; const r = repeatsOf(tryLog); if (r) L.noRepeat = r; return Object.keys(L).length ? L : null; })(), // learning v2 (#28)
       idleNudges: this.idleNudges, idleMs: Math.round(this.idleMs), flags: flags.join(','),
     };
   }

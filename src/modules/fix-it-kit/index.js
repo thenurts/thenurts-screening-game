@@ -7,7 +7,7 @@ import s3 from './assets/howto-3.webp';
 
 export default {
   id: 'fix-it-kit',
-  version: 1,
+  version: 2, // v2: learning v2 (#28: noRepeat from the try log; first completed practice only)
   title: 'Mia’s Fix-It Kit',
   tagline: 'Things keep going wrong at sports day. How many ways can you fix them?',
   trait: 'creative',

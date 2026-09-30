@@ -104,7 +104,8 @@ export default class GameScene extends ModuleScene {
     if (this.tut) {
       if (e.missed) return this.practiceFail(FB.missed(c.worth));
       if (!e.correctExAnte) return this.practiceFail(FB.against(c.card.options[SIDE(best)]));
-      practiceMemo.steps[this.idx] = { tries: this.ptries + 1, usedFailSafe: !!this.failSafe };
+      if (!practiceMemo.done) practiceMemo.steps[this.idx] = { tries: // only the first completed practice counts (Framework v0.5)
+        this.ptries + 1, usedFailSafe: !!this.failSafe };
       this.trace('jd_tutorial', { step: this.idx + 1, tries: this.ptries + 1, usedFailSafe: !!this.failSafe });
       this.failSafe = false;
       return this.showResult(e, c.id === 'P1' ? FB.good : 'Right: a check there would cost 6 to maybe win a little.');

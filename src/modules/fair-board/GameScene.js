@@ -444,7 +444,7 @@ export default class GameScene extends ModuleScene {
   end() {
     this.claim = null;
     this.setButtons(false);
-    if (this.form === 'P') { Object.assign(practiceMemo, { done: true, failSafes: this.pFailSafes }); return this.finish(this.metrics()); }
+    if (this.form === 'P') { if (!practiceMemo.done) Object.assign(practiceMemo, { done: true, failSafes: this.pFailSafes }); return this.finish(this.metrics()); } // first completed practice only (Framework v0.5)
     const m = this.metrics();
     this.trace('fb_recap', { correct: m.correct });
     const c = this.add.container(0, 0).setDepth(950);

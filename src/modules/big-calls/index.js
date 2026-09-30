@@ -8,7 +8,7 @@ import s4 from './assets/howto-4.webp';
 
 export default {
   id: 'big-calls',
-  version: 1,
+  version: 2, // v2: learning v2 (#28: first completed practice only)
   title: 'Zoey’s Big Calls',
   tagline: 'Zoey has 10 calls to make for the school week. Check the clues, or decide?',
   trait: 'judgement',
