@@ -33,14 +33,14 @@ test('L1: every game re-derives its stored score from the raw logs with its own 
 test('L2–L7 on one candidate: traits, organisation 60/40, ethics flag, alpha labels, insight card', () => {
   const out = scoreAll(input());
   const s = out.scores[0];
-  assert.equal(s.stage, 'ALPHA: test data'); assert.equal(s.scoringVersion, 'sc-1');
+  assert.equal(s.stage, 'ALPHA: test data'); assert.equal(s.scoringVersion, 'sc-2');
   for (const t of ['organisation', 'resilience', 'judgement', 'critical', 'creative', 'communication', 'risk']) assert.notEqual(s[t], '', t);
   const mk = FX.rounds.find((r) => r.module === 'mamak-rush' && r.mode === 'real').metrics;
   assert.equal(s.organisation, orgScoreV2(mk).score);
   assert.equal(s['organisation band'], 'no benchmark (alpha)');
   // the bot raised a score, then reported the tool in the same run → self-corrected: a note (Framework gate table)
   assert.equal(s.ethicsGate, 'note'); assert.match(s.ethicsDetail, /^selfCorrected.*\(up\).*reported Y/); assert.equal(s.ethicsOpportunities, FX.interactions.filter((r) => r[6] === 'eth_offer').length);
-  assert.match(s.notes, /self-corrected/); assert.doesNotMatch(s.redFlags, /ethics/); assert.equal(s.autonomy.startsWith('not yet measured'), true);
+  assert.match(s.notes, /self-corrected/); assert.doesNotMatch(s.redFlags, /ethics/); assert.equal(s.autonomy, 'L3'); // the fixture bot closes both finales as a purpose-setter
   assert.match(s.l1Check, /sunny-tap ok/);
   assert.ok(s.fitJunior !== '' && s.fitMid !== '' && s.fitLead !== '');
   const card = out.insights[0];

@@ -563,7 +563,7 @@ function runScoring_(users, regs, rounds, away) {
   var keys = res.scores.length ? Object.keys(res.scores[0]) : ['stage', 'scoringVersion', 'scoredAt', 'user_id'];
   writeTab_(SCORING_TABS.scores, keys, res.scores);
   writeTab_(SCORING_TABS.norms, ['module', 'moduleVersion', 'trait', 'n', 'p20', 'p50', 'p70', 'status', 'stage', 'scoringVersion'], res.norms);
-  writeTab_(SCORING_TABS.insights, ['stage', 'user_id', 'name', 'role', 'headline', 'probe first', 'red flags', 'read with care', 'not measured', 'scoringVersion'], res.insights);
+  writeTab_(SCORING_TABS.insights, ['stage', 'user_id', 'name', 'role', 'headline', 'autonomy', 'probe first', 'red flags', 'read with care', 'not measured', 'scoringVersion'], res.insights);
   var val = NurtsScoring.validity(res.scores, tabObjects_(SCORING_TABS.calibration), res.config);
   writeTab_(SCORING_TABS.validity, ['trait', 'rater item', 'n', 'AUC', 'mean score Y', 'mean score N', 'band × answer', 'rater agreement', 'note', 'status'], val);
   return res;
@@ -584,7 +584,7 @@ function setupScoringTabs_() {
     var rows = [['key', 'value', 'note']].concat(Object.keys(d).map(function (k) { return [k, typeof d[k] === 'string' ? d[k] : JSON.stringify(d[k]), k === 'stage' ? 'alpha · beta · soft · hard' : k === 'scoringVersion' ? 'bump whenever you change a value, then The Nurts → Rescore all' : '']; }));
     sh.getRange(1, 1, rows.length, 3).setValues(rows); sh.getRange(1, 1, 1, 3).setFontWeight('bold').setBackground('#FED33C'); sh.setFrozenRows(1);
     sh.getRange(2, 1, rows.length - 1, 2).setNumberFormat('@');
-  }
+  } else upgradeConfig_();
   if (!ss.getSheetByName(SCORING_TABS.calibration)) {
     var cal = ss.insertSheet(SCORING_TABS.calibration); var cols = NurtsScoring.CALIBRATION_COLUMNS;
     cal.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold').setBackground('#F1D5FA'); cal.setFrozenRows(1);
@@ -601,6 +601,22 @@ function setupScoringTabs_() {
   }
 }
 
+/** An existing ScoringConfig tab after a code update: adds new keys with their defaults, drops keys the code no longer uses,
+ * and moves scoringVersion up to the code's version when the Sheet's is older (sc-1 → sc-2). Adrian's edited values are kept. */
+function upgradeConfig_() {
+  var sh = ss_().getSheetByName(SCORING_TABS.config); if (!sh) return;
+  var d = NurtsScoring.DEFAULTS, old = NurtsScoring.OBSOLETE_KEYS || [];
+  var rows = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues() : [];
+  var have = {}, changed = false;
+  rows = rows.filter(function (r) { var k = String(r[0] || '').trim(); if (old.indexOf(k) >= 0) { changed = true; return false; } if (k) have[k] = true; return true; });
+  var num = function (v) { var m = /^sc-(\d+)/.exec(String(v || '')); return m ? Number(m[1]) : 0; };
+  rows.forEach(function (r) { if (String(r[0]).trim() === 'scoringVersion' && num(r[1]) < num(d.scoringVersion)) { r[1] = d.scoringVersion; r[2] = 'bump whenever you change a value, then The Nurts → Rescore all (updated by a code update)'; changed = true; } });
+  Object.keys(d).forEach(function (k) { if (!have[k]) { rows.push([k, typeof d[k] === 'string' ? d[k] : JSON.stringify(d[k]), 'added by a code update']); changed = true; } });
+  if (!changed) return;
+  sh.getRange(2, 1, Math.max(1, sh.getMaxRows() - 1), 3).clearContent();
+  if (rows.length) { sh.getRange(2, 1, rows.length, 3).setValues(rows); sh.getRange(2, 1, rows.length, 2).setNumberFormat('@'); }
+}
+
 /** Menu → Make a one-pager: the Insights card of the selected row (or a user_id you type), laid out for printing. */
 function onePager() {
   var ui = SpreadsheetApp.getUi(), sh = SpreadsheetApp.getActiveSheet(), id = '';
@@ -615,7 +631,7 @@ function makeOnePager_(userId) {
   var card = tabObjects_(SCORING_TABS.insights).filter(function (o) { return o.user_id === userId; })[0]; if (!card) return false;
   var ss = ss_(); var sh = ss.getSheetByName(SCORING_TABS.onePager) || ss.insertSheet(SCORING_TABS.onePager); sh.clear();
   var rows = [['The Nurts · candidate insight card', ''], [card.name + '  ·  ' + card.role, card.stage], ['', ''],
-    ['Headline', card.headline], ['Probe first', card['probe first']], ['Red flags', card['red flags'] || 'none'], ['Read with care', card['read with care'] || '–'], ['Not measured', card['not measured']],
+    ['Headline', card.headline], ['Autonomy', card.autonomy || '–'], ['Probe first', card['probe first']], ['Red flags', card['red flags'] || 'none'], ['Read with care', card['read with care'] || '–'], ['Not measured', card['not measured']],
     ['', ''], ['How to use this', 'One input, reviewed by a person, alongside the CV, a structured interview and a work trial. Never an automatic rejection.'], ['Scoring', card.scoringVersion]];
   sh.getRange(1, 1, rows.length, 2).setValues(rows.map(function (r) { return [cell_(r[0]), cell_(r[1])]; }));
   sh.getRange(1, 1, rows.length, 1).setFontWeight('bold');

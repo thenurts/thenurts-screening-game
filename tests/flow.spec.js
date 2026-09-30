@@ -212,6 +212,18 @@ test('applicant: register → how to → practice → real round → report → 
     expect(ins[1][ins[0].indexOf('headline')]).toMatch(/fit: Junior/);
     expect(sheets.Norms.slice(1).every((r) => r[7] === 'off (alpha)')).toBeTruthy();
     expect(sheets.ScoringConfig.length).toBeGreaterThan(10);
+    // autonomy (requests #32–34): the bot closes both finales as a purpose-setter → L3 in both
+    expect(sc[1][sc[0].indexOf('autonomy')]).toBe('L3'); expect(sc[1][sc[0].indexOf('autonomy detail')]).toMatch(/Closing Time L3.*Free Fix L3/);
+    expect(ins[1][ins[0].indexOf('autonomy')]).toBe('L3'); expect(cs[1][hd.indexOf('autonomy')]).toBe('L3');
+    expect(sheets.Validity.some((r) => r[0] === 'autonomy')).toBeTruthy();
+    // an older ScoringConfig (update 16) is upgraded in place: new keys added, obsolete keys dropped, scoringVersion moved up
+    const cfg = sheets.ScoringConfig, vr = cfg.findIndex((r) => r[0] === 'scoringVersion') + 1, ar = cfg.findIndex((r) => r[0] === 'autonomy.enabled') + 1;
+    await fetch(GAS + '/__set/ScoringConfig?' + encodeURIComponent(JSON.stringify([[vr, 2, 'sc-1'], [ar, 1, 'autonomyFactor'], [ar, 2, '{"Junior":1}']])));
+    await fetch(GAS + '/__run/refreshSummary');
+    const up = (await (await fetch(GAS + '/__dump')).json()).sheets;
+    expect(up.ScoringConfig.find((r) => r[0] === 'scoringVersion')[1]).toBe('sc-2');
+    expect(up.ScoringConfig.some((r) => r[0] === 'autonomyFactor')).toBeFalsy(); expect(up.ScoringConfig.some((r) => r[0] === 'autonomy.enabled')).toBeTruthy();
+    expect(up.Scores[1][up.Scores[0].indexOf('scoringVersion')]).toBe('sc-2');
   }
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
@@ -531,6 +543,10 @@ test('the nurts mamak v1.2: careful plan = 98.9 on Form A (26 of 27 ★), tapau 
   expect(m.learn.firstUse[1]).toBeGreaterThanOrEqual(3); expect(m.learn.firstUse[0]).toBe(m.learn.firstUse[1]); // careful play passes every probe
   expect(m.minutesPlayed).toBe(36);
   expect(m.parkedReturn).toBe(1);
+  // the Closing Time finale (#32): played after the shift by the purpose-setter bot; the shift's score is unchanged
+  expect(m.mainDone).toBe(true); expect(m.autonomy.done).toBe(true); expect(m.autonomy.tips).toBe(0);
+  expect(m.autonomy.log).toBe('1:c3:0;2:c3:0;3:c3:0;4:c2:0;5:c2:0;6:c2:0;7:c5:0;8:c5:0;9:c5:0;10:c6:0;11:c6:0;12:c8:0');
+  expect(m.autonomy.gauges).toEqual({ stars: 0.818, happy: 0.8, regulars: 1, noWaste: 0.889 });
   expect(errors).toEqual([]);
 });
 
@@ -618,6 +634,9 @@ test('fix-it kit: explorer = 83.6 on Form A; chips come from the kit; how-to use
   expect(m.form).toBe('A');
   expect(m.creativeScore).toBe(83.6);
   expect(m.learn.pickup[1]).toBe(2);
+  // the Free Fix finale (#33): three fixes, then Done while the aims are in balance
+  expect(m.mainDone).toBe(true); expect(m.autonomy.log).toBe('p1:0:0;p2:0:0;p4:0:0;done:0'); expect(m.autonomy.stoppedEarly).toBe(true);
+  expect(m.autonomy.gauges).toEqual({ kids: 0.8, fixed: 0.6, kitLeft: 0.625 });
   if (!LIVE) expect(dbj.interactions.some((r) => r[6] === 'howto' && JSON.stringify(r[7]).includes('round'))).toBeTruthy();
   expect(errors).toEqual([]);
 });

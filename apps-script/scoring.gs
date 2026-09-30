@@ -16,7 +16,7 @@ var NurtsScoring = (function(exports) {
 	//#endregion
 	//#region src/scoring/config.js
 	var DEFAULTS = {
-		scoringVersion: "sc-1",
+		scoringVersion: "sc-2",
 		stage: "alpha",
 		"norms.minProvisional": 5,
 		"norms.minBands": 30,
@@ -151,11 +151,29 @@ var NurtsScoring = (function(exports) {
 			learning: 2
 		},
 		"weights.cap": 3,
-		autonomyFactor: {
-			Junior: 1,
-			Mid: 1,
-			Lead: 1
+		"autonomy.enabled": true,
+		"autonomy.rules": {
+			tipBeforeL1: .5,
+			coherenceL1: .55,
+			coherenceL3: .7,
+			outcomeL3: .5,
+			freezeRatio: 3,
+			freezeMinMs: 1e4,
+			idleNaMs: 12e4
 		},
+		"autonomy.targets": {
+			Junior: 1,
+			Mid: 2,
+			Lead: 3
+		},
+		"autonomy.typeMax": { Intern: 1 },
+		"autonomy.typeMin": { Freelance: 2 },
+		"autonomy.shortFactor": [
+			1,
+			.8,
+			.6
+		],
+		"autonomy.validAuc": .6,
 		"validity.descriptiveBelow": 20
 	};
 	/** DEFAULTS overlaid with the Sheet's values (unknown keys are kept, so new settings can be added without code). */
@@ -180,6 +198,7 @@ var NurtsScoring = (function(exports) {
 		hard: ""
 	};
 	var STAGE_NO_NORMS = { alpha: true };
+	var OBSOLETE_KEYS = ["autonomyFactor"];
 	//#endregion
 	//#region src/modules/lucky-dip/scoring.js
 	var SCORING$1 = {
@@ -226,7 +245,7 @@ var NurtsScoring = (function(exports) {
 		const m = s.length >> 1;
 		return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 	};
-	var mean$3 = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+	var mean$5 = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 	var r2 = (x) => x == null ? null : Math.round(x * 100) / 100;
 	function score$2({ decisions, bags, idleNudges = 0, timedOut = false, repeatAttempt = false }, cfg = SCORING$1) {
 		const scored = decisions.filter((d) => d.stake !== "free");
@@ -265,12 +284,12 @@ var NurtsScoring = (function(exports) {
 		});
 		const post = scoredBags.filter((b) => afterLoss.has(b.bag)).map(depth);
 		const other = scoredBags.filter((b) => !afterLoss.has(b.bag)).map(depth);
-		const calDelta = post.length && other.length ? mean$3(post) - mean$3(other) : null;
+		const calDelta = post.length && other.length ? mean$5(post) - mean$5(other) : null;
 		let riskCalibration = calDelta == null ? "n/a" : calDelta <= -cfg.calibrationBand ? "yes" : calDelta >= cfg.calibrationBand ? "no" : "partly";
 		const firstChilli = scoredBags.findIndex(isChilli);
 		if (stop <= cfg.calibNaBelow || firstChilli < 0) riskCalibration = "n/a-low";
-		const before = mean$3(scoredBags.slice(0, Math.max(0, firstChilli)).map(depth));
-		const after3 = mean$3(scoredBags.slice(firstChilli + 1, firstChilli + 4).map(depth));
+		const before = mean$5(scoredBags.slice(0, Math.max(0, firstChilli)).map(depth));
+		const after3 = mean$5(scoredBags.slice(firstChilli + 1, firstChilli + 4).map(depth));
 		const postSetbackDelta = r2(firstChilli >= 0 && before != null && after3 != null ? after3 - before : null);
 		const msMed = median$2(scored.map((d) => d.ms));
 		const allSame = scored.length > 0 && new Set(scored.map((d) => d.choice)).size === 1;
@@ -351,7 +370,7 @@ var NurtsScoring = (function(exports) {
 		efficiency: .15,
 		repair: .1
 	};
-	var mean$2 = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
+	var mean$4 = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
 	var r3$2 = (x) => Math.round(x * 1e3) / 1e3;
 	/** Shown points for one turn: the message's points (checker.points: clarifiers count) minus 1 per ask, floored at 0. */
 	function turnPoints(t) {
@@ -375,7 +394,7 @@ var NurtsScoring = (function(exports) {
 		const byTurn = Object.fromEntries(turns.map((t) => [t.turn, t]));
 		const passed = turns.filter((t) => t.pass);
 		const meaningRate = passed.length / nTurns;
-		const efficiency = mean$2(passed.map((t) => {
+		const efficiency = mean$4(passed.map((t) => {
 			var _t$ratio;
 			return (_t$ratio = t.ratio) !== null && _t$ratio !== void 0 ? _t$ratio : Math.min(1, t.ideal / t.used);
 		}));
@@ -396,7 +415,7 @@ var NurtsScoring = (function(exports) {
 			if (t7 === null || t7 === void 0 ? void 0 : t7.pass) shorthandAdaptation = 1;
 			else if (t7 && t7.contextTile && t7.words.includes(t7.contextTile)) shorthandAdaptation = 0;
 		}
-		const adaptation = mean$2(shorthandAdaptation === "n/a" ? adaptParts : [...adaptParts, shorthandAdaptation]);
+		const adaptation = mean$4(shorthandAdaptation === "n/a" ? adaptParts : [...adaptParts, shorthandAdaptation]);
 		const gapScores = [5, 9].map((n) => byTurn[n]).map((t) => {
 			if (!t) return 0;
 			const k = (t.asks || []).findIndex((a) => a.correct);
@@ -406,7 +425,7 @@ var NurtsScoring = (function(exports) {
 			var _t$asks2;
 			return s + (((_t$asks2 = t.asks) === null || _t$asks2 === void 0 ? void 0 : _t$asks2.length) || 0);
 		}, 0);
-		const askScore = .7 * mean$2(gapScores) + .3 * Math.max(0, 1 - unneededAsks / 8);
+		const askScore = .7 * mean$4(gapScores) + .3 * Math.max(0, 1 - unneededAsks / 8);
 		const t6 = byTurn[6];
 		const repairQuality = t6 ? repairOf(t6.words, t6.fix) : 0;
 		const commScore = Math.round(100 * (WEIGHTS.meaning * meaningRate + WEIGHTS.adaptation * adaptation + WEIGHTS.ask * askScore + WEIGHTS.efficiency * efficiency + WEIGHTS.repair * repairQuality));
@@ -5338,8 +5357,296 @@ var NurtsScoring = (function(exports) {
 		return e;
 	}
 	//#endregion
+	//#region src/scoring/util.js
+	var mean$3 = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+	var r1 = (x) => x == null || Number.isNaN(x) ? null : Math.round(x * 10) / 10;
+	var r3 = (x) => x == null || Number.isNaN(x) ? null : Math.round(x * 1e3) / 1e3;
+	var num = (v) => v === "" || v == null || Number.isNaN(Number(v)) ? null : Number(v);
+	/** Percentile rank (0–100) of x in pool: the share below plus half the ties. */
+	function percentile(x, pool) {
+		if (x == null || !pool.length) return null;
+		const below = pool.filter((v) => v < x).length, same = pool.filter((v) => v === x).length;
+		return r1(100 * (below + same / 2) / pool.length);
+	}
+	/** The value at quantile q (0–1), linear between order statistics. */
+	function quantile(pool, q) {
+		if (!pool.length) return null;
+		const s = [...pool].sort((a, b) => a - b), i = (s.length - 1) * q, lo = Math.floor(i);
+		return r1(s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo));
+	}
+	/** AUC: the chance a random "Y" person scores higher than a random "N" person (ties count half). */
+	function auc(yes, no) {
+		if (!yes.length || !no.length) return null;
+		let w = 0;
+		for (const a of yes) for (const b of no) w += a > b ? 1 : a === b ? .5 : 0;
+		return r3(w / (yes.length * no.length));
+	}
+	var flagsOf = (m) => String((m === null || m === void 0 ? void 0 : m.flags) || "").split(/[ ,]+/).filter((f) => f && f !== "none");
+	/** Python-style max(): the FIRST key with the largest f(k); arrays compare element by element (like tuples). */
+	function argmax(keys, f) {
+		let best = null, bv = null;
+		for (const k of keys) {
+			const v = [].concat(f(k));
+			if (bv === null || cmpTuple(v, bv) > 0) {
+				best = k;
+				bv = v;
+			}
+		}
+		return best;
+	}
+	var cmpTuple = (a, b) => {
+		for (let i = 0; i < a.length; i++) {
+			if (a[i] > b[i]) return 1;
+			if (a[i] < b[i]) return -1;
+		}
+		return 0;
+	};
+	var argmin = (keys, f) => argmax(keys, (k) => -f(k));
+	//#endregion
+	//#region src/modules/mamak-rush/closing.js
+	var ORDERS = [
+		[
+			"c1",
+			1,
+			2,
+			1,
+			3,
+			false,
+			"teh",
+			"zoey"
+		],
+		[
+			"c2",
+			1,
+			3,
+			2,
+			9,
+			true,
+			"roti",
+			"noah"
+		],
+		[
+			"c3",
+			1,
+			3,
+			3,
+			7,
+			false,
+			"nasi",
+			"raj"
+		],
+		[
+			"c4",
+			3,
+			2,
+			1,
+			3,
+			false,
+			"kopi",
+			"amira"
+		],
+		[
+			"c5",
+			4,
+			3,
+			3,
+			6,
+			false,
+			"murtabak",
+			"mia"
+		],
+		[
+			"c6",
+			5,
+			2,
+			1,
+			7,
+			true,
+			"teh",
+			"liam"
+		],
+		[
+			"c7",
+			7,
+			2,
+			1,
+			3,
+			false,
+			"kopi",
+			"zoey"
+		],
+		[
+			"c8",
+			9,
+			3,
+			3,
+			5,
+			false,
+			"nasi",
+			"amira"
+		],
+		[
+			"c9",
+			10,
+			3,
+			2,
+			5,
+			false,
+			"roti",
+			"raj"
+		]
+	];
+	var AIMS$1 = [
+		"stars",
+		"happy",
+		"regulars",
+		"noWaste"
+	];
+	var BEST$1 = {
+		stars: 11,
+		walkouts: 2,
+		regulars: 2,
+		waste: 0
+	};
+	var WORST = {
+		walkouts: 7,
+		waste: 9
+	};
+	var TAU$1 = .575;
+	var O = Object.fromEntries(ORDERS.map((o) => [o[0], o]));
+	var mean$2 = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+	function newClosing() {
+		return {
+			t: 1,
+			prog: {},
+			done: {},
+			left: {},
+			log: [],
+			over: false
+		};
+	}
+	function measures$1(st) {
+		const done = ORDERS.filter((o) => st.done[o[0]]);
+		const walk = ORDERS.filter((o) => st.left[o[0]]).length, waste = ORDERS.filter((o) => (st.prog[o[0]] || 0) > 0 && (st.prog[o[0]] || 0) < o[2]).length;
+		return {
+			stars: Math.min(1, done.reduce((a, o) => a + o[3], 0) / BEST$1.stars),
+			happy: Math.max(0, Math.min(1, (WORST.walkouts - walk) / (WORST.walkouts - BEST$1.walkouts))),
+			regulars: done.filter((o) => o[5]).length / BEST$1.regulars,
+			noWaste: Math.max(0, Math.min(1, (WORST.waste - waste) / (WORST.waste - BEST$1.waste)))
+		};
+	}
+	function value(o, st, t) {
+		const rem = o[2] - (st.prog[o[0]] || 0), slack = o[1] + o[4] - t - rem + 1, can = t + rem - 1 <= 12;
+		return {
+			stars: can ? o[3] / rem : 0,
+			happy: can ? slack <= 1 ? 1 : .3 : 0,
+			regulars: can ? o[5] ? 1 : 0 : 0,
+			noWaste: can ? (st.prog[o[0]] || 0) > 0 ? 1 : .2 : -1
+		};
+	}
+	function balancerPick(opts, st) {
+		const m = measures$1(st), weak = argmin(AIMS$1, (a) => m[a]);
+		return argmax(Object.keys(opts), (k) => [opts[k][weak], opts[k].stars]);
+	}
+	/** Start of minute t: customers whose time ran out leave. Returns the orders on the counter now (reference order). */
+	function openOrders(st) {
+		const t = st.t;
+		for (const o of ORDERS) if (o[1] + o[4] < t && !st.done[o[0]] && !st.left[o[0]] && o[1] <= t) st.left[o[0]] = true;
+		return ORDERS.filter((o) => o[1] <= t && !st.done[o[0]] && !st.left[o[0]]);
+	}
+	/** One minute: work one step on order `id` (or nothing when the counter is empty). Logs what the scoring layer needs. */
+	function step(st, id, tipBefore = false) {
+		if (st.over) return st;
+		const avail = openOrders(st);
+		if (!avail.length) st.log.push({
+			t: st.t,
+			choice: null
+		});
+		else {
+			const vals = Object.fromEntries(avail.map((o) => [o[0], value(o, st, st.t)]));
+			st.log.push({
+				t: st.t,
+				options: vals,
+				choice: id,
+				tipBefore: !!tipBefore,
+				balancerBest: balancerPick(vals, st),
+				m: measures$1(st)
+			});
+			if (id) {
+				st.prog[id] = (st.prog[id] || 0) + 1;
+				if (st.prog[id] >= O[id][2]) st.done[id] = true;
+			}
+		}
+		st.t++;
+		if (st.t > 12) {
+			for (const o of ORDERS) if (o[1] + o[4] <= 12 && !st.done[o[0]] && !st.left[o[0]]) st.left[o[0]] = true;
+			st.over = true;
+		}
+		return st;
+	}
+	function replay$1(logStr) {
+		const st = newClosing(), by = {};
+		for (const s of String(logStr || "").split(";").filter(Boolean)) {
+			const [t, c, tp] = s.split(":");
+			by[t] = {
+				c: c === "-" ? null : c,
+				tip: tp === "1"
+			};
+		}
+		while (!st.over) {
+			const e = by[st.t] || {
+				c: null,
+				tip: false
+			};
+			step(st, e.c, e.tip);
+		}
+		return st;
+	}
+	var py2 = (x) => {
+		const r = x * 100, f = Math.floor(r), d = r - f;
+		return (Math.abs(d - .5) < 1e-9 ? f % 2 === 0 ? f : f + 1 : Math.round(r)) / 100;
+	};
+	/** The facts the level rules read (autonomy_read in the reference): coherence of any consistent priority, tips before trying,
+	* balance (the weakest aim) and outcome (the mean). Rounded to 2 places, as the reference compares them. */
+	function readFacts$1(st) {
+		const m = measures$1(st), log = st.log;
+		const dec = log.filter((e) => e.choice && new Set(AIMS$1.map((x) => argmax(Object.keys(e.options), (k) => e.options[k][x]))).size > 1);
+		const fits = [];
+		if (dec.length) {
+			const W = [
+				0,
+				.5,
+				1,
+				2
+			];
+			for (const a of W) for (const b of W) for (const c of W) for (const d of W) {
+				if (!a && !b && !c && !d) continue;
+				const w = {
+					stars: a,
+					happy: b,
+					regulars: c,
+					noWaste: d
+				};
+				fits.push(mean$2(dec.map((e) => e.choice === argmax(Object.keys(e.options), (k) => AIMS$1.reduce((s, x) => s + e.options[k][x] * w[x], 0)) ? 1 : 0)));
+			}
+			fits.push(mean$2(dec.map((e) => e.choice === e.balancerBest ? 1 : 0)));
+			for (const aim of AIMS$1) for (const fl of [.35, .5]) fits.push(mean$2(dec.map((e) => e.choice === (Math.min(...Object.values(e.m)) < fl ? e.balancerBest : argmax(Object.keys(e.options), (k) => [e.options[k][aim], e.options[k].stars])) ? 1 : 0)));
+		}
+		const chosen = log.filter((e) => e.choice);
+		return {
+			coherence: py2(fits.length ? Math.max(...fits) : 0),
+			tipBefore: py2(chosen.length ? mean$2(chosen.map((e) => e.tipBefore ? 1 : 0)) : 0),
+			balance: py2(Math.min(...Object.values(m))),
+			outcome: py2(mean$2(Object.values(m))),
+			tau: TAU$1,
+			decisions: dec.length,
+			measures: m
+		};
+	}
+	//#endregion
 	//#region src/modules/mamak-rush/rescore.js
 	var rescore_exports$3 = /* @__PURE__ */ __exportAll({
+		autonomyFacts: () => autonomyFacts$1,
 		learningFacts: () => learningFactsFromV1,
 		primaryKey: () => primaryKey$3,
 		rederive: () => rederive$3
@@ -5354,6 +5661,16 @@ var NurtsScoring = (function(exports) {
 		}
 		const x = metrics$2(st);
 		return _objectSpread2(_objectSpread2({}, x), {}, { orgScore: orgScore(x) }, facets(x));
+	}
+	function autonomyFacts$1(m) {
+		const a = m === null || m === void 0 ? void 0 : m.autonomy;
+		if (!a || typeof a.log !== "string" || !a.done) return null;
+		return _objectSpread2(_objectSpread2({}, readFacts$1(replay$1(a.log))), {}, {
+			tips: a.tips,
+			firstActionMs: a.firstActionMs,
+			medianActionMs: a.medianActionMs,
+			idleMs: a.idleMs
+		});
 	}
 	var content_default$1 = {
 		version: "1.0",
@@ -5836,9 +6153,9 @@ var NurtsScoring = (function(exports) {
 	//#region src/modules/fix-it-kit/rules.js
 	var KIT = content_default$1.kit;
 	var KIT_IDS = Object.keys(KIT);
-	var TRIES = content_default$1.tries;
+	var TRIES$1 = content_default$1.tries;
 	var COUNT_MAX = content_default$1.countMax;
-	var PROBLEMS = content_default$1.problems;
+	var PROBLEMS$1 = content_default$1.problems;
 	var W = {
 		fluency: .3,
 		originality: .25,
@@ -5846,7 +6163,7 @@ var NurtsScoring = (function(exports) {
 		hitRate: .15,
 		blockedRecovery: .1
 	};
-	var problemsOf = (form) => Object.keys(PROBLEMS).filter((id) => PROBLEMS[id].form === form);
+	var problemsOf = (form) => Object.keys(PROBLEMS$1).filter((id) => PROBLEMS$1[id].form === form);
 	/** Python's round(x, n) (exact halves go to even), so metrics match the reference. */
 	function pyRound$2(x, n = 0) {
 		const d = x * 2 ** (n + 1);
@@ -5867,7 +6184,7 @@ var NurtsScoring = (function(exports) {
 		return null;
 	}
 	/** Live state for one problem (the scene drives it one try at a time; the same code replays the reference bots). */
-	function newProblem(pid, cfg = PROBLEMS[pid], kitIds = KIT_IDS) {
+	function newProblem(pid, cfg = PROBLEMS$1[pid], kitIds = KIT_IDS) {
 		return {
 			pid,
 			cfg,
@@ -5902,7 +6219,7 @@ var NurtsScoring = (function(exports) {
 			ps.avail = ps.avail.filter((a) => a !== ps.cfg.block);
 			justBlocked = ps.cfg.block;
 		}
-		if (ps.log.length >= TRIES) ps.over = true;
+		if (ps.log.length >= TRIES$1) ps.over = true;
 		return {
 			entry: e,
 			fix: f,
@@ -5942,8 +6259,170 @@ var NurtsScoring = (function(exports) {
 		return m;
 	}
 	//#endregion
+	//#region src/modules/fix-it-kit/freefix.js
+	var PROBLEMS = {
+		p1: [
+			3,
+			[["U"], ["R", "H"]],
+			"Shade the waiting bench"
+		],
+		p2: [
+			3,
+			[["R"], ["RB", "C"]],
+			"Mark the long-jump line"
+		],
+		p3: [
+			1,
+			[["S"], ["C"]],
+			"Scoreboard keeps tipping"
+		],
+		p4: [
+			2,
+			[["W"], ["B"]],
+			"Cones keep blowing over"
+		],
+		p5: [
+			1,
+			[["RB"], ["H"]],
+			"A loose flag"
+		]
+	};
+	var PIDS = Object.keys(PROBLEMS);
+	var AIMS = [
+		"kids",
+		"fixed",
+		"kitLeft"
+	];
+	var TAU = .435;
+	var mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+	var BEST = (() => {
+		let kids = 0, fixed = 0;
+		const rec = (fx, used, depth) => {
+			kids = Math.max(kids, [...fx].reduce((a, p) => a + PROBLEMS[p][0], 0));
+			fixed = Math.max(fixed, fx.size);
+			if (depth === 6) return;
+			for (const p of PIDS) {
+				if (fx.has(p)) continue;
+				for (const f of PROBLEMS[p][1]) if (!f.some((o) => used.has(o))) rec(/* @__PURE__ */ new Set([...fx, p]), /* @__PURE__ */ new Set([...used, ...f]), depth + 1);
+			}
+		};
+		rec(/* @__PURE__ */ new Set(), /* @__PURE__ */ new Set(), 0);
+		return {
+			kids,
+			fixed,
+			kitLeft: 8
+		};
+	})();
+	function newFreeFix() {
+		return {
+			fixed: /* @__PURE__ */ new Set(),
+			used: /* @__PURE__ */ new Set(),
+			log: [],
+			over: false,
+			fixes: []
+		};
+	}
+	var keyOf = (p, i) => `${p}:${i}`;
+	function measures(st) {
+		return {
+			kids: [...st.fixed].reduce((a, p) => a + PROBLEMS[p][0], 0) / BEST.kids,
+			fixed: st.fixed.size / BEST.fixed,
+			kitLeft: (8 - st.used.size) / 8
+		};
+	}
+	/** The fixes still possible, in reference order: "p:i" → what each aim gains. */
+	function options(st) {
+		const o = {};
+		for (const p of PIDS) {
+			if (st.fixed.has(p)) continue;
+			PROBLEMS[p][1].forEach((f, i) => {
+				if (!f.some((x) => st.used.has(x))) o[keyOf(p, i)] = {
+					kids: PROBLEMS[p][0] / 3,
+					fixed: 1,
+					kitLeft: 1 - f.length / 2
+				};
+			});
+		}
+		return o;
+	}
+	var balancer = (opts, m) => {
+		const weak = argmin(AIMS, (a) => m[a]);
+		return argmax(Object.keys(opts), (k) => [opts[k][weak], opts[k].kids]);
+	};
+	/** One try: apply fix "p:i", or null = Done (stop early). */
+	function apply(st, choice, tipBefore = false) {
+		if (st.over) return st;
+		const opts = options(st), m = measures(st);
+		if (!Object.keys(opts).length) {
+			st.over = true;
+			return st;
+		}
+		st.log.push({
+			options: opts,
+			choice,
+			tipBefore: !!tipBefore,
+			balancerBest: balancer(opts, m),
+			m
+		});
+		if (choice == null) {
+			st.over = true;
+			return st;
+		}
+		if (!(choice in opts)) throw new Error(`not a possible fix: ${choice}`);
+		const [p, i] = choice.split(":");
+		st.fixed.add(p);
+		for (const x of PROBLEMS[p][1][Number(i)]) st.used.add(x);
+		st.fixes.push(choice);
+		if (st.log.length >= 6 || !Object.keys(options(st)).length) st.over = true;
+		return st;
+	}
+	function replay(logStr) {
+		const st = newFreeFix();
+		for (const s of String(logStr || "").split(";").filter(Boolean)) {
+			if (st.over) break;
+			const j = s.lastIndexOf(":");
+			const c = s.slice(0, j);
+			apply(st, c === "done" ? null : c, s.slice(j + 1) === "1");
+		}
+		return st;
+	}
+	/** The facts the level rules read (read() in the reference; not rounded there). */
+	function readFacts(st) {
+		const m = measures(st), log = st.log;
+		const dec = log.filter((e) => e.choice != null && Object.keys(e.options).length > 1);
+		const fits = [];
+		if (dec.length) {
+			const W = [
+				0,
+				.5,
+				1,
+				2
+			];
+			for (const a of W) for (const b of W) for (const c of W) {
+				if (!a && !b && !c) continue;
+				const w = {
+					kids: a,
+					fixed: b,
+					kitLeft: c
+				};
+				fits.push(mean(dec.map((e) => e.choice === argmax(Object.keys(e.options), (k) => AIMS.reduce((s, x) => s + e.options[k][x] * w[x], 0)) ? 1 : 0)));
+			}
+			fits.push(mean(dec.map((e) => e.choice === e.balancerBest ? 1 : 0)));
+		}
+		return {
+			coherence: fits.length ? Math.max(...fits) : 0,
+			tipBefore: log.length ? mean(log.map((e) => e.tipBefore ? 1 : 0)) : 0,
+			balance: Math.min(...Object.values(m)),
+			outcome: mean(Object.values(m)),
+			tau: TAU,
+			decisions: dec.length,
+			measures: m
+		};
+	}
+	//#endregion
 	//#region src/modules/fix-it-kit/rescore.js
 	var rescore_exports$2 = /* @__PURE__ */ __exportAll({
+		autonomyFacts: () => autonomyFacts,
 		learningFacts: () => learningFactsFromV1,
 		parseTries: () => parseTries,
 		primaryKey: () => primaryKey$2,
@@ -5992,6 +6471,17 @@ var NurtsScoring = (function(exports) {
 			}
 		});
 		return opp ? [rep, opp] : null;
+	}
+	function autonomyFacts(m) {
+		const a = m === null || m === void 0 ? void 0 : m.autonomy;
+		if (!a || typeof a.log !== "string" || !a.done) return null;
+		return _objectSpread2(_objectSpread2({}, readFacts(replay(a.log))), {}, {
+			tips: a.tips,
+			firstActionMs: a.firstActionMs,
+			medianActionMs: a.medianActionMs,
+			idleMs: a.idleMs,
+			stoppedEarly: !!a.stoppedEarly
+		});
 	}
 	var content_default = {
 		version: "1.1",
@@ -7144,32 +7634,6 @@ var NurtsScoring = (function(exports) {
 	};
 	Object.fromEntries(Object.entries(ADAPTERS).map(([id, a]) => [a.trait, id]));
 	//#endregion
-	//#region src/scoring/util.js
-	var mean = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
-	var r1 = (x) => x == null || Number.isNaN(x) ? null : Math.round(x * 10) / 10;
-	var r3 = (x) => x == null || Number.isNaN(x) ? null : Math.round(x * 1e3) / 1e3;
-	var num = (v) => v === "" || v == null || Number.isNaN(Number(v)) ? null : Number(v);
-	/** Percentile rank (0–100) of x in pool: the share below plus half the ties. */
-	function percentile(x, pool) {
-		if (x == null || !pool.length) return null;
-		const below = pool.filter((v) => v < x).length, same = pool.filter((v) => v === x).length;
-		return r1(100 * (below + same / 2) / pool.length);
-	}
-	/** The value at quantile q (0–1), linear between order statistics. */
-	function quantile(pool, q) {
-		if (!pool.length) return null;
-		const s = [...pool].sort((a, b) => a - b), i = (s.length - 1) * q, lo = Math.floor(i);
-		return r1(s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo));
-	}
-	/** AUC: the chance a random "Y" person scores higher than a random "N" person (ties count half). */
-	function auc(yes, no) {
-		if (!yes.length || !no.length) return null;
-		let w = 0;
-		for (const a of yes) for (const b of no) w += a > b ? 1 : a === b ? .5 : 0;
-		return r3(w / (yes.length * no.length));
-	}
-	var flagsOf = (m) => String((m === null || m === void 0 ? void 0 : m.flags) || "").split(/[ ,]+/).filter((f) => f && f !== "none");
-	//#endregion
 	//#region src/scoring/traits.js
 	var RELIABILITY = {
 		risk: "good",
@@ -7429,6 +7893,129 @@ var NurtsScoring = (function(exports) {
 		};
 	}
 	//#endregion
+	//#region src/scoring/autonomy.js
+	var FINALES = {
+		"mamak-rush": "Closing Time",
+		"fix-it-kit": "Free Fix"
+	};
+	/** One finale's level from its facts (the reference rules; thresholds in ScoringConfig `autonomy.rules`). */
+	function levelOf(f, cfg = DEFAULTS) {
+		const R = cfg["autonomy.rules"];
+		if (f.tipBefore >= R.tipBeforeL1 || f.coherence < R.coherenceL1) return 1;
+		if (f.coherence >= R.coherenceL3 && f.balance >= f.tau && f.outcome >= R.outcomeL3) return 3;
+		return 2;
+	}
+	/** A freeze: the first move took ≥ 3× the player's own median move and ≥ 10 s (the clock starts after the brief card).
+	* Framework v0.7: a freeze counts toward L1 only alongside another L1 signal, so on its own it is a note. */
+	function isFreeze(f, cfg = DEFAULTS) {
+		const R = cfg["autonomy.rules"];
+		return f.firstActionMs != null && f.medianActionMs != null && f.medianActionMs > 0 && f.firstActionMs >= R.freezeRatio * f.medianActionMs && f.firstActionMs >= R.freezeMinMs;
+	}
+	/** metrics (a completed official round of mamak-rush or fix-it-kit) → { game, status, level, facts, freeze, provisional, why } */
+	function finaleRead(module, metrics, adapter, cfg = DEFAULTS) {
+		const game = FINALES[module];
+		if (!(metrics === null || metrics === void 0 ? void 0 : metrics.autonomy)) return {
+			game,
+			status: "not played"
+		};
+		let f = null;
+		try {
+			f = (adapter === null || adapter === void 0 ? void 0 : adapter.autonomyFacts) ? adapter.autonomyFacts(metrics) : null;
+		} catch (_unused) {
+			f = null;
+		}
+		if (!f) return {
+			game,
+			status: "not played"
+		};
+		const fl = flagsOf(metrics);
+		if (fl.includes("disengaged") || fl.includes("idle") || (f.idleMs || 0) >= cfg["autonomy.rules"].idleNaMs) return {
+			game,
+			status: "n/a",
+			facts: f,
+			why: "disengaged or idle"
+		};
+		return {
+			game,
+			status: "ok",
+			level: levelOf(f, cfg),
+			facts: f,
+			freeze: isFreeze(f, cfg),
+			provisional: !!metrics.priorCasualPlay
+		};
+	}
+	/** The two finales → one read (the reference combine(), plus provisional and n/a). factorLevel = null → autonomyFactor 1. */
+	function combineAutonomy(reads, cfg = DEFAULTS) {
+		const ok = reads.filter((r) => r.status === "ok"), na = reads.filter((r) => r.status === "n/a");
+		const detail = reads.filter((r) => r.status !== "not played").map((r) => r.status === "ok" ? `${r.game} L${r.level} (coherence ${r.facts.coherence.toFixed(2)} · balance ${r.facts.balance.toFixed(2)} · outcome ${r.facts.outcome.toFixed(2)} · tips before ${Math.round(r.facts.tipBefore * 100)}%${r.freeze ? " · froze at the start" : ""}${r.provisional ? " · practised before" : ""})` : `${r.game} n/a (${r.why})`).join(" · ");
+		const notes = ok.filter((r) => r.freeze).map((r) => `autonomy: slow first move in ${r.game} (a freeze on its own is a note)`);
+		const base = {
+			detail,
+			notes,
+			red: false,
+			kind: ""
+		};
+		if (!ok.length) return _objectSpread2(_objectSpread2({}, base), {}, {
+			level: null,
+			factorLevel: null,
+			label: na.length ? "not enough evidence (disengaged or idle in the finale)" : "not measured (no finale played)",
+			kind: na.length ? "na" : "none"
+		});
+		if (ok.length === 1) return _objectSpread2(_objectSpread2({}, base), {}, {
+			level: ok[0].level,
+			factorLevel: null,
+			label: `L${ok[0].level} (provisional: one finale)`,
+			kind: "provisional"
+		});
+		const [a, b] = ok.map((r) => r.level), practised = ok.some((r) => r.provisional);
+		let c;
+		if (a === b) c = {
+			level: a,
+			label: `L${a}`,
+			kind: "agree"
+		};
+		else if (Math.abs(a - b) === 1) c = {
+			level: Math.min(a, b),
+			label: `L${Math.min(a, b)}–L${Math.max(a, b)} (mixed)`,
+			kind: "range"
+		};
+		else c = {
+			level: 2,
+			label: "L2 (inconsistent between games)",
+			kind: "inconsistent"
+		};
+		if (c.kind === "inconsistent") notes.push("autonomy: the two finales disagree by two levels (discuss)");
+		if (practised) return _objectSpread2(_objectSpread2(_objectSpread2({}, base), c), {}, {
+			factorLevel: null,
+			label: `${c.label} (provisional: practised before)`,
+			kind: "provisional"
+		});
+		return _objectSpread2(_objectSpread2(_objectSpread2({}, base), c), {}, {
+			factorLevel: c.level,
+			red: a === 1 && b === 1
+		});
+	}
+	/** The autonomy target for a level and employment type (Framework: Junior L1 · Mid L2 · Lead L3; Intern L1; Freelance ≥ L2). */
+	function targetOf(level, type, cfg = DEFAULTS) {
+		var _cfg$autonomyTargets;
+		let t = (_cfg$autonomyTargets = cfg["autonomy.targets"][level]) !== null && _cfg$autonomyTargets !== void 0 ? _cfg$autonomyTargets : 1;
+		const mx = cfg["autonomy.typeMax"][type], mn = cfg["autonomy.typeMin"][type];
+		if (mx != null) t = Math.min(t, mx);
+		if (mn != null) t = Math.max(t, mn);
+		return t;
+	}
+	/** meets the target 1.0 · one level short 0.8 · two short 0.6 (a range already uses its lower level). */
+	function autonomyFactor(autoLevel, level, type, cfg = DEFAULTS) {
+		if (!cfg["autonomy.enabled"] || autoLevel == null) return 1;
+		const short = Math.max(0, targetOf(level, type, cfg) - autoLevel);
+		return cfg["autonomy.shortFactor"][Math.min(short, cfg["autonomy.shortFactor"].length - 1)];
+	}
+	var AUTONOMY_PROBES = {
+		Junior: "Tell me about a task you were given clear steps for. What did you do when a step didn’t work?",
+		Mid: "Tell me about a time you were given only a goal. How did you work out the how?",
+		Lead: "Tell me about a time you were given only a broad aim. How did you decide what the goals should be?"
+	};
+	//#endregion
 	//#region src/scoring/fit.js
 	/** Role weights for a function × employment type × level, with the caps, floors and the Intern caps applied. */
 	function weightsFor(fn, type, level, cfg = DEFAULTS) {
@@ -7452,9 +8039,9 @@ var NurtsScoring = (function(exports) {
 		const out = risk < lo ? lo - risk : risk > hi ? risk - hi : 0;
 		return 1 - (1 - cfg["risk.outsideFloor"]) * Math.min(1, out / cfg["risk.outsideSpan"]);
 	}
-	/** values: { trait: 0–100 } (percentiles once norms exist, raw before). Missing traits drop out and the rest rescale. */
-	function roleFit(values, risk, fn, type, level, cfg = DEFAULTS) {
-		var _cfg$autonomyFactor$l;
+	/** values: { trait: 0–100 } (percentiles once norms exist, raw before). Missing traits drop out and the rest rescale.
+	* autoLevel: the combined autonomy level used for the factor (null = not measured / provisional → factor 1). */
+	function roleFit(values, risk, fn, type, level, cfg = DEFAULTS, autoLevel = null) {
 		const { weights, riskBand } = weightsFor(fn, type, level, cfg);
 		let sw = 0, s = 0;
 		for (const t of MIB) if (values[t] != null && weights[t] > 0) {
@@ -7462,7 +8049,7 @@ var NurtsScoring = (function(exports) {
 			s += weights[t] * values[t];
 		}
 		if (!sw) return null;
-		return r1(s / sw * riskFactor(risk, riskBand, cfg) * ((_cfg$autonomyFactor$l = cfg.autonomyFactor[level]) !== null && _cfg$autonomyFactor$l !== void 0 ? _cfg$autonomyFactor$l : 1));
+		return r1(s / sw * riskFactor(risk, riskBand, cfg) * autonomyFactor(autoLevel, level, type, cfg));
 	}
 	var LEVELS = [
 		"Junior",
@@ -7478,11 +8065,11 @@ var NurtsScoring = (function(exports) {
 		"Other"
 	];
 	/** The suitability spectrum for the registered function and type, plus the best-fit function (at Mid). */
-	function spectrum(values, risk, fn, type, cfg = DEFAULTS) {
-		const fit = Object.fromEntries(LEVELS.map((L) => [L, roleFit(values, risk, fn, type, L, cfg)]));
+	function spectrum(values, risk, fn, type, cfg = DEFAULTS, autoLevel = null) {
+		const fit = Object.fromEntries(LEVELS.map((L) => [L, roleFit(values, risk, fn, type, L, cfg, autoLevel)]));
 		let best = null;
 		for (const f of FUNCTIONS) {
-			const v = roleFit(values, risk, f, type, "Mid", cfg);
+			const v = roleFit(values, risk, f, type, "Mid", cfg, autoLevel);
 			if (v != null && (!best || v > best.fit)) best = {
 				fn: f,
 				fit: v
@@ -7517,7 +8104,11 @@ var NurtsScoring = (function(exports) {
 		alwaysDisagree: (g) => `Disagreed with almost every claim in ${g}.`,
 		notEnoughEvidence: (g) => `${g} ended early: not enough evidence for a score.`
 	};
-	var official = (rs) => rs.filter((r) => r.mode === "real" && r.status === "completed").sort((a, b) => a.startedAt - b.startedAt);
+	var leftInFinale = (r) => {
+		var _r$metrics;
+		return (r.status === "quit" || r.status === "abandoned") && !!((_r$metrics = r.metrics) === null || _r$metrics === void 0 ? void 0 : _r$metrics.mainDone);
+	};
+	var official = (rs) => rs.filter((r) => r.mode === "real" && (r.status === "completed" || leftInFinale(r))).sort((a, b) => a.startedAt - b.startedAt);
 	/** L1: re-derive a round's metrics from its raw logs with the game's own code; compare with what the client stored. */
 	function rederiveRound(r) {
 		const a = ADAPTERS[r.module], m = r.metrics || {};
@@ -7583,8 +8174,8 @@ var NurtsScoring = (function(exports) {
 				if (!firsts[k]) firsts[k] = r;
 			}
 			for (const [k, r] of Object.entries(firsts)) {
-				var _r$metrics;
-				if ((_r$metrics = r.metrics) === null || _r$metrics === void 0 ? void 0 : _r$metrics.truncated) continue;
+				var _r$metrics2;
+				if ((_r$metrics2 = r.metrics) === null || _r$metrics2 === void 0 ? void 0 : _r$metrics2.truncated) continue;
 				const s = scoreRound(r);
 				if (s.score != null) (pools[k] || (pools[k] = [])).push(s.score);
 			}
@@ -7629,12 +8220,13 @@ var NurtsScoring = (function(exports) {
 				traits,
 				learn,
 				eth: ethicsGate((evByUser[u.userId] || []).filter((e) => Number(e.runNo) === run).sort((a, b) => a.t - b.t), Object.keys(off).length > 0),
-				entries
+				entries,
+				auto: combineAutonomy(Object.keys(FINALES).filter((m) => off[m]).map((m) => finaleRead(m, off[m].metrics, ADAPTERS[m], cfg)), cfg)
 			};
 		});
 		for (const p of perUser) {
-			var _traits$risk$score, _traits$risk, _traits$risk2, _input$away, _ADAPTERS$module2, _traits$organisation$, _traits$organisation, _traits$organisation$2, _traits$organisation2, _traits$risk$extra$ri, _traits$risk3, _spec$fit$Mid, _spec$fit$Junior, _spec$fit$Mid2, _spec$fit$Lead, _traits$communication, _traits$communication2, _traits$communication3, _traits$communication4;
-			const { u, run, inRun, off, traits, learn, eth } = p;
+			var _traits$risk$score, _traits$risk, _traits$risk2, _input$away, _ADAPTERS$module2, _traits$organisation$, _traits$organisation, _traits$organisation$2, _traits$organisation2, _traits$risk$extra$ri, _traits$risk3, _spec$fit$Mid, _spec$fit$Junior, _spec$fit$Mid2, _spec$fit$Lead, _auto$level, _traits$communication, _traits$communication2, _traits$communication3, _traits$communication4;
+			const { u, run, inRun, off, traits, learn, eth, auto } = p;
 			const reg = regs[u.userId] || {}, fn = reg.desiredFunction || "Other", type = reg.employmentType || "Full-time";
 			const lpct = !noNorms && learnPool.length >= cfg["norms.minBands"] && learn.score != null ? percentile(learn.score, learnPool) : null;
 			const learnOut = lpct != null ? learningComposite(p.entries, cfg, {
@@ -7645,7 +8237,9 @@ var NurtsScoring = (function(exports) {
 			const values = {};
 			for (const t of MIB) if (t === "learning") values.learning = learnOut.score;
 			else if (traits[t]) values[t] = allNormed && traits[t].pct != null ? traits[t].pct : traits[t].score;
-			const spec = spectrum(values, (_traits$risk$score = (_traits$risk = traits.risk) === null || _traits$risk === void 0 ? void 0 : _traits$risk.score) !== null && _traits$risk$score !== void 0 ? _traits$risk$score : null, fn, type, cfg);
+			const risk = (_traits$risk$score = (_traits$risk = traits.risk) === null || _traits$risk === void 0 ? void 0 : _traits$risk.score) !== null && _traits$risk$score !== void 0 ? _traits$risk$score : null;
+			const autoOn = cfg["autonomy.enabled"] && auto.factorLevel != null;
+			const spec = spectrum(values, risk, fn, type, cfg, autoOn ? auto.factorLevel : null);
 			const red = [], notes = [], positives = [], caveats = [];
 			if (eth.gate === "flag") red.push("ethics: confirmed a higher score and left it");
 			if (eth.gate === "note") notes.push("ethics: raised a score, then put it back (self-corrected)");
@@ -7659,6 +8253,8 @@ var NurtsScoring = (function(exports) {
 			const ldFlags = flagsOf((_traits$risk2 = traits.risk) === null || _traits$risk2 === void 0 ? void 0 : _traits$risk2.metrics);
 			if (ldFlags.includes("reckless")) red.push("risk: reckless (kept pushing after losses)");
 			if (ldFlags.includes("frozen")) red.push("risk: frozen (banked almost nothing)");
+			if (auto.red) red.push("autonomy: L1 in both finales (matters when considering Mid or Lead)");
+			notes.push(...auto.notes);
 			const realTries = {};
 			inRun.filter((r) => r.mode === "real").forEach((r) => {
 				realTries[r.module] = (realTries[r.module] || 0) + 1;
@@ -7668,11 +8264,13 @@ var NurtsScoring = (function(exports) {
 				return ((_ADAPTERS$m = ADAPTERS[m]) === null || _ADAPTERS$m === void 0 ? void 0 : _ADAPTERS$m.title) || m;
 			});
 			if (run > 1 || multi.length) red.push(`brute-force pattern: ${run > 1 ? `run ${run}` : ""}${run > 1 && multi.length ? "; " : ""}${multi.length ? `restarted ${multi.join(", ")}` : ""}`);
-			const unfinished = inRun.filter((r) => r.mode === "real" && (r.status === "quit" || r.status === "abandoned")).map((r) => {
+			const unfinished = inRun.filter((r) => r.mode === "real" && (r.status === "quit" || r.status === "abandoned") && !leftInFinale(r)).map((r) => {
 				var _ADAPTERS$r$module;
 				return ((_ADAPTERS$r$module = ADAPTERS[r.module]) === null || _ADAPTERS$r$module === void 0 ? void 0 : _ADAPTERS$r$module.title) || r.module;
 			});
 			if (unfinished.length) notes.push(`left unfinished: ${[...new Set(unfinished)].join(", ")}`);
+			const finaleLeft = inRun.filter((r) => r.mode === "real" && leftInFinale(r)).map((r) => FINALES[r.module] || r.module);
+			if (finaleLeft.length) notes.push(`left during the ${[...new Set(finaleLeft)].join(" and ")} finale (the scored part counts)`);
 			const tabs = ((_input$away = input.away) === null || _input$away === void 0 ? void 0 : _input$away[`${u.userId}|fair-board`]) || 0;
 			if (tabs) notes.push(`switched tabs ${tabs}× during Fair Board`);
 			for (const [module, s] of Object.entries(off)) for (const f of flagsOf(s.metrics)) if (CAVEAT_TEXT[f]) caveats.push(CAVEAT_TEXT[f](((_ADAPTERS$module2 = ADAPTERS[module]) === null || _ADAPTERS$module2 === void 0 ? void 0 : _ADAPTERS$module2.title) || module));
@@ -7738,7 +8336,10 @@ var NurtsScoring = (function(exports) {
 				fitLead: (_spec$fit$Lead = spec.fit.Lead) !== null && _spec$fit$Lead !== void 0 ? _spec$fit$Lead : "",
 				suggestedLevel: "",
 				bestFitFunction: spec.bestFitFunction,
-				autonomy: "not yet measured (autonomyFactor 1; traits only)",
+				autonomy: auto.label,
+				autonomyLevel: (_auto$level = auto.level) !== null && _auto$level !== void 0 ? _auto$level : "",
+				"autonomy detail": auto.detail,
+				"autonomy factor": !cfg["autonomy.enabled"] ? "off (autonomy.enabled = false): traits only" : autoOn ? `applied (L${auto.factorLevel} vs each level’s target)` : "not applied (not measured, provisional or n/a): traits only",
 				redFlags: red.join("; "),
 				notes: notes.join("; "),
 				positives: positives.join("; "),
@@ -7770,11 +8371,14 @@ var NurtsScoring = (function(exports) {
 				var _spec$fit$L;
 				return `${L} ${(_spec$fit$L = spec.fit[L]) !== null && _spec$fit$L !== void 0 ? _spec$fit$L : "–"}`;
 			}).join(" · ");
-			const headline = scoredTraits.length ? `${fn} fit: ${fitTxt} (${allNormed ? "vs other candidates" : "raw, no benchmark yet"}). Strongest: ${strongest.map(tl).join(", ")}.` : "No completed games yet.";
+			const headline = scoredTraits.length ? `${fn} fit: ${fitTxt} (${allNormed ? "vs other candidates" : "raw, no benchmark yet"}${autoOn ? "" : "; traits only"}). Strongest: ${strongest.map(tl).join(", ")}.` : "No completed games yet.";
+			const bestLevel = LEVELS.filter((L) => spec.fit[L] != null).sort((a, b) => spec.fit[b] - spec.fit[a])[0] || "Mid";
+			const autoProbe = auto.kind !== "agree" && scoredTraits.length ? [`autonomy (${auto.label}; ${bestLevel}): “${AUTONOMY_PROBES[bestLevel]}”`] : [];
 			const probes = [
 				...lowest.map((t) => `${TRAIT_LABEL[t]}: “${PROBES[t]}”`),
 				...eth.gate === "flag" ? [`integrity: “${PROBES.ethics}”`] : [],
-				...red.some((x) => x.startsWith("brute")) ? [`repeat plays: “${PROBES.bruteForce}”`] : []
+				...red.some((x) => x.startsWith("brute")) ? [`repeat plays: “${PROBES.bruteForce}”`] : [],
+				...autoProbe
 			];
 			insights.push({
 				stage: row.stage,
@@ -7782,10 +8386,11 @@ var NurtsScoring = (function(exports) {
 				name: u.name || "",
 				role: `${fn} · ${type}`,
 				headline,
+				autonomy: auto.label,
 				"probe first": probes.join("\n"),
 				"red flags": red.join("\n"),
 				"read with care": caveats.join("\n"),
-				"not measured": "Autonomy (for now), domain skills, motivation for this role, and culture beyond integrity.",
+				"not measured": `${auto.level == null ? "Autonomy (no finale read yet), domain" : "Domain"} skills, motivation for this role, and culture beyond integrity.`,
 				scoringVersion: cfg.scoringVersion
 			});
 		}
@@ -7943,11 +8548,36 @@ var NurtsScoring = (function(exports) {
 				"rater item": item,
 				n: yes.length + no.length,
 				AUC: A !== null && A !== void 0 ? A : "",
-				"mean score Y": (_r = r1(mean(yes))) !== null && _r !== void 0 ? _r : "",
-				"mean score N": (_r2 = r1(mean(no))) !== null && _r2 !== void 0 ? _r2 : "",
+				"mean score Y": (_r = r1(mean$3(yes))) !== null && _r !== void 0 ? _r : "",
+				"mean score N": (_r2 = r1(mean$3(no))) !== null && _r2 !== void 0 ? _r2 : "",
 				"band × answer": Object.entries(table).map(([k, n]) => `${k}: ${n}`).join(" · "),
 				"rater agreement": agreement(ratings, item),
 				note: A == null ? "needs both Y and N answers" : A < .55 ? "mismatch: near chance or inverted" : "",
+				status: label
+			});
+		}
+		{
+			var _r3, _r4;
+			const yes = [], no = [], table = {};
+			for (const r of ratings) {
+				const s = byUser[r.user_id], a = r["needed little hand-holding"];
+				const v = Number(s === null || s === void 0 ? void 0 : s.autonomyLevel);
+				if (!s || s.autonomyLevel === "" || s.autonomyLevel == null || Number.isNaN(v) || a !== "Y" && a !== "N") continue;
+				(a === "Y" ? yes : no).push(v);
+				const k = `L${v}${/provisional/.test(s.autonomy) ? " (provisional)" : ""} × ${a}`;
+				table[k] = (table[k] || 0) + 1;
+			}
+			const A = auc(yes, no);
+			rows.push({
+				trait: "autonomy",
+				"rater item": "needed little hand-holding",
+				n: yes.length + no.length,
+				AUC: A !== null && A !== void 0 ? A : "",
+				"mean score Y": (_r3 = r1(mean$3(yes))) !== null && _r3 !== void 0 ? _r3 : "",
+				"mean score N": (_r4 = r1(mean$3(no))) !== null && _r4 !== void 0 ? _r4 : "",
+				"band × answer": Object.entries(table).map(([k, n]) => `${k}: ${n}`).join(" · "),
+				"rater agreement": agreement(ratings, "needed little hand-holding"),
+				note: A == null ? "needs both Y and N answers (scores = level 1–3; the 90-day hand-holding check comes with the Outcomes tab)" : A < cfg["autonomy.validAuc"] ? `AUC below ${cfg["autonomy.validAuc"]}: consider autonomy.enabled = false (probe-only) until it is fixed` : "",
 				status: label
 			});
 		}
@@ -7998,7 +8628,7 @@ var NurtsScoring = (function(exports) {
 		const val = (u, t) => byUser[u][t] === "" || byUser[u][t] == null ? NaN : Number(byUser[u][t]);
 		const sep = Object.keys(TRAIT_ITEM).map((t) => {
 			const g = good.map((r) => val(r.user_id, t)).filter((x) => !Number.isNaN(x)), b = bad.map((r) => val(r.user_id, t)).filter((x) => !Number.isNaN(x));
-			const d = g.length && b.length ? r1(mean(g) - mean(b)) : null;
+			const d = g.length && b.length ? r1(mean$3(g) - mean$3(b)) : null;
 			return d == null ? null : `${t} ${d > 0 ? "+" : ""}${d}`;
 		}).filter(Boolean);
 		rows.push({
@@ -8034,16 +8664,22 @@ var NurtsScoring = (function(exports) {
 	exports.CALIBRATION_CHOICES = CALIBRATION_CHOICES;
 	exports.CALIBRATION_COLUMNS = CALIBRATION_COLUMNS;
 	exports.DEFAULTS = DEFAULTS;
+	exports.OBSOLETE_KEYS = OBSOLETE_KEYS;
 	exports.PROBES = PROBES;
 	exports.STAGE_LABEL = STAGE_LABEL;
 	exports.TRAITS_OUT = TRAITS_OUT;
+	exports.autonomyFactor = autonomyFactor;
+	exports.combineAutonomy = combineAutonomy;
 	exports.ethicsGate = ethicsGate;
+	exports.finaleRead = finaleRead;
 	exports.learningComposite = learningComposite;
 	exports.learningFromMetrics = learningFromMetrics;
+	exports.levelOf = levelOf;
 	exports.mergeConfig = mergeConfig;
 	exports.orgScoreV2 = orgScoreV2;
 	exports.rederiveRound = rederiveRound;
 	exports.scoreAll = scoreAll;
+	exports.targetOf = targetOf;
 	exports.traitOf = traitOf;
 	exports.validity = validity;
 	return exports;

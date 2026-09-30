@@ -117,6 +117,7 @@ http.createServer((req, res) => {
     if (req.url.startsWith('/__prop/')) { const [k, v] = decodeURIComponent(req.url.slice(8)).split('='); state.ctx.PropertiesService.getScriptProperties().setProperty(k, v || null); return res.end('{"ok":true}'); } // e.g. /__prop/DEV_PIN= (unset)
     if (req.url.startsWith('/__reset')) { fresh(); return res.end('{"ok":true}'); }
     if (req.url.startsWith('/__call/')) { const [fn, q] = req.url.slice(8).split('?'); const args = q ? JSON.parse(decodeURIComponent(q)) : []; return res.end(JSON.stringify({ ok: true, result: state.ctx[fn](...args) ?? null })); } // e.g. /__call/purge_?["reason","PURGE"]
+    if (req.url.startsWith('/__set/')) { const [name, q] = req.url.slice(7).split('?'); const sh = state.ctx.ss_().getSheetByName(decodeURIComponent(name)); for (const [r, c, v] of JSON.parse(decodeURIComponent(q))) sh.getRange(r, c).setValue(v); return res.end('{"ok":true}'); } // e.g. /__set/ScoringConfig?[[2,2,"sc-1"]]
     if (req.url.startsWith('/__run/')) { state.ctx[req.url.slice(7)](); return res.end('{"ok":true}'); } // e.g. /__run/refreshSummary
     if (req.method === 'GET') return res.end(state.ctx.doGet().content);
     if (!/^text\/plain/.test(req.headers['content-type'] || '')) { res.statusCode = 415; return res.end('{"ok":false,"error":"client must send text/plain"}'); }
