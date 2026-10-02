@@ -1,15 +1,17 @@
 """Sunny Tap (resilience): reference v1 (RS1 build pack). Run: python3 sunny-tap-reference.py → SELF-TEST PASS.
-One 110-second round, no retry: Fair 20 s · Wipeout 10 s · Fair 20 s · Wipeout 10 s · Fair 20 s · Wipeout 10 s · Fair 20 s (after an unscored 10 s warm-up).
-Suns pop up across the sky over a sunny beach: tap them (+10). A sun that fades untapped costs 3. A tap on a cloud or empty sky costs 15.
+v1.2: 4 rounds of Fair 20 s + Wipeout 10 s (2:00 of play), each followed by a mini-report (gained / faded / mis-taps + a score line chart; a Continue button). An unscored 10 s warm-up comes first. No retry.
+Suns pop up across the sky over a sunny beach: tap them (+10). A sun that fades untapped costs 10. A tap on a cloud or empty sky costs 15.
 The score is floored at 0. **Only the three Fair phases are measured** (accuracy + reaction time; score = 25% accuracy shock + 50% speed shock + 25% hold) (the same fixed pace in all three). The Wipeouts exist to create real
 pressure: their spawn rate = max(the fixed flood, 2.5 x the player's own Fair-1 hit rate), so fast tappers are overwhelmed too.
 The game's JS must reproduce schedule() and score_round() exactly (parity fixture exported from this file)."""
 import random, statistics, math
-PHASES = [("F1", 0, 20), ("W1", 20, 30), ("F2", 30, 50), ("W2", 50, 60), ("F3", 60, 80), ("W3", 80, 90), ("F4", 90, 110)]   # seconds; the visible clock counts 1:50 -> 0:00
+PHASES = [("F1", 0, 20), ("W1", 20, 30), ("F2", 30, 50), ("W2", 50, 60), ("F3", 60, 80), ("W3", 80, 90), ("F4", 90, 110), ("W4", 110, 120)]
+# v1.2: 4 rounds of (Fair 20 s + Wipeout 10 s) = 2:00 of play; a MINI-REPORT pause after each round (the game clock stops).
+# The fair phase after each report is the recovery window (F2-F4). Times are on the game clock, excluding the report pauses.
 POST = [n for n, _, _ in PHASES if n.startswith("F") and n != "F1"]   # the fair phases that follow a wipeout
 FAIR = dict(sun_every=0.5, sun_life=1.6, cloud_every=4.0, cloud_life=1.6)
-WIPE = dict(min_rate=4.0, adapt=2.5, sun_life=0.8, cloud_share=0.3)
-PTS = dict(hit=10, fade=-3, miss=-15)
+WIPE = dict(min_rate=7.0, adapt=4.5, sun_life=0.6, cloud_share=0.25)   # v1.2: tuned so every skill level nets ~0 or less per round (tapping-ceiling model)
+PTS = dict(hit=10, fade=-10, miss=-15)   # v1.2: a missed sun costs as much as a caught one (was -3), so sitting out a wipeout never protects points
 EARLY = 8.0   # seconds: the "shock" window at the start of Fair 2 and Fair 3
 def schedule(seed=2026, f1_hit_rate=None):
     """Fair phases: a fixed, seeded schedule (identical for everyone). Wipeouts: rate = max(min_rate, adapt * f1_hit_rate) targets/s."""
@@ -33,6 +35,12 @@ def phase_of(t):
     for n, a, b in PHASES:
         if a <= t < b: return n
     return None
+def round_report(taps, fades, n):
+    """the mini-report after round n (1-4): points gained, lost to fades, lost to mis-taps, and the score line (for the chart)."""
+    a, b = (n - 1) * 30, n * 30
+    g = sum(PTS["hit"] for tp in taps if tp[1] == "hit" and a <= tp[0] < b); m = sum(PTS["miss"] for tp in taps if tp[1] == "miss" and a <= tp[0] < b)
+    f = sum(PTS["fade"] for t in fades if a <= t < b)
+    return dict(round=n, gained=g, lostFaded=f, lostMisTaps=m, net=g + f + m)
 def score_round(taps, fades, sched, quit_at=None):
     """taps: [(t, 'hit', spawn_t) | (t, 'miss', None)], fades: [t]; sched: the schedule that was played.
     Display score = points (feel). MEASURES use the Fair phases only: accuracy (hits / suns shown) and reaction time (tap - spawn)."""

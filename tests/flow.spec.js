@@ -319,6 +319,42 @@ test('alpha #35: resume as a returning user, a busy server, DEV button + Report 
   expect(errors).toEqual([]);
 });
 
+test('alpha #35 regression (Game Ideas): 2 casual games → Apply → a full registered run with the DEV button and Report a problem', async ({ page }, info) => {
+  test.skip(!LIVE || info.project.name !== 'desktop', 'needs the Apps Script harness; run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  const E3 = 'casual.then.apply@example.com', P3 = '+60170000003', ID = `${E3}|${P3}`;
+  await page.goto('/' + Q + 'speed=10');
+  await reset(page);
+  await page.click('#btn-casual');
+  for (let g = 0; g < 2; g++) {
+    await expect(page.locator('#btn-start')).toBeVisible({ timeout: 20_000 });
+    const bot = await botFor(page); await page.click('#btn-start'); await playRound(page, bot);
+    await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 }); await page.click('#btn-continue');
+  }
+  await page.waitForTimeout(3500); await page.reload(); // leaves play-for-fun, then applies from the home screen
+  await page.click('#btn-apply'); await page.click('#btn-new');
+  await page.fill('#f-name', 'Casual Then Apply'); await page.fill('#f-email', E3); await page.fill('#f-phone', P3);
+  await page.click('#f-type >> text=Full-time'); await page.click('#f-dept >> text=Sales'); await page.check('#f-consent');
+  await page.click('#btn-register');
+  await expect(page.locator('#btn-start')).toBeVisible();
+  await page.click('#btn-start'); await playRound(page, await botFor(page));
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+  await playRest(page);
+  await expect(page.locator('#btn-restart')).toBeVisible(); // the final report loads
+  await page.click('#tn-report-problem'); await page.click('#tn-problem-3'); // reports the tool…
+  await page.click('#tn-eth-btn'); const inp = page.locator('.tn-eth__in').first(); await inp.fill(String(Number(await inp.inputValue()) + 60)); await page.click('#tn-eth-confirm'); // …then inflates anyway
+  await page.waitForTimeout(4000);
+  await fetch(GAS + '/__run/refreshSummary');
+  const { sheets } = await (await fetch(GAS + '/__dump')).json();
+  const S = sheets.Scores, row = S.find((r) => r[3] === ID), g = (k) => row[S[0].indexOf(k)];
+  for (const t of ['organisation', 'resilience', 'judgement', 'critical', 'creative', 'communication', 'risk']) expect(g(t), t).not.toBe(''); // every trait is scored
+  expect(g('ethicsGate')).toBe('flag'); expect(g('ethicsDetail')).toMatch(/reported Y/);
+  expect(g('practisedNote')).toMatch(/practised before/); // only the 2 practised games' learning parts are n/a
+  expect(sheets['Candidate Summary'].some((r) => r[0] === ID)).toBeTruthy();
+  expect(sheets.Interactions.slice(1).some((r) => r[1] === ID && r[6] === 'eth_report_problem')).toBeTruthy();
+  expect(errors).toEqual([]);
+});
+
 test('casual: play for fun → straight to games, logged as Casual User with no PII', async ({ page }, info) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -714,14 +750,14 @@ test('big calls: wise = 100 on Form A; Check shows strength + cost and hides aft
   // practice P1: deciding without the (worth-it) strong check twice → fail-safe guides the player
   await S('(s) => s.choose(1)'); await page.waitForTimeout(600);
   await S('(s) => s.choose(1)'); await page.waitForTimeout(600);
-  expect(await S('(s) => [s.failSafe, s.lastSay]')).toEqual([true, 'Tap Check: this one is worth a look.']);
+  expect(await S('(s) => [s.failSafe, s.lastSay]')).toEqual([true, 'Tap Ask: this one is worth asking about.']);
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-jd-practice.png` });
   await playRound(page, 'jd');
   await expect(page.locator('#btn-start')).toBeVisible({ timeout: 30_000 });
   await page.click('#btn-start');
   await page.waitForFunction(() => window.__tnGame.scene.getScenes(true).some((x) => x.scene.key === 'mod:big-calls' && x.running && x.cs), null, { timeout: 30_000 });
-  // A01 (worth 20, not urgent): the button names the next clue's strength and cost, and hides after 3 checks
-  expect(await S('(s) => s.checkBtn.list[1].list[1].text')).toBe('Check · weak clue · −2');
+  // A01: the button names who you'd ask next and the cost (request #38)
+  expect(await S('(s) => s.checkBtn.list[1].list[1].text')).toBe('👁 Ask someone who saw it · −2');
   if (shots) await page.screenshot({ path: `test-results/${info.project.name}-jd-call.png` });
   await playRound(page, 'jd');
   await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 60_000 });

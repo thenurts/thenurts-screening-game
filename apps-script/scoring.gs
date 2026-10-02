@@ -427,8 +427,10 @@ var NurtsScoring = (function(exports) {
 		}, 0);
 		const askScore = .7 * mean$4(gapScores) + .3 * Math.max(0, 1 - unneededAsks / 8);
 		const t6 = byTurn[6];
-		const repairQuality = t6 ? repairOf(t6.words, t6.fix) : 0;
-		const commScore = Math.round(100 * (WEIGHTS.meaning * meaningRate + WEIGHTS.adaptation * adaptation + WEIGHTS.ask * askScore + WEIGHTS.efficiency * efficiency + WEIGHTS.repair * repairQuality));
+		const repairNa = !!t6 && !t6.pass && t6.fix == null;
+		const repairQuality = repairNa ? null : t6 ? repairOf(t6.words, t6.fix) : 0;
+		const parts = WEIGHTS.meaning * meaningRate + WEIGHTS.adaptation * adaptation + WEIGHTS.ask * askScore + WEIGHTS.efficiency * efficiency;
+		const commScore = Math.round(100 * (repairNa ? parts / (1 - WEIGHTS.repair) : parts + WEIGHTS.repair * repairQuality));
 		const flags = [];
 		if (idleNudges >= 3) flags.push("idle");
 		if (restartedAfterSetback) flags.push("restartedAfterSetback");
@@ -6484,8 +6486,8 @@ var NurtsScoring = (function(exports) {
 		});
 	}
 	var content_default = {
-		version: "1.1",
-		date: "2026-09-27",
+		version: "1.2",
+		date: "2026-10-02",
 		model: {
 			"arrowWeight": .4895,
 			"checkCost": {
@@ -6498,650 +6500,9 @@ var NurtsScoring = (function(exports) {
 				20,
 				30
 			],
-			"note": "One currency: points. A check reveals the next clue; its strength (weak = 1 arrow, strong = 2) is shown on the Check button first. Ex-ante best = the side with more arrows (live tally). A tie means either is fine."
+			"note": "v1.2: no tally. 👁 'saw it' (first-hand) = 2 arrows of weight; 👂 'heard it' (second-hand/old) = 1. Ex-ante best = the weighted sum of what the player has seen. The Check button names the next source type. Stakes are shown as kids affected (10/20/30)."
 		},
-		forms: {
-			"A": [
-				{
-					"id": "A01",
-					"situation": "Relay race today: field or hall?",
-					"options": {
-						"L": "Field",
-						"R": "Hall"
-					},
-					"worth": 20,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "L",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Mia heard",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Teacher",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Last year",
-							"strength": 2,
-							"points": "R"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "A02",
-					"situation": "Class party: 20 or 30 pizzas?",
-					"options": {
-						"L": "20 pizzas",
-						"R": "30 pizzas"
-					},
-					"worth": 10,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "L",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Teacher",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Weather app",
-							"strength": 2,
-							"points": "L"
-						},
-						{
-							"label": "Janitor",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "A03",
-					"situation": "Tour bus: North or South gate?",
-					"options": {
-						"L": "North",
-						"R": "South"
-					},
-					"worth": 10,
-					"urgent": true,
-					"firstClue": {
-						"arrows": 1,
-						"points": "R",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Mia heard",
-							"strength": 2,
-							"points": "R"
-						},
-						{
-							"label": "Office note",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Raj thinks",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "R"
-				},
-				{
-					"id": "A04",
-					"situation": "Bake sale: cupcakes or cookies first?",
-					"options": {
-						"L": "Cupcakes",
-						"R": "Cookies"
-					},
-					"worth": 30,
-					"urgent": true,
-					"firstClue": {
-						"arrows": 1,
-						"points": "R",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Class chat",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Office note",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Sign-up sheet",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "A05",
-					"situation": "Posters: print 50 or 100?",
-					"options": {
-						"L": "50",
-						"R": "100"
-					},
-					"worth": 10,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "L",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Weather app",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Teacher",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Poll",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "A06",
-					"situation": "Lost hall key: classroom or gym?",
-					"options": {
-						"L": "Classroom",
-						"R": "Gym"
-					},
-					"worth": 30,
-					"urgent": false,
-					"firstClue": null,
-					"clues": [
-						{
-							"label": "Teacher",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Raj thinks",
-							"strength": 2,
-							"points": "L"
-						},
-						{
-							"label": "Weather app",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "A07",
-					"situation": "Movie night: start at 7 or 8?",
-					"options": {
-						"L": "7 pm",
-						"R": "8 pm"
-					},
-					"worth": 30,
-					"urgent": false,
-					"firstClue": null,
-					"clues": [
-						{
-							"label": "Last year",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Survey",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Survey",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "R"
-				},
-				{
-					"id": "A08",
-					"situation": "Prize stall: books or games?",
-					"options": {
-						"L": "Books",
-						"R": "Games"
-					},
-					"worth": 30,
-					"urgent": true,
-					"firstClue": null,
-					"clues": [
-						{
-							"label": "Raj thinks",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Class chat",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Raj thinks",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "R"
-				},
-				{
-					"id": "A09",
-					"situation": "Photo day: morning or afternoon?",
-					"options": {
-						"L": "Morning",
-						"R": "Afternoon"
-					},
-					"worth": 30,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "R",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Mia heard",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Class chat",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Noah saw",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "R"
-				},
-				{
-					"id": "A10",
-					"situation": "Talent show opener: choir or band?",
-					"options": {
-						"L": "Choir",
-						"R": "Band"
-					},
-					"worth": 30,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "R",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Weather app",
-							"strength": 2,
-							"points": "R"
-						},
-						{
-							"label": "Weather app",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Sign-up sheet",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "R"
-				}
-			],
-			"B": [
-				{
-					"id": "B01",
-					"situation": "Craft corner: paint or clay?",
-					"options": {
-						"L": "Paint",
-						"R": "Clay"
-					},
-					"worth": 30,
-					"urgent": true,
-					"firstClue": {
-						"arrows": 1,
-						"points": "L",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Class chat",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Office note",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Sign-up sheet",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "R"
-				},
-				{
-					"id": "B02",
-					"situation": "Class trip: museum or zoo?",
-					"options": {
-						"L": "Museum",
-						"R": "Zoo"
-					},
-					"worth": 30,
-					"urgent": true,
-					"firstClue": null,
-					"clues": [
-						{
-							"label": "Raj thinks",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Class chat",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Raj thinks",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "B03",
-					"situation": "Club snacks: buns or fruit?",
-					"options": {
-						"L": "Buns",
-						"R": "Fruit"
-					},
-					"worth": 10,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "R",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Teacher",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Weather app",
-							"strength": 2,
-							"points": "R"
-						},
-						{
-							"label": "Janitor",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "R"
-				},
-				{
-					"id": "B04",
-					"situation": "Fun fair ride: swings or slide first?",
-					"options": {
-						"L": "Swings",
-						"R": "Slide"
-					},
-					"worth": 30,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "L",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Weather app",
-							"strength": 2,
-							"points": "L"
-						},
-						{
-							"label": "Weather app",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Sign-up sheet",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "B05",
-					"situation": "Missing ball: store room or field?",
-					"options": {
-						"L": "Store room",
-						"R": "Field"
-					},
-					"worth": 30,
-					"urgent": false,
-					"firstClue": null,
-					"clues": [
-						{
-							"label": "Teacher",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Raj thinks",
-							"strength": 2,
-							"points": "R"
-						},
-						{
-							"label": "Weather app",
-							"strength": 1,
-							"points": "R"
-						}
-					],
-					"outcome": "R"
-				},
-				{
-					"id": "B06",
-					"situation": "Sports day photo: field or steps?",
-					"options": {
-						"L": "Field",
-						"R": "Steps"
-					},
-					"worth": 20,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "R",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Mia heard",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Teacher",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Last year",
-							"strength": 2,
-							"points": "L"
-						}
-					],
-					"outcome": "R"
-				},
-				{
-					"id": "B07",
-					"situation": "Choir practice: Monday or Tuesday?",
-					"options": {
-						"L": "Monday",
-						"R": "Tuesday"
-					},
-					"worth": 30,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "L",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Mia heard",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Class chat",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Noah saw",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "B08",
-					"situation": "Pick-up point: main or side door?",
-					"options": {
-						"L": "Main door",
-						"R": "Side door"
-					},
-					"worth": 10,
-					"urgent": true,
-					"firstClue": {
-						"arrows": 1,
-						"points": "L",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Mia heard",
-							"strength": 2,
-							"points": "L"
-						},
-						{
-							"label": "Office note",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Raj thinks",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "B09",
-					"situation": "Quiz night: 12 or 16 teams?",
-					"options": {
-						"L": "12 teams",
-						"R": "16 teams"
-					},
-					"worth": 30,
-					"urgent": false,
-					"firstClue": null,
-					"clues": [
-						{
-							"label": "Last year",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Survey",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Survey",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "L"
-				},
-				{
-					"id": "B10",
-					"situation": "Flyers: hand out or pin up?",
-					"options": {
-						"L": "Hand out",
-						"R": "Pin up"
-					},
-					"worth": 10,
-					"urgent": false,
-					"firstClue": {
-						"arrows": 1,
-						"points": "R",
-						"label": "First word"
-					},
-					"clues": [
-						{
-							"label": "Weather app",
-							"strength": 1,
-							"points": "R"
-						},
-						{
-							"label": "Teacher",
-							"strength": 1,
-							"points": "L"
-						},
-						{
-							"label": "Poll",
-							"strength": 1,
-							"points": "L"
-						}
-					],
-					"outcome": "R"
-				}
-			]
-		},
+		forms: /* @__PURE__ */ JSON.parse("{\"A\":[{\"id\":\"A01\",\"situation\":\"Relay race today: field or hall?\",\"options\":{\"L\":\"Field\",\"R\":\"Hall\"},\"kidsAffected\":30,\"urgent\":false,\"startClues\":[{\"source\":\"Official timetable\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Official timetable: \\\"Field\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Liam heard: \\\"Hall\\\"\"}],\"clues\":[{\"source\":\"Caretaker saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Caretaker saw: \\\"Hall\\\"\"},{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Last year's notes: \\\"Field\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Liam heard: \\\"Hall\\\"\"}],\"outcome\":\"R\"},{\"id\":\"A02\",\"situation\":\"Class party: 20 or 30 pizzas?\",\"options\":{\"L\":\"20 pizzas\",\"R\":\"30 pizzas\"},\"kidsAffected\":10,\"urgent\":false,\"startClues\":[{\"source\":\"Noah saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Noah saw: \\\"30 pizzas\\\"\"}],\"clues\":[{\"source\":\"Office notice\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Office notice: \\\"30 pizzas\\\"\"},{\"source\":\"Booking email\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Booking email: \\\"30 pizzas\\\"\"},{\"source\":\"Amira guesses\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Amira guesses: \\\"30 pizzas\\\"\"}],\"outcome\":\"R\"},{\"id\":\"A03\",\"situation\":\"Tour bus: North or South gate?\",\"options\":{\"L\":\"North\",\"R\":\"South\"},\"kidsAffected\":30,\"urgent\":false,\"startClues\":[{\"source\":\"Teacher saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Teacher saw: \\\"North\\\"\"},{\"source\":\"Mia thinks\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Mia thinks: \\\"South\\\"\"}],\"clues\":[{\"source\":\"Sign-up sheet\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Sign-up sheet: \\\"South\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Liam heard: \\\"North\\\"\"},{\"source\":\"Teacher saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Teacher saw: \\\"North\\\"\"}],\"outcome\":\"L\"},{\"id\":\"A04\",\"situation\":\"Bake sale: cupcakes or cookies first?\",\"options\":{\"L\":\"Cupcakes\",\"R\":\"Cookies\"},\"kidsAffected\":10,\"urgent\":false,\"startClues\":[{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Class chat rumour: \\\"Cookies\\\"\"}],\"clues\":[{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Class chat rumour: \\\"Cupcakes\\\"\"},{\"source\":\"Raj heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Raj heard: \\\"Cupcakes\\\"\"},{\"source\":\"Mia thinks\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Mia thinks: \\\"Cupcakes\\\"\"}],\"outcome\":\"L\"},{\"id\":\"A05\",\"situation\":\"Posters: print 50 or 100?\",\"options\":{\"L\":\"50\",\"R\":\"100\"},\"kidsAffected\":20,\"urgent\":true,\"startClues\":[{\"source\":\"Booking email\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Booking email: \\\"100\\\"\"},{\"source\":\"Someone said\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Someone said: \\\"50\\\"\"}],\"clues\":[{\"source\":\"Sign-up sheet\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Sign-up sheet: \\\"100\\\"\"},{\"source\":\"Raj heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Raj heard: \\\"50\\\"\"},{\"source\":\"Official timetable\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Official timetable: \\\"50\\\"\"}],\"outcome\":\"R\"},{\"id\":\"A06\",\"situation\":\"Lost hall key: classroom or gym?\",\"options\":{\"L\":\"Classroom\",\"R\":\"Gym\"},\"kidsAffected\":10,\"urgent\":true,\"startClues\":[],\"clues\":[{\"source\":\"Driver's text\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Driver's text: \\\"Classroom\\\"\"},{\"source\":\"Caretaker saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Caretaker saw: \\\"Classroom\\\"\"},{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Class chat rumour: \\\"Classroom\\\"\"}],\"outcome\":\"L\"},{\"id\":\"A07\",\"situation\":\"Movie night: start at 7 or 8?\",\"options\":{\"L\":\"7 pm\",\"R\":\"8 pm\"},\"kidsAffected\":30,\"urgent\":true,\"startClues\":[{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Last year's notes: \\\"7 pm\\\"\"},{\"source\":\"Office notice\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Office notice: \\\"8 pm\\\"\"}],\"clues\":[{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Last year's notes: \\\"7 pm\\\"\"},{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Last year's notes: \\\"7 pm\\\"\"},{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Class chat rumour: \\\"7 pm\\\"\"}],\"outcome\":\"L\"},{\"id\":\"A08\",\"situation\":\"Prize stall: books or games?\",\"options\":{\"L\":\"Books\",\"R\":\"Games\"},\"kidsAffected\":20,\"urgent\":false,\"startClues\":[{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Class chat rumour: \\\"Books\\\"\"}],\"clues\":[{\"source\":\"Driver's text\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Driver's text: \\\"Books\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Liam heard: \\\"Games\\\"\"},{\"source\":\"Booking email\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Booking email: \\\"Books\\\"\"}],\"outcome\":\"L\"},{\"id\":\"A09\",\"situation\":\"Photo day: morning or afternoon?\",\"options\":{\"L\":\"Morning\",\"R\":\"Afternoon\"},\"kidsAffected\":30,\"urgent\":true,\"startClues\":[{\"source\":\"Teacher saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Teacher saw: \\\"Afternoon\\\"\"},{\"source\":\"Raj heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Raj heard: \\\"Morning\\\"\"}],\"clues\":[{\"source\":\"Booking email\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Booking email: \\\"Afternoon\\\"\"},{\"source\":\"Someone said\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Someone said: \\\"Afternoon\\\"\"},{\"source\":\"Caretaker saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Caretaker saw: \\\"Afternoon\\\"\"}],\"outcome\":\"R\"},{\"id\":\"A10\",\"situation\":\"Talent show opener: choir or band?\",\"options\":{\"L\":\"Choir\",\"R\":\"Band\"},\"kidsAffected\":30,\"urgent\":false,\"startClues\":[{\"source\":\"Noah saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Noah saw: \\\"Choir\\\"\"},{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Class chat rumour: \\\"Band\\\"\"}],\"clues\":[{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Last year's notes: \\\"Band\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Liam heard: \\\"Choir\\\"\"},{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Last year's notes: \\\"Band\\\"\"}],\"outcome\":\"L\"}],\"B\":[{\"id\":\"B01\",\"situation\":\"Craft corner: paint or clay?\",\"options\":{\"L\":\"Paint\",\"R\":\"Clay\"},\"kidsAffected\":10,\"urgent\":false,\"startClues\":[{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Class chat rumour: \\\"Paint\\\"\"}],\"clues\":[{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Class chat rumour: \\\"Clay\\\"\"},{\"source\":\"Raj heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Raj heard: \\\"Clay\\\"\"},{\"source\":\"Mia thinks\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Mia thinks: \\\"Clay\\\"\"}],\"outcome\":\"R\"},{\"id\":\"B02\",\"situation\":\"Class trip: museum or zoo?\",\"options\":{\"L\":\"Museum\",\"R\":\"Zoo\"},\"kidsAffected\":20,\"urgent\":false,\"startClues\":[{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Class chat rumour: \\\"Zoo\\\"\"}],\"clues\":[{\"source\":\"Driver's text\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Driver's text: \\\"Zoo\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Liam heard: \\\"Museum\\\"\"},{\"source\":\"Booking email\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Booking email: \\\"Zoo\\\"\"}],\"outcome\":\"R\"},{\"id\":\"B03\",\"situation\":\"Club snacks: buns or fruit?\",\"options\":{\"L\":\"Buns\",\"R\":\"Fruit\"},\"kidsAffected\":10,\"urgent\":false,\"startClues\":[{\"source\":\"Noah saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Noah saw: \\\"Buns\\\"\"}],\"clues\":[{\"source\":\"Office notice\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Office notice: \\\"Buns\\\"\"},{\"source\":\"Booking email\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Booking email: \\\"Buns\\\"\"},{\"source\":\"Amira guesses\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Amira guesses: \\\"Buns\\\"\"}],\"outcome\":\"L\"},{\"id\":\"B04\",\"situation\":\"Fun fair ride: swings or slide first?\",\"options\":{\"L\":\"Swings\",\"R\":\"Slide\"},\"kidsAffected\":30,\"urgent\":false,\"startClues\":[{\"source\":\"Noah saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Noah saw: \\\"Slide\\\"\"},{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Class chat rumour: \\\"Swings\\\"\"}],\"clues\":[{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Last year's notes: \\\"Swings\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Liam heard: \\\"Slide\\\"\"},{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Last year's notes: \\\"Swings\\\"\"}],\"outcome\":\"R\"},{\"id\":\"B05\",\"situation\":\"Missing ball: store room or field?\",\"options\":{\"L\":\"Store room\",\"R\":\"Field\"},\"kidsAffected\":10,\"urgent\":true,\"startClues\":[],\"clues\":[{\"source\":\"Driver's text\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Driver's text: \\\"Field\\\"\"},{\"source\":\"Caretaker saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Caretaker saw: \\\"Field\\\"\"},{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Class chat rumour: \\\"Field\\\"\"}],\"outcome\":\"R\"},{\"id\":\"B06\",\"situation\":\"Sports day photo: field or steps?\",\"options\":{\"L\":\"Field\",\"R\":\"Steps\"},\"kidsAffected\":30,\"urgent\":false,\"startClues\":[{\"source\":\"Official timetable\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Official timetable: \\\"Steps\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Liam heard: \\\"Field\\\"\"}],\"clues\":[{\"source\":\"Caretaker saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Caretaker saw: \\\"Field\\\"\"},{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Last year's notes: \\\"Steps\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Liam heard: \\\"Field\\\"\"}],\"outcome\":\"L\"},{\"id\":\"B07\",\"situation\":\"Choir practice: Monday or Tuesday?\",\"options\":{\"L\":\"Monday\",\"R\":\"Tuesday\"},\"kidsAffected\":30,\"urgent\":true,\"startClues\":[{\"source\":\"Teacher saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Teacher saw: \\\"Monday\\\"\"},{\"source\":\"Raj heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Raj heard: \\\"Tuesday\\\"\"}],\"clues\":[{\"source\":\"Booking email\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Booking email: \\\"Monday\\\"\"},{\"source\":\"Someone said\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Someone said: \\\"Monday\\\"\"},{\"source\":\"Caretaker saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Caretaker saw: \\\"Monday\\\"\"}],\"outcome\":\"L\"},{\"id\":\"B08\",\"situation\":\"Pick-up point: main or side door?\",\"options\":{\"L\":\"Main door\",\"R\":\"Side door\"},\"kidsAffected\":30,\"urgent\":false,\"startClues\":[{\"source\":\"Teacher saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Teacher saw: \\\"Side door\\\"\"},{\"source\":\"Mia thinks\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"L\",\"text\":\"Mia thinks: \\\"Main door\\\"\"}],\"clues\":[{\"source\":\"Sign-up sheet\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Sign-up sheet: \\\"Main door\\\"\"},{\"source\":\"Liam heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Liam heard: \\\"Side door\\\"\"},{\"source\":\"Teacher saw\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Teacher saw: \\\"Side door\\\"\"}],\"outcome\":\"R\"},{\"id\":\"B09\",\"situation\":\"Quiz night: 12 or 16 teams?\",\"options\":{\"L\":\"12 teams\",\"R\":\"16 teams\"},\"kidsAffected\":30,\"urgent\":true,\"startClues\":[{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Last year's notes: \\\"16 teams\\\"\"},{\"source\":\"Office notice\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Office notice: \\\"12 teams\\\"\"}],\"clues\":[{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Last year's notes: \\\"16 teams\\\"\"},{\"source\":\"Last year's notes\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Last year's notes: \\\"16 teams\\\"\"},{\"source\":\"Class chat rumour\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Class chat rumour: \\\"16 teams\\\"\"}],\"outcome\":\"R\"},{\"id\":\"B10\",\"situation\":\"Flyers: hand out or pin up?\",\"options\":{\"L\":\"Hand out\",\"R\":\"Pin up\"},\"kidsAffected\":20,\"urgent\":true,\"startClues\":[{\"source\":\"Booking email\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Booking email: \\\"Hand out\\\"\"},{\"source\":\"Someone said\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Someone said: \\\"Pin up\\\"\"}],\"clues\":[{\"source\":\"Sign-up sheet\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"L\",\"text\":\"Sign-up sheet: \\\"Hand out\\\"\"},{\"source\":\"Raj heard\",\"kind\":\"heard it\",\"icon\":\"👂\",\"strength\":1,\"points\":\"R\",\"text\":\"Raj heard: \\\"Pin up\\\"\"},{\"source\":\"Official timetable\",\"kind\":\"saw it\",\"icon\":\"👁\",\"strength\":2,\"points\":\"R\",\"text\":\"Official timetable: \\\"Pin up\\\"\"}],\"outcome\":\"L\"}]}"),
 		practice: [{
 			"id": "P1",
 			"situation": "Sports day relay: field or hall?",
@@ -7149,28 +6510,37 @@ var NurtsScoring = (function(exports) {
 				"L": "Field",
 				"R": "Hall"
 			},
-			"worth": 30,
+			"kidsAffected": 30,
 			"urgent": false,
-			"firstClue": null,
+			"startClues": [],
 			"clues": [
 				{
-					"label": "Weather app",
+					"source": "Caretaker saw",
+					"kind": "saw it",
+					"icon": "👁",
 					"strength": 2,
-					"points": "R"
+					"points": "R",
+					"text": "Caretaker saw: \"Hall\""
 				},
 				{
-					"label": "Janitor",
+					"source": "Janitor heard",
+					"kind": "heard it",
+					"icon": "👂",
 					"strength": 1,
-					"points": "R"
+					"points": "R",
+					"text": "Janitor heard: \"Hall\""
 				},
 				{
-					"label": "Sky",
+					"source": "Someone said",
+					"kind": "heard it",
+					"icon": "👂",
 					"strength": 1,
-					"points": "L"
+					"points": "L",
+					"text": "Someone said: \"Field\""
 				}
 			],
 			"outcome": "R",
-			"teach": "Worth 30, a tie, strong clue next: checking is worth it."
+			"teach": "Affects 30 kids, a tie, and the next source saw it: asking is worth it."
 		}, {
 			"id": "P2",
 			"situation": "Snack table: left or right corner?",
@@ -7178,33 +6548,50 @@ var NurtsScoring = (function(exports) {
 				"L": "Left",
 				"R": "Right"
 			},
-			"worth": 10,
+			"kidsAffected": 10,
 			"urgent": true,
-			"firstClue": {
-				"arrows": 1,
+			"startClues": [{
+				"source": "Mia thinks",
+				"kind": "heard it",
+				"icon": "👂",
+				"strength": 1,
 				"points": "L",
-				"label": "Mia thinks"
-			},
+				"text": "Mia thinks: \"Left\""
+			}],
 			"clues": [
 				{
-					"label": "Class chat",
+					"source": "Class chat rumour",
+					"kind": "heard it",
+					"icon": "👂",
 					"strength": 1,
-					"points": "R"
+					"points": "R",
+					"text": "Class chat rumour: \"Right\""
 				},
 				{
-					"label": "Poll",
+					"source": "Raj heard",
+					"kind": "heard it",
+					"icon": "👂",
 					"strength": 1,
-					"points": "L"
+					"points": "L",
+					"text": "Raj heard: \"Left\""
 				},
 				{
-					"label": "Noah saw",
+					"source": "Liam heard",
+					"kind": "heard it",
+					"icon": "👂",
 					"strength": 1,
-					"points": "L"
+					"points": "L",
+					"text": "Liam heard: \"Left\""
 				}
 			],
 			"outcome": "L",
-			"teach": "Worth 10, urgent (a check costs 6), weak clue next: checking costs more than it can win. Just decide."
-		}]
+			"teach": "Affects 10 kids, urgent (asking costs 6), and the next source only heard it: asking costs more than it can win. Just decide."
+		}],
+		consequenceLines: {
+			"right": "Good call: {kids} kids were happy.",
+			"wrongSmart": "Unlucky! {kids} kids waited. But that was the smart call.",
+			"wrong": "{kids} kids waited at the wrong place."
+		}
 	};
 	//#endregion
 	//#region src/modules/big-calls/rules.js
@@ -7218,13 +6605,15 @@ var NurtsScoring = (function(exports) {
 	var dir = (p) => p === "L" ? 1 : -1;
 	/** A content card → the reference's call shape. */
 	function toCall(c) {
+		var _c$kidsAffected;
+		const start = c.startClues || [];
 		return {
 			id: c.id,
-			worth: c.worth,
+			worth: (_c$kidsAffected = c.kidsAffected) !== null && _c$kidsAffected !== void 0 ? _c$kidsAffected : c.worth,
 			urgent: !!c.urgent,
-			first: c.firstClue ? c.firstClue.arrows * dir(c.firstClue.points) : 0,
+			first: start.reduce((a, k) => a + k.strength * dir(k.points), 0),
 			clues: c.clues.map((k) => [
-				k.label,
+				k.source,
 				k.strength,
 				dir(k.points)
 			]),
@@ -7325,7 +6714,8 @@ var NurtsScoring = (function(exports) {
 		rederive: () => rederive$1
 	});
 	var primaryKey$1 = "judgementScore";
-	function rederive$1(m) {
+	function rederive$1(m, version) {
+		if (version != null && Number(version) < 3) return null;
 		if (typeof (m === null || m === void 0 ? void 0 : m.callLog) !== "string" || !["A", "B"].includes(m.form)) return null;
 		const calls = Object.fromEntries(callsOf(m.form).map((c) => [c.id, c]));
 		const log = [];
@@ -7382,6 +6772,11 @@ var NurtsScoring = (function(exports) {
 			"F4",
 			90,
 			110
+		],
+		[
+			"W4",
+			110,
+			120
 		]
 	];
 	var POST = PHASES.filter(([n]) => n[0] === "F" && n !== "F1").map(([n]) => n);
@@ -7392,14 +6787,14 @@ var NurtsScoring = (function(exports) {
 		cloud_life: 1.6
 	};
 	var WIPE = {
-		min_rate: 4,
-		adapt: 2.5,
-		sun_life: .8,
-		cloud_share: .3
+		min_rate: 7,
+		adapt: 4.5,
+		sun_life: .6,
+		cloud_share: .25
 	};
 	var PTS = {
 		hit: 10,
-		fade: -3,
+		fade: -10,
 		miss: -15
 	};
 	var OFFICIAL_SEED = 2026;
@@ -7588,7 +6983,8 @@ var NurtsScoring = (function(exports) {
 		rederive: () => rederive
 	});
 	var primaryKey = "resilienceScore";
-	function rederive(m) {
+	function rederive(m, version) {
+		if (version != null && Number(version) < 3) return null;
 		if (typeof (m === null || m === void 0 ? void 0 : m.tapLog) !== "string" || !m.seed) return null;
 		return scoreRound(m.tapLog.split(" ").filter(Boolean).map((s) => {
 			const x = /^([\d.]+)(?:h([\d.]+)|m)$/.exec(s);
@@ -8124,7 +7520,7 @@ var NurtsScoring = (function(exports) {
 		};
 		let rd = null;
 		try {
-			rd = a.rederive ? a.rederive(m) : null;
+			rd = a.rederive ? a.rederive(m, r.moduleVersion) : null;
 		} catch (_unused) {
 			rd = null;
 		}

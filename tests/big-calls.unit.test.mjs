@@ -5,7 +5,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CONTENT, BOTS, run, metrics, voi, callsOf, newCall, check, decide, stateOf, MAX_CHECKS } from '../src/modules/big-calls/rules.js';
+import { CONTENT, BOTS, WEIGHING, run12, metrics, voi, callsOf, newCall, check, decide, stateOf, MAX_CHECKS } from '../src/modules/big-calls/rules.js';
+import { PyRandom } from '../src/modules/sunny-tap/rules.js'; // tests only: Python's random.Random, for the reference's coin-flip ties
 
 const py = (t, args) => { try { return execFileSync('python3', args, { encoding: 'utf8' }); } catch (e) { if (e.code === 'ENOENT') { t.skip('python3 not installed'); return null; } throw e; } };
 const FX = JSON.parse(readFileSync('tests/fixtures/judgement-parity.json', 'utf8'));
@@ -25,14 +26,16 @@ test('content.json is exactly what the reference generates, and converts back to
 test('JS voi matches the reference on a 108-point grid', () => {
   for (const [w, n, s, u, v] of FX.voi) assert.ok(Math.abs(voi(w, n, s, u) - v) < 1e-9, `voi(${w},${n},${s},${u})`);
 });
-test('JS run + metrics match the reference for all 12 bots × both forms', () => {
-  assert.equal(FX.runs.length, 24);
+/** Python's random.Random(seed).choice([1, -1]), call after call. */
+const pyTie = (seed) => { const r = new PyRandom(seed); return () => { let x; do x = r.u32() >>> 30; while (x >= 2); return [1, -1][x]; }; };
+test('JS run12 + metrics match the reference: 12 checking bots × 5 ways of weighing × 2 forms × 3 tie seeds', () => {
+  assert.equal(FX.runs.length, 360);
   for (const r of FX.runs) {
-    const log = run(BOTS[r.bot], r.form);
-    assert.deepEqual(log, r.log, `${r.form} ${r.bot} log`);
-    assert.deepEqual(metrics(log), r.metrics, `${r.form} ${r.bot} metrics`);
+    const log = run12(BOTS[r.bot], WEIGHING[r.decider], r.form, pyTie(r.seed));
+    assert.deepEqual(log, r.log, `${r.form} ${r.bot} / ${r.decider} / ${r.seed} log`);
+    assert.deepEqual(metrics(log), r.metrics, `${r.form} ${r.bot} / ${r.decider} metrics`);
   }
-  for (const f of ['A', 'B']) assert.equal(metrics(run(BOTS.wise, f)).judgementScore, 100);
+  for (const f of ['A', 'B']) assert.equal(metrics(run12(BOTS.wise, WEIGHING['weigh properly'], f)).judgementScore, 100);
 });
 test('practice calls teach what they say; the Check button hides after 3; the Smart-call verdict ignores luck', () => {
   const [p1, p2] = callsOf('P');
@@ -41,9 +44,12 @@ test('practice calls teach what they say; the Check button hides after 3; the Sm
   const b = newCall(p2); assert.equal(check(b).verdict, false, 'P2: an urgent weak check is wasted');
   const c = newCall(callsOf('A')[0]); for (let i = 0; i < MAX_CHECKS; i++) check(c);
   assert.equal(stateOf(c).left, 0); assert.equal(check(c), null);
-  // A04: the tally favours Cookies (R) but the outcome is Cupcakes (L): following the tally is unlucky but correct ex ante
+  // A04: the face-up rumour says Cookies (R) but the outcome is Cupcakes (L): following the evidence is unlucky but correct ex ante
   const d = newCall(callsOf('A')[3]); const e = decide(d, -1);
   assert.equal(e.correctExAnte, true); assert.equal(e.won, false); assert.equal(e.points, 0);
   const f = newCall(callsOf('A')[3]); check(f); const g = decide(f, 1);
-  assert.equal(g.won, true); assert.equal(g.points, 24, 'worth 30 − an urgent check (6)'); assert.equal(g.correctExAnte, true, 'the tally is a tie after the check');
+  assert.equal(g.won, true); assert.equal(g.points, 8, 'affects 10 kids − one check (2)'); assert.equal(g.correctExAnte, true, 'the evidence is a tie after the check');
+  // v1.2: 6 of 10 calls start with a 👁 vs 👂 conflict, and one 👁 outweighs one 👂
+  for (const form of ['A', 'B']) assert.equal(CONTENT.forms[form].filter((c) => c.startClues.length === 2 && c.startClues[0].strength !== c.startClues[1].strength && c.startClues[0].points !== c.startClues[1].points).length, 6);
+  const a01 = newCall(callsOf('A')[0]); assert.equal(stateOf(a01).net, 1, 'A01 starts 👁 Field vs 👂 Hall → Field');
 });

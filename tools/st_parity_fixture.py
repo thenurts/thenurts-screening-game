@@ -19,6 +19,7 @@ def play(skill, composure, seed, quit_at=None):  # the reference simulate(), als
     return {'f1': f1, 'taps': taps, 'fades': fades, 'quitAt': quit_at, 'metrics': m}
 schedules = [{'seed': s, 'f1': f, 'events': st.schedule(seed=s, f1_hit_rate=f)} for s in (2026, 2027) for f in (None, 1.0, 1.4, 2.2, 3.0)]
 players = [play(sk, co, seed) for seed, (sk, co) in enumerate([(a / 2, b / 2) for a in range(-3, 4) for b in range(-3, 4)])]
-players += [play(0, 0, 100, quit_at=75), play(1, -1, 101, quit_at=40), play(-1, 1, 102, quit_at=105)]
+players += [play(0, 0, 100, quit_at=75), play(1, -1, 101, quit_at=40), play(-1, 1, 102, quit_at=105), play(0.5, 0.5, 103, quit_at=115)]
+for p in players: p['reports'] = [st.round_report(p['taps'], p['fades'], n) for n in (1, 2, 3, 4)]
 json.dump({'schedules': schedules, 'players': players}, open('tests/fixtures/sunny-tap-parity.json', 'w'), separators=(',', ':'))
 print('wrote', len(schedules), 'schedules,', len(players), 'players')
