@@ -1,6 +1,6 @@
 {
- "version": "1.1",
- "date": "2026-09-27",
+ "version": "1.2",
+ "date": "2026-10-02",
  "model": {
   "arrowWeight": 0.4895,
   "checkCost": {
@@ -13,7 +13,7 @@
    20,
    30
   ],
-  "note": "One currency: points. A check reveals the next clue; its strength (weak = 1 arrow, strong = 2) is shown on the Check button first. Ex-ante best = the side with more arrows (live tally). A tie means either is fine."
+  "note": "v1.2: no tally. 👁 'saw it' (first-hand) = 2 arrows of weight; 👂 'heard it' (second-hand/old) = 1. Ex-ante best = the weighted sum of what the player has seen. The Check button names the next source type. Stakes are shown as kids affected (10/20/30)."
  },
  "forms": {
   "A": [
@@ -24,31 +24,53 @@
      "L": "Field",
      "R": "Hall"
     },
-    "worth": 20,
+    "kidsAffected": 30,
     "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "L",
-     "label": "First word"
-    },
-    "clues": [
+    "startClues": [
      {
-      "label": "Mia heard",
-      "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Teacher",
-      "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Last year",
+      "source": "Official timetable",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "R"
+      "points": "L",
+      "text": "Official timetable: \"Field\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Liam heard: \"Hall\""
      }
     ],
-    "outcome": "L"
+    "clues": [
+     {
+      "source": "Caretaker saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Caretaker saw: \"Hall\""
+     },
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Last year's notes: \"Field\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Liam heard: \"Hall\""
+     }
+    ],
+    "outcome": "R"
    },
    {
     "id": "A02",
@@ -57,31 +79,45 @@
      "L": "20 pizzas",
      "R": "30 pizzas"
     },
-    "worth": 10,
+    "kidsAffected": 10,
     "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "L",
-     "label": "First word"
-    },
-    "clues": [
+    "startClues": [
      {
-      "label": "Teacher",
-      "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Weather app",
+      "source": "Noah saw",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "L"
-     },
-     {
-      "label": "Janitor",
-      "strength": 1,
-      "points": "L"
+      "points": "R",
+      "text": "Noah saw: \"30 pizzas\""
      }
     ],
-    "outcome": "L"
+    "clues": [
+     {
+      "source": "Office notice",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Office notice: \"30 pizzas\""
+     },
+     {
+      "source": "Booking email",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Booking email: \"30 pizzas\""
+     },
+     {
+      "source": "Amira guesses",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Amira guesses: \"30 pizzas\""
+     }
+    ],
+    "outcome": "R"
    },
    {
     "id": "A03",
@@ -90,31 +126,53 @@
      "L": "North",
      "R": "South"
     },
-    "worth": 10,
-    "urgent": true,
-    "firstClue": {
-     "arrows": 1,
-     "points": "R",
-     "label": "First word"
-    },
-    "clues": [
+    "kidsAffected": 30,
+    "urgent": false,
+    "startClues": [
      {
-      "label": "Mia heard",
+      "source": "Teacher saw",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "R"
+      "points": "L",
+      "text": "Teacher saw: \"North\""
      },
      {
-      "label": "Office note",
+      "source": "Mia thinks",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Raj thinks",
-      "strength": 1,
-      "points": "R"
+      "points": "R",
+      "text": "Mia thinks: \"South\""
      }
     ],
-    "outcome": "R"
+    "clues": [
+     {
+      "source": "Sign-up sheet",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Sign-up sheet: \"South\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Liam heard: \"North\""
+     },
+     {
+      "source": "Teacher saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Teacher saw: \"North\""
+     }
+    ],
+    "outcome": "L"
    },
    {
     "id": "A04",
@@ -123,28 +181,42 @@
      "L": "Cupcakes",
      "R": "Cookies"
     },
-    "worth": 30,
-    "urgent": true,
-    "firstClue": {
-     "arrows": 1,
-     "points": "R",
-     "label": "First word"
-    },
+    "kidsAffected": 10,
+    "urgent": false,
+    "startClues": [
+     {
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Class chat rumour: \"Cookies\""
+     }
+    ],
     "clues": [
      {
-      "label": "Class chat",
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
+      "points": "L",
+      "text": "Class chat rumour: \"Cupcakes\""
      },
      {
-      "label": "Office note",
+      "source": "Raj heard",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
+      "points": "L",
+      "text": "Raj heard: \"Cupcakes\""
      },
      {
-      "label": "Sign-up sheet",
+      "source": "Mia thinks",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
+      "points": "L",
+      "text": "Mia thinks: \"Cupcakes\""
      }
     ],
     "outcome": "L"
@@ -156,31 +228,53 @@
      "L": "50",
      "R": "100"
     },
-    "worth": 10,
-    "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "L",
-     "label": "First word"
-    },
-    "clues": [
+    "kidsAffected": 20,
+    "urgent": true,
+    "startClues": [
      {
-      "label": "Weather app",
-      "strength": 1,
-      "points": "L"
+      "source": "Booking email",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Booking email: \"100\""
      },
      {
-      "label": "Teacher",
+      "source": "Someone said",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Poll",
-      "strength": 1,
-      "points": "R"
+      "points": "L",
+      "text": "Someone said: \"50\""
      }
     ],
-    "outcome": "L"
+    "clues": [
+     {
+      "source": "Sign-up sheet",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Sign-up sheet: \"100\""
+     },
+     {
+      "source": "Raj heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Raj heard: \"50\""
+     },
+     {
+      "source": "Official timetable",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Official timetable: \"50\""
+     }
+    ],
+    "outcome": "R"
    },
    {
     "id": "A06",
@@ -189,24 +283,33 @@
      "L": "Classroom",
      "R": "Gym"
     },
-    "worth": 30,
-    "urgent": false,
-    "firstClue": null,
+    "kidsAffected": 10,
+    "urgent": true,
+    "startClues": [],
     "clues": [
      {
-      "label": "Teacher",
-      "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Raj thinks",
+      "source": "Driver's text",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "L"
+      "points": "L",
+      "text": "Driver's text: \"Classroom\""
      },
      {
-      "label": "Weather app",
+      "source": "Caretaker saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Caretaker saw: \"Classroom\""
+     },
+     {
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
+      "points": "L",
+      "text": "Class chat rumour: \"Classroom\""
      }
     ],
     "outcome": "L"
@@ -218,27 +321,53 @@
      "L": "7 pm",
      "R": "8 pm"
     },
-    "worth": 30,
-    "urgent": false,
-    "firstClue": null,
-    "clues": [
+    "kidsAffected": 30,
+    "urgent": true,
+    "startClues": [
      {
-      "label": "Last year",
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
+      "points": "L",
+      "text": "Last year's notes: \"7 pm\""
      },
      {
-      "label": "Survey",
-      "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Survey",
-      "strength": 1,
-      "points": "R"
+      "source": "Office notice",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Office notice: \"8 pm\""
      }
     ],
-    "outcome": "R"
+    "clues": [
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Last year's notes: \"7 pm\""
+     },
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Last year's notes: \"7 pm\""
+     },
+     {
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Class chat rumour: \"7 pm\""
+     }
+    ],
+    "outcome": "L"
    },
    {
     "id": "A08",
@@ -247,27 +376,45 @@
      "L": "Books",
      "R": "Games"
     },
-    "worth": 30,
-    "urgent": true,
-    "firstClue": null,
-    "clues": [
+    "kidsAffected": 20,
+    "urgent": false,
+    "startClues": [
      {
-      "label": "Raj thinks",
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Class chat",
-      "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Raj thinks",
-      "strength": 1,
-      "points": "R"
+      "points": "L",
+      "text": "Class chat rumour: \"Books\""
      }
     ],
-    "outcome": "R"
+    "clues": [
+     {
+      "source": "Driver's text",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Driver's text: \"Books\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Liam heard: \"Games\""
+     },
+     {
+      "source": "Booking email",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Booking email: \"Books\""
+     }
+    ],
+    "outcome": "L"
    },
    {
     "id": "A09",
@@ -276,28 +423,50 @@
      "L": "Morning",
      "R": "Afternoon"
     },
-    "worth": 30,
-    "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "R",
-     "label": "First word"
-    },
+    "kidsAffected": 30,
+    "urgent": true,
+    "startClues": [
+     {
+      "source": "Teacher saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Teacher saw: \"Afternoon\""
+     },
+     {
+      "source": "Raj heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Raj heard: \"Morning\""
+     }
+    ],
     "clues": [
      {
-      "label": "Mia heard",
-      "strength": 1,
-      "points": "R"
+      "source": "Booking email",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Booking email: \"Afternoon\""
      },
      {
-      "label": "Class chat",
+      "source": "Someone said",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
+      "points": "R",
+      "text": "Someone said: \"Afternoon\""
      },
      {
-      "label": "Noah saw",
-      "strength": 1,
-      "points": "R"
+      "source": "Caretaker saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Caretaker saw: \"Afternoon\""
      }
     ],
     "outcome": "R"
@@ -309,31 +478,53 @@
      "L": "Choir",
      "R": "Band"
     },
-    "worth": 30,
+    "kidsAffected": 30,
     "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "R",
-     "label": "First word"
-    },
-    "clues": [
+    "startClues": [
      {
-      "label": "Weather app",
+      "source": "Noah saw",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "R"
+      "points": "L",
+      "text": "Noah saw: \"Choir\""
      },
      {
-      "label": "Weather app",
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Sign-up sheet",
-      "strength": 1,
-      "points": "R"
+      "points": "R",
+      "text": "Class chat rumour: \"Band\""
      }
     ],
-    "outcome": "R"
+    "clues": [
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Last year's notes: \"Band\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Liam heard: \"Choir\""
+     },
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Last year's notes: \"Band\""
+     }
+    ],
+    "outcome": "L"
    }
   ],
   "B": [
@@ -344,28 +535,42 @@
      "L": "Paint",
      "R": "Clay"
     },
-    "worth": 30,
-    "urgent": true,
-    "firstClue": {
-     "arrows": 1,
-     "points": "L",
-     "label": "First word"
-    },
+    "kidsAffected": 10,
+    "urgent": false,
+    "startClues": [
+     {
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Class chat rumour: \"Paint\""
+     }
+    ],
     "clues": [
      {
-      "label": "Class chat",
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
+      "points": "R",
+      "text": "Class chat rumour: \"Clay\""
      },
      {
-      "label": "Office note",
+      "source": "Raj heard",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
+      "points": "R",
+      "text": "Raj heard: \"Clay\""
      },
      {
-      "label": "Sign-up sheet",
+      "source": "Mia thinks",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
+      "points": "R",
+      "text": "Mia thinks: \"Clay\""
      }
     ],
     "outcome": "R"
@@ -377,27 +582,45 @@
      "L": "Museum",
      "R": "Zoo"
     },
-    "worth": 30,
-    "urgent": true,
-    "firstClue": null,
-    "clues": [
+    "kidsAffected": 20,
+    "urgent": false,
+    "startClues": [
      {
-      "label": "Raj thinks",
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Class chat",
-      "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Raj thinks",
-      "strength": 1,
-      "points": "L"
+      "points": "R",
+      "text": "Class chat rumour: \"Zoo\""
      }
     ],
-    "outcome": "L"
+    "clues": [
+     {
+      "source": "Driver's text",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Driver's text: \"Zoo\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Liam heard: \"Museum\""
+     },
+     {
+      "source": "Booking email",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Booking email: \"Zoo\""
+     }
+    ],
+    "outcome": "R"
    },
    {
     "id": "B03",
@@ -406,31 +629,45 @@
      "L": "Buns",
      "R": "Fruit"
     },
-    "worth": 10,
+    "kidsAffected": 10,
     "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "R",
-     "label": "First word"
-    },
-    "clues": [
+    "startClues": [
      {
-      "label": "Teacher",
-      "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Weather app",
+      "source": "Noah saw",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "R"
-     },
-     {
-      "label": "Janitor",
-      "strength": 1,
-      "points": "R"
+      "points": "L",
+      "text": "Noah saw: \"Buns\""
      }
     ],
-    "outcome": "R"
+    "clues": [
+     {
+      "source": "Office notice",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Office notice: \"Buns\""
+     },
+     {
+      "source": "Booking email",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Booking email: \"Buns\""
+     },
+     {
+      "source": "Amira guesses",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Amira guesses: \"Buns\""
+     }
+    ],
+    "outcome": "L"
    },
    {
     "id": "B04",
@@ -439,31 +676,53 @@
      "L": "Swings",
      "R": "Slide"
     },
-    "worth": 30,
+    "kidsAffected": 30,
     "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "L",
-     "label": "First word"
-    },
-    "clues": [
+    "startClues": [
      {
-      "label": "Weather app",
+      "source": "Noah saw",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "L"
+      "points": "R",
+      "text": "Noah saw: \"Slide\""
      },
      {
-      "label": "Weather app",
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Sign-up sheet",
-      "strength": 1,
-      "points": "L"
+      "points": "L",
+      "text": "Class chat rumour: \"Swings\""
      }
     ],
-    "outcome": "L"
+    "clues": [
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Last year's notes: \"Swings\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Liam heard: \"Slide\""
+     },
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Last year's notes: \"Swings\""
+     }
+    ],
+    "outcome": "R"
    },
    {
     "id": "B05",
@@ -472,24 +731,33 @@
      "L": "Store room",
      "R": "Field"
     },
-    "worth": 30,
-    "urgent": false,
-    "firstClue": null,
+    "kidsAffected": 10,
+    "urgent": true,
+    "startClues": [],
     "clues": [
      {
-      "label": "Teacher",
-      "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Raj thinks",
+      "source": "Driver's text",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "R"
+      "points": "R",
+      "text": "Driver's text: \"Field\""
      },
      {
-      "label": "Weather app",
+      "source": "Caretaker saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Caretaker saw: \"Field\""
+     },
+     {
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
+      "points": "R",
+      "text": "Class chat rumour: \"Field\""
      }
     ],
     "outcome": "R"
@@ -501,31 +769,53 @@
      "L": "Field",
      "R": "Steps"
     },
-    "worth": 20,
+    "kidsAffected": 30,
     "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "R",
-     "label": "First word"
-    },
-    "clues": [
+    "startClues": [
      {
-      "label": "Mia heard",
-      "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Teacher",
-      "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Last year",
+      "source": "Official timetable",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "L"
+      "points": "R",
+      "text": "Official timetable: \"Steps\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Liam heard: \"Field\""
      }
     ],
-    "outcome": "R"
+    "clues": [
+     {
+      "source": "Caretaker saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Caretaker saw: \"Field\""
+     },
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Last year's notes: \"Steps\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "L",
+      "text": "Liam heard: \"Field\""
+     }
+    ],
+    "outcome": "L"
    },
    {
     "id": "B07",
@@ -534,28 +824,50 @@
      "L": "Monday",
      "R": "Tuesday"
     },
-    "worth": 30,
-    "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "L",
-     "label": "First word"
-    },
+    "kidsAffected": 30,
+    "urgent": true,
+    "startClues": [
+     {
+      "source": "Teacher saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Teacher saw: \"Monday\""
+     },
+     {
+      "source": "Raj heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Raj heard: \"Tuesday\""
+     }
+    ],
     "clues": [
      {
-      "label": "Mia heard",
-      "strength": 1,
-      "points": "L"
+      "source": "Booking email",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Booking email: \"Monday\""
      },
      {
-      "label": "Class chat",
+      "source": "Someone said",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
+      "points": "L",
+      "text": "Someone said: \"Monday\""
      },
      {
-      "label": "Noah saw",
-      "strength": 1,
-      "points": "L"
+      "source": "Caretaker saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Caretaker saw: \"Monday\""
      }
     ],
     "outcome": "L"
@@ -567,31 +879,53 @@
      "L": "Main door",
      "R": "Side door"
     },
-    "worth": 10,
-    "urgent": true,
-    "firstClue": {
-     "arrows": 1,
-     "points": "L",
-     "label": "First word"
-    },
-    "clues": [
+    "kidsAffected": 30,
+    "urgent": false,
+    "startClues": [
      {
-      "label": "Mia heard",
+      "source": "Teacher saw",
+      "kind": "saw it",
+      "icon": "👁",
       "strength": 2,
-      "points": "L"
+      "points": "R",
+      "text": "Teacher saw: \"Side door\""
      },
      {
-      "label": "Office note",
+      "source": "Mia thinks",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "R"
-     },
-     {
-      "label": "Raj thinks",
-      "strength": 1,
-      "points": "L"
+      "points": "L",
+      "text": "Mia thinks: \"Main door\""
      }
     ],
-    "outcome": "L"
+    "clues": [
+     {
+      "source": "Sign-up sheet",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Sign-up sheet: \"Main door\""
+     },
+     {
+      "source": "Liam heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Liam heard: \"Side door\""
+     },
+     {
+      "source": "Teacher saw",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Teacher saw: \"Side door\""
+     }
+    ],
+    "outcome": "R"
    },
    {
     "id": "B09",
@@ -600,27 +934,53 @@
      "L": "12 teams",
      "R": "16 teams"
     },
-    "worth": 30,
-    "urgent": false,
-    "firstClue": null,
-    "clues": [
+    "kidsAffected": 30,
+    "urgent": true,
+    "startClues": [
      {
-      "label": "Last year",
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
+      "points": "R",
+      "text": "Last year's notes: \"16 teams\""
      },
      {
-      "label": "Survey",
-      "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Survey",
-      "strength": 1,
-      "points": "L"
+      "source": "Office notice",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Office notice: \"12 teams\""
      }
     ],
-    "outcome": "L"
+    "clues": [
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Last year's notes: \"16 teams\""
+     },
+     {
+      "source": "Last year's notes",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Last year's notes: \"16 teams\""
+     },
+     {
+      "source": "Class chat rumour",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Class chat rumour: \"16 teams\""
+     }
+    ],
+    "outcome": "R"
    },
    {
     "id": "B10",
@@ -629,31 +989,53 @@
      "L": "Hand out",
      "R": "Pin up"
     },
-    "worth": 10,
-    "urgent": false,
-    "firstClue": {
-     "arrows": 1,
-     "points": "R",
-     "label": "First word"
-    },
-    "clues": [
+    "kidsAffected": 20,
+    "urgent": true,
+    "startClues": [
      {
-      "label": "Weather app",
-      "strength": 1,
-      "points": "R"
+      "source": "Booking email",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Booking email: \"Hand out\""
      },
      {
-      "label": "Teacher",
+      "source": "Someone said",
+      "kind": "heard it",
+      "icon": "👂",
       "strength": 1,
-      "points": "L"
-     },
-     {
-      "label": "Poll",
-      "strength": 1,
-      "points": "L"
+      "points": "R",
+      "text": "Someone said: \"Pin up\""
      }
     ],
-    "outcome": "R"
+    "clues": [
+     {
+      "source": "Sign-up sheet",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "L",
+      "text": "Sign-up sheet: \"Hand out\""
+     },
+     {
+      "source": "Raj heard",
+      "kind": "heard it",
+      "icon": "👂",
+      "strength": 1,
+      "points": "R",
+      "text": "Raj heard: \"Pin up\""
+     },
+     {
+      "source": "Official timetable",
+      "kind": "saw it",
+      "icon": "👁",
+      "strength": 2,
+      "points": "R",
+      "text": "Official timetable: \"Pin up\""
+     }
+    ],
+    "outcome": "L"
    }
   ]
  },
@@ -665,28 +1047,37 @@
     "L": "Field",
     "R": "Hall"
    },
-   "worth": 30,
+   "kidsAffected": 30,
    "urgent": false,
-   "firstClue": null,
+   "startClues": [],
    "clues": [
     {
-     "label": "Weather app",
+     "source": "Caretaker saw",
+     "kind": "saw it",
+     "icon": "👁",
      "strength": 2,
-     "points": "R"
+     "points": "R",
+     "text": "Caretaker saw: \"Hall\""
     },
     {
-     "label": "Janitor",
+     "source": "Janitor heard",
+     "kind": "heard it",
+     "icon": "👂",
      "strength": 1,
-     "points": "R"
+     "points": "R",
+     "text": "Janitor heard: \"Hall\""
     },
     {
-     "label": "Sky",
+     "source": "Someone said",
+     "kind": "heard it",
+     "icon": "👂",
      "strength": 1,
-     "points": "L"
+     "points": "L",
+     "text": "Someone said: \"Field\""
     }
    ],
    "outcome": "R",
-   "teach": "Worth 30, a tie, strong clue next: checking is worth it."
+   "teach": "Affects 30 kids, a tie, and the next source saw it: asking is worth it."
   },
   {
    "id": "P2",
@@ -695,32 +1086,51 @@
     "L": "Left",
     "R": "Right"
    },
-   "worth": 10,
+   "kidsAffected": 10,
    "urgent": true,
-   "firstClue": {
-    "arrows": 1,
-    "points": "L",
-    "label": "Mia thinks"
-   },
+   "startClues": [
+    {
+     "source": "Mia thinks",
+     "kind": "heard it",
+     "icon": "👂",
+     "strength": 1,
+     "points": "L",
+     "text": "Mia thinks: \"Left\""
+    }
+   ],
    "clues": [
     {
-     "label": "Class chat",
+     "source": "Class chat rumour",
+     "kind": "heard it",
+     "icon": "👂",
      "strength": 1,
-     "points": "R"
+     "points": "R",
+     "text": "Class chat rumour: \"Right\""
     },
     {
-     "label": "Poll",
+     "source": "Raj heard",
+     "kind": "heard it",
+     "icon": "👂",
      "strength": 1,
-     "points": "L"
+     "points": "L",
+     "text": "Raj heard: \"Left\""
     },
     {
-     "label": "Noah saw",
+     "source": "Liam heard",
+     "kind": "heard it",
+     "icon": "👂",
      "strength": 1,
-     "points": "L"
+     "points": "L",
+     "text": "Liam heard: \"Left\""
     }
    ],
    "outcome": "L",
-   "teach": "Worth 10, urgent (a check costs 6), weak clue next: checking costs more than it can win. Just decide."
+   "teach": "Affects 10 kids, urgent (asking costs 6), and the next source only heard it: asking costs more than it can win. Just decide."
   }
- ]
+ ],
+ "consequenceLines": {
+  "right": "Good call: {kids} kids were happy.",
+  "wrongSmart": "Unlucky! {kids} kids waited. But that was the smart call.",
+  "wrong": "{kids} kids waited at the wrong place."
+ }
 }

@@ -1,6 +1,7 @@
-// Zoey's Big Calls rule engine: a port of tests/judgement-reference.py v1.1 (build pack JD1 v1.1). voi(), run() and metrics()
+// Zoey's Big Calls rule engine: a port of tests/judgement-reference.py v1.2 (build pack JD1 v1.2). voi(), run12() and metrics()
 // must match the reference exactly (tests/fixtures/judgement-parity.json, from tools/jd_parity_fixture.py).
-// Sides: +1 = the left option (L), −1 = the right option (R). net = the live tally (sum of arrows, L positive).
+// Sides: +1 = the left option (L), −1 = the right option (R). net = the weighted evidence seen so far (👁 saw it = 2, 👂 heard it
+// = 1, L positive). v1.2 shows NO tally: the player weighs the messages; net is only used to score the call ex ante.
 import CONTENT from './content.json' with { type: 'json' };
 
 export { CONTENT };
@@ -13,8 +14,9 @@ export const WD = 0.5; // jd.weights: decisionAccuracy 0.5 · infoValue 0.5
 const dir = (p) => (p === 'L' ? 1 : -1);
 /** A content card → the reference's call shape. */
 export function toCall(c) {
-  return { id: c.id, worth: c.worth, urgent: !!c.urgent, first: c.firstClue ? c.firstClue.arrows * dir(c.firstClue.points) : 0,
-    clues: c.clues.map((k) => [k.label, k.strength, dir(k.points)]), truth: dir(c.outcome), card: c };
+  const start = c.startClues || [];
+  return { id: c.id, worth: c.kidsAffected ?? c.worth, urgent: !!c.urgent, first: start.reduce((a, k) => a + k.strength * dir(k.points), 0),
+    clues: c.clues.map((k) => [k.source, k.strength, dir(k.points)]), truth: dir(c.outcome), card: c };
 }
 export const callsOf = (form) => (form === 'P' ? CONTENT.practice : CONTENT.forms[form]).map(toCall);
 
@@ -58,6 +60,30 @@ export function decide(cs, choice) {
   const cost = cs.next * COST[c.urgent], won = choice === c.truth;
   return cs.entry = { worth: c.worth, correctExAnte: best === 0 || choice === best, checks: [...cs.checks], missed,
     id: c.id, choice, tally: cs.net, best, won, points: won ? Math.max(0, c.worth - cost) : 0, cost };
+}
+
+/** The reference's ways of weighing what has been seen ([[strength, dir], …] → +1 / −1 / 0 = a tie). */
+const sgn = (x) => (x === 0 ? 0 : x > 0 ? 1 : -1);
+export const WEIGHING = {
+  'weigh properly': (seen) => sgn(seen.reduce((a, [st, d]) => a + st * d, 0)),
+  'count clues equally': (seen) => sgn(seen.reduce((a, [, d]) => a + d, 0)),
+  'trust the latest clue': (seen) => (seen.length ? seen.at(-1)[1] : 0),
+  'stick with the first clue': (seen) => (seen.length ? seen[0][1] : 0),
+  'ignore hearsay': (seen) => sgn(seen.filter(([st]) => st === 2).reduce((a, [, d]) => a + d, 0)),
+};
+/** Reference run12(checker, decider, form): the player checks by `checker` and decides by THEIR OWN weighing; a tie → tie(). */
+export function run12(checker, decider, form = 'A', tie = () => 1) {
+  const log = [];
+  for (const call of callsOf(form)) {
+    const cs = newCall(call), seen = (call.card.startClues || []).map((k) => [k.strength, dir(k.points)]);
+    for (;;) {
+      const act = checker(stateOf(cs));
+      if (act[0] === 'check' && cs.next < MAX_CHECKS) { const r = check(cs); seen.push([r.strength, r.points]); continue; }
+      let ch = decider(seen); if (ch === 0) ch = tie();
+      const e = decide(cs, ch); log.push({ worth: e.worth, correctExAnte: e.correctExAnte, checks: e.checks, missed: e.missed }); break;
+    }
+  }
+  return log;
 }
 
 /** Reference run(policy, form): policy(state) → ['check'] | ['decide', side]. */

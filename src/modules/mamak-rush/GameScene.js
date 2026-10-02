@@ -288,7 +288,7 @@ export default class GameScene extends ModuleScene {
   render() {
     const st = this.st, t = st.tick;
     this.clockPill.text.setText(`${clock(Math.min(t, this.cfg.ticks + 1))} pm · ends ${clock(this.cfg.ticks + 1)}`);
-    this.starPill.text.setText(this.cfg.bestStars ? `★ ${this.starsNow()} / ${this.cfg.bestStars}` : `★ ${this.starsNow()}`);
+    this.starPill.text.setText(`★ ${this.starsNow()}`); // no "out of 27" (alpha #36: a better shift can beat it; the true max will come from Game Ideas)
     this.renderStrip();
     this.renderQueue();
     this.renderRow();
@@ -453,7 +453,7 @@ export default class GameScene extends ModuleScene {
     c.add(this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(60, 330, 600, 600, 36).fillStyle(hex(C.cream), 1).fillRoundedRect(60, 320, 600, 600, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(60, 320, 600, 600, 36));
     c.add(this.fitImg(this.add.image(W / 2, 420, 'liam-excited'), 140));
     c.add(this.txt(W / 2, 530, `${clock(this.cfg.ticks + 1)} pm · ${LINES.end}`, { fontSize: '36px' }));
-    c.add(this.txt(W / 2, 600, `You served ${m.starsServed} ★ of a possible ${m.bestPossible} ★`, { fontSize: '30px', fontStyle: '700' }));
+    c.add(this.txt(W / 2, 600, `You served ${m.starsServed} ★`, { fontSize: '34px', fontStyle: '700' }));
     const miss = this.missed || [];
     c.add(this.txt(W / 2, 700, miss.length ? `Missed: ${miss.slice(0, 6).join(', ')}${miss.length > 6 ? '…' : ''}` : 'No customer left without their order!', { fontSize: '24px', fontStyle: '600', color: C.charcoal, wordWrap: { width: 520 } }));
     const done = () => { this.shiftDone = null; c.destroy(true); this.startClosing(); }; // then the autonomy finale (#32)

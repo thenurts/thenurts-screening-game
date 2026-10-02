@@ -2,7 +2,8 @@
 import { callsOf, newCall, check, decide, metrics } from './rules.js';
 
 export const primaryKey = 'judgementScore';
-export function rederive(m) {
+export function rederive(m, version) {
+  if (version != null && Number(version) < 3) return null; // v1.1 rounds (module v1–2) used the old content: keep their stored scores
   if (typeof m?.callLog !== 'string' || !['A', 'B'].includes(m.form)) return null;
   const calls = Object.fromEntries(callsOf(m.form).map((c) => [c.id, c]));
   const log = [];
