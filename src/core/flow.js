@@ -1,7 +1,7 @@
 // Player flow controller (spec §2): Home → Register/Login → [PreGame → Round → PostGame]* → Report.
 import { api } from './api.js';
 import { session } from './session.js';
-import { log, claimAnonymous, flush, openTrace, takeTrace, resolveRound, queueEnd } from './logger.js';
+import { log, claimAnonymous, flush, openTrace, trace, takeTrace, resolveRound, queueEnd } from './logger.js';
 import { modules, nextModule, runOrder } from './registry.js';
 import { hideUi, show, h, toast, button } from './ui/dom.js';
 import { friendly } from './errors.js';
@@ -121,6 +121,7 @@ async function play(manifest, mode) {
   const base = { roundUid, module: manifest.id, mode, moduleVersion: manifest.version, seed,
     positionInRun: session.order.indexOf(manifest) + 1, moduleOrder: session.order.map((m) => m.id).join('>') };
   openTrace(roundUid, { module: manifest.id, moduleVersion: manifest.version, mode });
+  trace(roundUid, [0, 'device', { deviceClass: deviceClass(), vw: innerWidth, vh: innerHeight }]); // also for rounds that end unfinished
   log(manifest.id, mode === 'practice' ? 'practice_start' : 'round_start', { seed }, ctx);
   const key = `mod:${manifest.id}`;
   let scene = null;
@@ -148,7 +149,14 @@ async function play(manifest, mode) {
   scene = game.scene.getScene(key);
 }
 
+/** phone · tablet · desktop (alpha #36: logged on every round, so norms can be split by device later). */
+export function deviceClass() {
+  const coarse = matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0, short = Math.min(screen.width, screen.height);
+  return coarse && short < 600 ? 'phone' : coarse && short < 1100 ? 'tablet' : 'desktop';
+}
+
 function roundDone(manifest, mode, base, res, key) {
+  if (res.metrics) res.metrics.deviceClass = deviceClass();
   const ctx = { roundUid: base.roundUid, moduleVersion: manifest.version };
   const ev = mode === 'practice' ? (res.status === 'completed' ? 'practice_end' : 'practice_quit') : res.status === 'completed' ? 'round_complete' : 'round_quit';
   log(manifest.id, ev, res.status === 'completed' ? res.metrics : { elapsedMs: res.elapsedMs }, ctx);

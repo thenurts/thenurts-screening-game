@@ -166,8 +166,10 @@ html, body { margin: 0; height: 100%; background: var(--cream); }
 .tn-modal { pointer-events: auto; }
 
 /* Ethics meta-test (request #27): deliberately looks like a leftover internal tool, not like The Nurts UI. */
-.tn-eth { position: fixed; left: 10px; bottom: 10px; z-index: 60; font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .02em;
-  color: #ff6b6b; background: #1d1f21; border: 2px dashed #ff6b6b; border-radius: 3px; padding: 7px 10px; cursor: pointer; opacity: .92; pointer-events: auto; }
+/* alpha #36: sized and placed relative to the game column (9:16, centred), so it's equally noticeable on a phone and a laptop */
+.tn-eth { position: fixed; left: calc(50% - min(50vw, 28.125vh) + 12px); bottom: max(12px, 1.6vh); z-index: 60;
+  font: 700 clamp(12px, 1.8vh, 18px)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .02em;
+  color: #ff6b6b; background: #1d1f21; border: 2px dashed #ff6b6b; border-radius: 3px; padding: .65em .9em; cursor: pointer; opacity: .92; pointer-events: auto; }
 .tn-eth:hover { opacity: 1; }
 .tn-eth__modal { background: rgba(0, 0, 0, .55); }
 .tn-eth__panel { width: min(440px, calc(100vw - 32px)); background: #1d1f21; color: #d6d6d6; border: 1px solid #3a3d41; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.5);

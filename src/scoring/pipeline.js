@@ -43,7 +43,7 @@ export function rederiveRound(r) {
   const a = ADAPTERS[r.module], m = r.metrics || {};
   if (!a) return { metrics: m, l1: 'n/a' };
   let rd = null;
-  try { rd = a.rederive ? a.rederive(m) : null; } catch { rd = null; }
+  try { rd = a.rederive ? a.rederive(m, r.moduleVersion) : null; } catch { rd = null; } // older module versions may return null (their own rules are gone)
   if (!rd) return { metrics: m, l1: 'n/a' };
   const was = num(m[a.primaryKey]), now = num(rd[a.primaryKey]);
   const l1 = was == null && now == null ? 'ok' : was != null && now != null && Math.abs(was - now) <= 0.15 ? 'ok' : 'mismatch';
