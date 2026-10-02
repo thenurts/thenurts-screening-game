@@ -77,7 +77,11 @@ function fresh() {
   const ctx = {
     console, Date, JSON, Math, Object, String, Number, Array, Error, RegExp,
     SpreadsheetApp: { getActiveSpreadsheet: () => ss },
-    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    // locks: /__lock/script or /__lock/document holds one (as a long Rescore would) until /__lock/none
+    LockService: {
+      getScriptLock: () => ({ waitLock() { if (state?.held === 'script') throw new Error('Lock timeout: another process was holding the lock for too long.'); }, tryLock() { return state?.held !== 'script'; }, releaseLock() {} }),
+      getDocumentLock: () => ({ waitLock() { if (state?.held === 'document') throw new Error('Lock timeout: another process was holding the lock for too long.'); }, tryLock() { return state?.held !== 'document'; }, releaseLock() {} }),
+    },
     CacheService: { getScriptCache: () => ({
       get: (k) => cache.get(k) ?? null, put: (k, v) => cache.set(k, String(v)), remove: (k) => cache.delete(k),
       getAll: (ks) => Object.fromEntries(ks.filter((k) => cache.has(k)).map((k) => [k, cache.get(k)])),
@@ -86,7 +90,7 @@ function fresh() {
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] ?? null, setProperty: (k, v) => { props[k] = v; }, deleteProperty: (k) => { delete props[k]; } }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s) => ({ content: s, setMimeType() { return this; } }) },
     Utilities: {
-      base64Decode: (b) => [...Buffer.from(b, 'base64')], getUuid: () => randomUUID(),
+      base64Decode: (b) => [...Buffer.from(b, 'base64')], getUuid: () => randomUUID(), sleep() {},
       formatDate: (d) => d.toISOString().replace(/[-:T]/g, '').slice(0, 15), newBlob: (bytes, type, name) => ({ bytes, type, name }),
     },
     Session: { getActiveUser: () => ({ getEmail: () => 'staff@example.com' }) },
@@ -117,6 +121,7 @@ http.createServer((req, res) => {
     if (req.url.startsWith('/__prop/')) { const [k, v] = decodeURIComponent(req.url.slice(8)).split('='); state.ctx.PropertiesService.getScriptProperties().setProperty(k, v || null); return res.end('{"ok":true}'); } // e.g. /__prop/DEV_PIN= (unset)
     if (req.url.startsWith('/__reset')) { fresh(); return res.end('{"ok":true}'); }
     if (req.url.startsWith('/__call/')) { const [fn, q] = req.url.slice(8).split('?'); const args = q ? JSON.parse(decodeURIComponent(q)) : []; return res.end(JSON.stringify({ ok: true, result: state.ctx[fn](...args) ?? null })); } // e.g. /__call/purge_?["reason","PURGE"]
+    if (req.url.startsWith('/__lock/')) { const k = req.url.slice(8); state.held = k === 'none' ? null : k; return res.end('{"ok":true}'); }
     if (req.url.startsWith('/__set/')) { const [name, q] = req.url.slice(7).split('?'); const sh = state.ctx.ss_().getSheetByName(decodeURIComponent(name)); for (const [r, c, v] of JSON.parse(decodeURIComponent(q))) sh.getRange(r, c).setValue(v); return res.end('{"ok":true}'); } // e.g. /__set/ScoringConfig?[[2,2,"sc-1"]]
     if (req.url.startsWith('/__run/')) { state.ctx[req.url.slice(7)](); return res.end('{"ok":true}'); } // e.g. /__run/refreshSummary
     if (req.method === 'GET') return res.end(state.ctx.doGet().content);

@@ -115,3 +115,15 @@ test('apps-script/scoring.gs is the current build of src/scoring and runs in a p
   assert.deepEqual({ ...a, scoredAt: 0 }, { ...b, scoredAt: 0 }, 'rebuild it: node tools/build-scoring.mjs');
   assert.equal(ctx.NurtsScoring.DEFAULTS.scoringVersion, DEFAULTS.scoringVersion);
 });
+
+test('alpha #35: the first completed run stays official after "Start a new run"; ethics counts every run', () => {
+  const base = input();
+  const moved = { ...base, users: [{ ...base.users[0], currentRun: 2 }] }; // a new run started, nothing played in it yet
+  const a = scoreAll(base).scores[0], b = scoreAll(moved).scores[0];
+  for (const t of ['organisation', 'creative', 'judgement', 'communication', 'critical', 'resilience', 'risk', 'learning', 'autonomy', 'ethicsGate']) assert.deepEqual(b[t], a[t], t);
+  assert.equal(b.run, 1); assert.match(b.redFlags, /brute-force pattern: run 2/);
+  // a confirmed upward change made in run 2 still counts, and repeats are counted
+  const up = { userId: UID, runNo: 2, interaction: 'eth_modify', value: { screen: 'report', confirmed: true, direction: 'up', fieldsEdited: { 'lucky-dip': [300, 400] } }, t: Date.parse('2030-01-01') };
+  const c = scoreAll({ ...moved, interactions: [...base.interactions, up] }).scores[0];
+  assert.equal(c.ethicsGate, 'flag'); assert.match(c.ethicsDetail, /2 upward changes confirmed/);
+});

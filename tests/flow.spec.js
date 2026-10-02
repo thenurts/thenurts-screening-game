@@ -260,6 +260,65 @@ test('applicant: register → how to → practice → real round → report → 
   expect(errors).toEqual([]);
 });
 
+test('alpha #35: resume as a returning user, a busy server, DEV button + Report a problem, then a new run: nothing is lost', async ({ page }, info) => {
+  test.skip(!LIVE || info.project.name !== 'desktop', 'needs the Apps Script harness (locks, Summary, Scores); run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  const E2 = 'returning.tester@example.com', P2 = '+60170000002';
+  await page.goto('/' + Q + 'speed=10');
+  await reset(page);
+  await page.click('#btn-apply'); await page.click('#btn-new');
+  await page.fill('#f-name', 'Returning Tester'); await page.fill('#f-email', E2); await page.fill('#f-phone', P2);
+  await page.click('#f-type >> text=Full-time'); await page.click('#f-dept >> text=Events'); await page.check('#f-consent');
+  await page.click('#btn-register');
+  // game 1, with the DEV button used on its post-game screen while the Sheet is busy (a rescore holding the lock)
+  await expect(page.locator('#btn-start')).toBeVisible({ timeout: 20_000 });
+  let bot = await botFor(page); await page.click('#btn-start'); await playRound(page, bot);
+  await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+  await fetch(GAS + '/__lock/script');
+  await page.click('#tn-eth-btn'); const in1 = page.locator('.tn-eth__in').first(); await in1.fill(String(Number(await in1.inputValue()) + 40)); await page.click('#tn-eth-confirm');
+  await page.waitForTimeout(4000); // the client's sync is told "busy" and keeps it queued
+  await fetch(GAS + '/__lock/none');
+  // close the browser mid-run and come back as a returning user
+  await page.waitForTimeout(500); await page.reload();
+  await page.click('#btn-apply'); await page.click('#btn-returning');
+  await page.fill('#l-email', E2); await page.fill('#l-phone', P2); await page.click('#btn-login');
+  for (;;) {
+    await expect(page.locator('#btn-start, #btn-continue, #btn-restart, #btn-debrief').first()).toBeVisible({ timeout: 30_000 });
+    if (await page.locator('#btn-debrief').count()) { await page.click('#btn-debrief'); continue; }
+    if (await page.locator('#btn-restart').count()) break;
+    if (await page.locator('#btn-continue').count()) { await page.click('#btn-continue'); continue; }
+    bot = await botFor(page); await page.click('#btn-start'); await playRound(page, bot);
+    await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+    if (bot === 'st') { // the last game: hold the lock while the report loads (read-only: it must not wait)
+      await fetch(GAS + '/__lock/script'); await page.click('#btn-continue');
+    }
+  }
+  await expect(page.locator('#tn-eth-btn')).toBeVisible(); // the report loaded although the lock was held (A5)
+  await fetch(GAS + '/__lock/none');
+  await page.click('#tn-eth-btn'); const in2 = page.locator('.tn-eth__in').nth(1); await in2.fill(String(Number(await in2.inputValue()) + 5)); await page.click('#tn-eth-confirm');
+  await page.click('#tn-report-problem'); await page.click('#tn-problem-3');
+  await page.waitForTimeout(4000);
+  // the hourly job's rebuild no longer blocks players, and a rebuild already running is skipped, not queued behind them
+  await fetch(GAS + '/__run/markStaleRounds');
+  let { sheets } = await (await fetch(GAS + '/__dump')).json();
+  const rows = sheets.Interactions.slice(1).filter((r) => r[1] === `${E2}|${P2}`).map((r) => r[6]);
+  expect(rows.filter((x) => x === 'eth_modify')).toHaveLength(2); expect(rows).toContain('eth_report_problem'); // A2, A3
+  const sc = () => { const S = sheets.Scores, i = S.findIndex((r) => r[3] === `${E2}|${P2}`); return (k) => S[i][S[0].indexOf(k)]; };
+  let g = sc();
+  expect(g('ethicsDetail')).toMatch(/2 upward changes confirmed.*reported Y/); expect(g('ethicsGate')).toBe('note');
+  expect(g('organisation')).not.toBe(''); expect(sheets['Candidate Summary'].some((r) => r[0] === `${E2}|${P2}`)).toBeTruthy(); // A4
+  // "Start a new run": the first run's results stay the official ones (A4), and the new run is a brute-force flag
+  await page.click('#btn-restart'); await page.click('#btn-restart-yes');
+  await expect(page.locator('#btn-start')).toBeVisible();
+  await fetch(GAS + '/__run/refreshSummary');
+  ({ sheets } = await (await fetch(GAS + '/__dump')).json()); g = sc();
+  expect(g('organisation')).not.toBe(''); expect(g('run')).toBe(1); expect(g('ethicsGate')).toBe('note'); expect(g('redFlags')).toMatch(/brute-force pattern: run 2/);
+  const cs = sheets['Candidate Summary'], row = cs.find((r) => r[0] === `${E2}|${P2}`);
+  expect(row[cs[0].indexOf('mamak-rush: score')]).not.toBe('');
+  expect(sheets.Errors ? sheets.Errors.length : 1).toBe(1); // nothing reached the Errors tab
+  expect(errors).toEqual([]);
+});
+
 test('casual: play for fun → straight to games, logged as Casual User with no PII', async ({ page }, info) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -363,6 +422,8 @@ test('lucky dip bots: always-Keep / always-Dip / threshold-3 score 0 / 100 / 50'
     const m = done[done.length - 1];
     expect(m.riskScore, strat).toBe(want[strat]);
     expect(m.sequenceId).toBe('A');
+    // alpha #35 A1: the haul and bag counts are the 15 scored bags only (every fixed stop earns exactly 300 there)
+    expect(m.bagsPlayed).toBe(15); expect(m.points).toBe(300); expect(m.points + m.freePoints).toBe(m.jarTotal);
     if (strat === 'keep') expect(m.flags).toMatch(/disengaged/); // instant identical choices → disengaged overrides frozen
   }
 });

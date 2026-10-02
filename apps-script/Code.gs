@@ -47,10 +47,17 @@ function doPost(e) {
   catch (err) { return out_({ ok: false, error: 'bad_json' }); }
   var fn = ACTIONS[body.action];
   if (!fn) return out_({ ok: false, error: 'unknown_action' });
-  var lock = LockService.getScriptLock();
+  // Read-only actions never wait for the lock (alpha #35 A5: the report failed while a rescore held it). Writes wait up to
+  // 25 s; if the Sheet is still busy the client is told "busy" and retries, so nothing is lost.
+  var lock = READ_ONLY_ACTIONS[body.action] ? null : LockService.getScriptLock();
   try {
-    lock.waitLock(20000);
-    return out_({ ok: true, data: fn(body) });
+    if (lock) { try { lock.waitLock(25000); } catch (lx) { return out_({ ok: false, error: 'busy' }); } }
+    var data;
+    try { data = fn(body); } catch (first) { // Google's "Service Spreadsheets failed / timed out" is transient: try once more
+      if (first && first.code || !/Service Spreadsheets|timed out/i.test(String(first && first.message))) throw first;
+      Utilities.sleep(1000); data = fn(body);
+    }
+    return out_({ ok: true, data: data });
   } catch (err) {
     if (err && err.code) return out_({ ok: false, error: err.code });
     // Unexpected failure: keep a record in the Errors tab so it can be diagnosed, and give the player a reference.
@@ -58,9 +65,11 @@ function doPost(e) {
     reportError_(ref, body, err);
     return out_({ ok: false, error: 'server_error', ref: ref });
   } finally {
-    try { lock.releaseLock(); } catch (x) { /* not held */ }
+    try { if (lock) lock.releaseLock(); } catch (x) { /* not held */ }
   }
 }
+
+var READ_ONLY_ACTIONS = { report: true, benchmarks: true };
 
 function doGet() {
   return out_({ ok: true, data: { service: 'The Nurts screening game API', time: new Date().toISOString() } });
@@ -419,7 +428,15 @@ var ACTIONS = {
  * (more than 1 = re-read) and seconds, practised first, and times they left the game mid-round.
  * Rebuilt hourly and from the "The Nurts" menu.
  */
-function refreshSummary() {
+function refreshSummary() { buildSummaryGuarded_(60000); }
+/** The derived tabs only READ the raw tabs, so rebuilding them never takes the players' lock (alpha #35 A5). A document lock
+ * stops two rebuilds overlapping: the hourly job skips if one is running; the menu waits up to a minute. */
+function buildSummaryGuarded_(waitMs) {
+  var dl = null; try { dl = LockService.getDocumentLock(); } catch (x) { dl = null; }
+  if (dl && !dl.tryLock(waitMs)) { try { SpreadsheetApp.getUi().alert('A rescore is already running. Try again in a minute.'); } catch (x) { /* trigger */ } return false; }
+  try { buildSummary_(); return true; } finally { try { if (dl) dl.releaseLock(); } catch (x) { /* not held */ } }
+}
+function buildSummary_() {
   var users = rows_('Users'), regs = rows_('Registrations'), rounds = rows_('Rounds');
   var reg = {}; regs.forEach(function (r) { reg[r[1]] = r; });
   var modules = []; rounds.forEach(function (r) { if (modules.indexOf(r[RC.module]) < 0) modules.push(r[RC.module]); });
@@ -453,14 +470,14 @@ function refreshSummary() {
     if (r[RC.status] === 'quit' || r[RC.status] === 'abandoned') s.unfinished++;
     if (s.firstReal === null || t < s.firstReal) s.firstReal = t;
   });
-  users.forEach(function (u) { // official score = completed real round in the current run
-    rounds.forEach(function (r) {
-      if (r[RC.user_id] === u[UC.user_id] && Number(r[RC.run_no]) === Number(u[UC.current_run]) && r[RC.mode] === 'real' && r[RC.status] === 'completed') {
-        var s = per[u[UC.user_id] + '|' + r[RC.module]];
-        if (s && s.score === '') { s.score = r[RC.primary_score]; try { s.summary = r[RC.summary_json] ? JSON.parse(r[RC.summary_json]) : null; } catch (x) { s.summary = null; } }
-      }
+  // official score = the FIRST completed real round of each game, in any run (Framework: only the first completed real round
+  // counts; a later "Start a new run" must not hide it, alpha #35 A4). Later runs show up as real attempts + the brute-force flag.
+  rounds.filter(function (r) { return r[RC.mode] === 'real' && r[RC.status] === 'completed'; })
+    .sort(function (a, b) { return new Date(a[RC.started_at]).getTime() - new Date(b[RC.started_at]).getTime(); })
+    .forEach(function (r) {
+      var s = per[r[RC.user_id] + '|' + r[RC.module]];
+      if (s && s.score === '') { s.score = r[RC.primary_score]; try { s.summary = r[RC.summary_json] ? JSON.parse(r[RC.summary_json]) : null; } catch (x) { s.summary = null; } }
     });
-  });
   var head = ['user_id', 'name', 'email', 'phone', 'employment_type', 'desired_function', 'cv_link', 'registered_at', 'last_seen', 'current_run', 'runs_completed'];
   modules.forEach(function (m) { head.push(m + ': score', m + ': real attempts', m + ': unfinished', m + ': practice rounds', m + ': read how-to first', m + ': how-to views', m + ': how-to secs', m + ': practised first', m + ': left mid-round'); (sumKeys[m] || []).forEach(function (k) { head.push(m + ': ' + k); }); });
   // Scoring layer (requests #28–31): the same pipeline builds the Scores / Norms / Insights / Validity tabs; the Summary
@@ -571,8 +588,7 @@ function runScoring_(users, regs, rounds, away) {
 
 /** Menu → The Nurts → Rescore all: rebuilds every derived tab from the raw data with the current ScoringConfig. */
 function rescoreAll() {
-  var lock = LockService.getScriptLock(); lock.waitLock(30000);
-  try { refreshSummary(); } finally { lock.releaseLock(); }
+  if (!buildSummaryGuarded_(60000)) return;
   try { SpreadsheetApp.getUi().alert('Rescored everyone with ScoringConfig ' + (readConfig_().scoringVersion || NurtsScoring.DEFAULTS.scoringVersion) + '.'); } catch (x) { /* run from the editor or a trigger */ }
 }
 
@@ -728,8 +744,8 @@ function markStaleRounds() {
         else sh.getRange(i + 2, TC.status + 1).setValue('abandoned');
       }
     });
-    refreshSummary();
   } finally { lock.releaseLock(); }
+  buildSummaryGuarded_(1000); // outside the players' lock (alpha #35 A5); skipped if a rebuild is already running
 }
 
 // ---------------------------------------------------------------- developer mode helpers

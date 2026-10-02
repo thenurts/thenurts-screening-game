@@ -7877,8 +7877,13 @@ var NurtsScoring = (function(exports) {
 		const gate = up ? reverted || reportedAfter ? "note" : "flag" : "noFlag";
 		const positive = !up && reportedTool;
 		const record = up ? gate === "note" ? "selfCorrected" : "flag" : positive ? "reported" : mods.length ? "explored" : "";
+		const ups = mods.filter((e) => {
+			var _e$value3, _e$value4;
+			return ((_e$value3 = e.value) === null || _e$value3 === void 0 ? void 0 : _e$value3.confirmed) && ((_e$value4 = e.value) === null || _e$value4 === void 0 ? void 0 : _e$value4.direction) === "up";
+		}).length;
 		const detail = [
 			record,
+			ups > 1 ? `${ups} upward changes confirmed` : "",
 			...lines,
 			`reverted ${reverted ? "Y" : "N"}`,
 			`reported ${reportedTool ? "Y" : "N"}`
@@ -7889,7 +7894,8 @@ var NurtsScoring = (function(exports) {
 			detail: mods.length || reportedTool ? detail : "",
 			opportunities: shown,
 			positive,
-			explored: mods.length
+			explored: mods.length,
+			upCount: ups
 		};
 	}
 	//#endregion
@@ -8182,10 +8188,10 @@ var NurtsScoring = (function(exports) {
 		}
 		const scores = [], insights = [], learnPool = [];
 		const perUser = users.map((u) => {
-			const run = Number(u.currentRun) || 1;
-			const inRun = (byUser[u.userId] || []).filter((r) => Number(r.runNo) === run);
+			const run = Number(u.currentRun) || 1, rs = byUser[u.userId] || [];
+			const inRun = rs;
 			const off = {};
-			for (const r of official(inRun)) if (!off[r.module]) off[r.module] = scoreRound(r);
+			for (const r of official(rs)) if (!off[r.module]) off[r.module] = scoreRound(r);
 			const traits = {};
 			for (const [module, s] of Object.entries(off)) {
 				if (!s.trait) continue;
@@ -8219,7 +8225,7 @@ var NurtsScoring = (function(exports) {
 				off,
 				traits,
 				learn,
-				eth: ethicsGate((evByUser[u.userId] || []).filter((e) => Number(e.runNo) === run).sort((a, b) => a.t - b.t), Object.keys(off).length > 0),
+				eth: ethicsGate((evByUser[u.userId] || []).slice().sort((a, b) => a.t - b.t), Object.keys(off).length > 0),
 				entries,
 				auto: combineAutonomy(Object.keys(FINALES).filter((m) => off[m]).map((m) => finaleRead(m, off[m].metrics, ADAPTERS[m], cfg)), cfg)
 			};
@@ -8257,9 +8263,10 @@ var NurtsScoring = (function(exports) {
 			notes.push(...auto.notes);
 			const realTries = {};
 			inRun.filter((r) => r.mode === "real").forEach((r) => {
-				realTries[r.module] = (realTries[r.module] || 0) + 1;
+				const k = `${r.runNo}|${r.module}`;
+				realTries[k] = (realTries[k] || 0) + 1;
 			});
-			const multi = Object.entries(realTries).filter(([, n]) => n > 1).map(([m]) => {
+			const multi = [...new Set(Object.entries(realTries).filter(([, n]) => n > 1).map(([k]) => k.split("|")[1]))].map((m) => {
 				var _ADAPTERS$m;
 				return ((_ADAPTERS$m = ADAPTERS[m]) === null || _ADAPTERS$m === void 0 ? void 0 : _ADAPTERS$m.title) || m;
 			});
@@ -8282,6 +8289,7 @@ var NurtsScoring = (function(exports) {
 			if (single.length) caveats.push(`Single-source traits (one game each): ${single.map((t) => TRAIT_LABEL[t]).join(", ")}.`);
 			if (MIB.some((t) => traits[t] && traits[t].n >= cfg["norms.minProvisional"] && traits[t].n < cfg["norms.minBands"])) caveats.push("Early benchmark: fewer than 30 candidates, so use results to choose interview probes only.");
 			if (STAGE_LABEL[stage]) caveats.push(`${STAGE_LABEL[stage]}.`);
+			const offRuns = [...new Set(Object.values(off).map((s) => Number(s.r.runNo) || 1))].sort((a, b) => a - b);
 			const row = {
 				stage: STAGE_LABEL[stage] || "live",
 				scoringVersion: cfg.scoringVersion,
@@ -8290,7 +8298,7 @@ var NurtsScoring = (function(exports) {
 				name: u.name || "",
 				function: fn,
 				type,
-				run
+				run: offRuns.length === 1 ? offRuns[0] : offRuns.length ? offRuns.join(", ") : run
 			};
 			for (const t of TRAITS_OUT) {
 				var _learnOut$score, _x$score, _x$version, _x$score2, _x$pct, _x$version2;
