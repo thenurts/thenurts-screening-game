@@ -5,7 +5,7 @@ import h2 from './assets/howto-2.webp';
 
 export default {
   id: 'lucky-dip',
-  version: 3, // unchanged real round (how-to standard #19 changes only the cards and practice) · v1.2: no round timer (v1.1 = 2: chilli, starter sweet, 15 scored bags, sequenceVersion 2)
+  version: 4, // v4: the reported haul and bag counts are the 15 scored bags only (alpha #35 A1; free-bag sweets still fill the jar, logged as freePoints); v3 = unchanged real round (how-to standard #19 changes only the cards and practice) · v1.2: no round timer (v1.1 = 2: chilli, starter sweet, 15 scored bags, sequenceVersion 2)
   title: 'Lucky Dip',
   tagline: 'Fill your jar with sweets from Mia’s lucky bags. Just watch out for the chilli!',
   trait: 'risk',
@@ -24,8 +24,8 @@ export default {
   practice: { durationSec: null, showTimer: false, scored: false },
   round: { durationSec: null, showTimer: false }, // no timer: the round ends after 17 bags (idle time is logged as idleMs)
   metrics: [
-    { key: 'points', label: 'Sweets haul', unit: 'pts', primary: true, higherIsBetter: true },
-    { key: 'bagsBanked', label: 'Bags kept', unit: '', higherIsBetter: true },
+    { key: 'points', label: 'Sweets from the 15 scored bags', unit: 'pts', primary: true, higherIsBetter: true },
+    { key: 'bagsBanked', label: 'Scored bags kept', unit: '', higherIsBetter: true },
   ],
   traitScore: (m) => Number(m.riskScore ?? 50), // style scale: shown as a Cautious ↔ Bold spectrum
   devOptions: { sequence: ['A', 'generated'] }, // developer mode only: which bag order the real round uses

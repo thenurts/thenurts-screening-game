@@ -314,9 +314,11 @@ export default class GameScene extends ModuleScene {
   metrics() {
     const s = score({ decisions: this.decisions || [], bags: this.bags || [], idleNudges: this.idleNudges || 0, repeatAttempt: !!this.repeatAttempt });
     return {
-      points: this.points || 0,
-      bagsBanked: (this.bags || []).filter((b) => b.points > 0).length,
-      bagsPlayed: (this.bags || []).length,
+      // the 15 scored bags only (build pack §6: free bags count for nothing except the frozen check; alpha #35 A1)
+      points: (this.bags || []).filter((b) => b.stake !== 'free').reduce((a, b) => a + b.points, 0),
+      bagsBanked: (this.bags || []).filter((b) => b.stake !== 'free' && b.points > 0).length,
+      bagsPlayed: (this.bags || []).filter((b) => b.stake !== 'free').length,
+      freePoints: (this.bags || []).filter((b) => b.stake === 'free').reduce((a, b) => a + b.points, 0), jarTotal: this.points || 0,
       ...s,
       sequenceVersion: SEQUENCE_VERSION, sequenceId: this.sequenceId || '', sequence: this.sequenceCode || '', buttonSide: this.buttonSide, idleNudges: this.idleNudges || 0, idleMs: Math.round(this.idleMs || 0),
       // raw decisions for re-scoring later: [bag, stake(N|G), k = player dips so far (0–3), choice(0 keep|1 dip), ms]
