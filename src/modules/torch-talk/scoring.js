@@ -60,9 +60,12 @@ export function score({ turns = [], idleNudges = 0, restartedAfterSetback = fals
   const askScore = 0.7 * mean(gapScores) + 0.3 * Math.max(0, 1 - unneededAsks / 8);
 
   const t6 = byTurn[6];
-  const repairQuality = t6 ? repairOf(t6.words, t6.fix) : 0;
-
-  const commScore = Math.round(100 * (WEIGHTS.meaning * meaningRate + WEIGHTS.adaptation * adaptation + WEIGHTS.ask * askScore + WEIGHTS.efficiency * efficiency + WEIGHTS.repair * repairQuality));
+  // alpha #36: the friend only asks back ("front?") when the T6 message was understood; when it wasn't, there was no mix-up to
+  // repair, so repair is n/a and its weight is shared out (older rounds always had a fix and score as before)
+  const repairNa = !!t6 && !t6.pass && t6.fix == null;
+  const repairQuality = repairNa ? null : t6 ? repairOf(t6.words, t6.fix) : 0;
+  const parts = WEIGHTS.meaning * meaningRate + WEIGHTS.adaptation * adaptation + WEIGHTS.ask * askScore + WEIGHTS.efficiency * efficiency;
+  const commScore = Math.round(100 * (repairNa ? parts / (1 - WEIGHTS.repair) : parts + WEIGHTS.repair * repairQuality));
   const flags = [];
   if (idleNudges >= 3) flags.push('idle'); // no round cap since v2.2: idle is only flagged, never cut short
   if (restartedAfterSetback) flags.push('restartedAfterSetback');

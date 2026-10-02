@@ -276,10 +276,12 @@ export default class GameScene extends ModuleScene {
   showNoteOverlay(highlightWords = null) {
     this.hideOverlay();
     const v = this.view();
-    const dim = this.add.rectangle(this.W / 2, this.H / 2, v.vw + 40, v.vh + 40, 0x0b0b0b, 0.45).setInteractive();
-    const n = this.noteCard(this.W / 2, this.L.noteY, 660, 300);
+    // alpha #36: the open note covers only the message area, so the word tiles below stay tappable while it's open
+    const nh = Math.max(200, Math.min(300, this.L.trayY - this.L.noteY - 56)), bottom = this.L.trayY - 8, top = v.top ?? this.L.noteY - 400;
+    const dim = this.add.rectangle(this.W / 2, (top + bottom) / 2, v.vw + 40, bottom - top, 0x0b0b0b, 0.45).setInteractive();
+    const n = this.noteCard(this.W / 2, this.L.noteY, 660, nh);
     this.noteWords = n.words;
-    const hint = this.txt(this.W / 2, this.L.noteY + 330, 'Tap anywhere to close', { fontSize: '24px', color: C.white });
+    const hint = this.txt(this.W / 2, this.L.noteY + nh + 22, 'Tap here to close · words below still work', { fontSize: '22px', color: C.white, stroke: C.ink, strokeThickness: 5 });
     this.overlay.add([dim, n, hint]);
     dim.on('pointerup', () => this.hideOverlay());
     this.trace('note_expand', { turn: this.turnIdx + 1 });
@@ -528,7 +530,7 @@ export default class GameScene extends ModuleScene {
       if (probe && this.mode === 'real') { rec.probe = probe; this.trace('learn_probe', { probe, pass: rec.pass, turn: rec.turn, itemId: it.id }); }
       rec.paraphrase = rec.pass && words.some((w) => !noteWords(it).has(norm(w))); // a correct message using words that aren't in the note
       this.trace('comm_message', { turn: rec.turn, itemId: rec.itemId, tag: rec.tag, words, ideal: rec.ideal, used: rec.used, pass: rec.pass, failReason: rec.failReason, usedShorthand: rec.usedShorthand });
-      outcome = it.mixup ? 'echo' : rec.pass ? 'pass' : 'fail';
+      outcome = it.mixup && rec.pass ? 'echo' : rec.pass ? 'pass' : 'fail'; // the scripted mix-up only follows a message that was understood (alpha #36)
     }
     this.phase = 'send';
     this.renderPanel();
@@ -688,10 +690,11 @@ export default class GameScene extends ModuleScene {
     this.clearCallouts(); this.hideOverlay(); this.bubble.setAlpha(0);
     const L = this.L;
     if (n === 0) { this.msg = this.item.ideal.slice(0, 2); this.renderPanel();
-      this.callout(360, L.noteY + Math.min(L.noteH, 200) / 2, 150, 'Noah’s note', 560, L.noteY - 10);
-      this.callout(200, L.trayY + L.tileH / 2, 70, 'tap words', 200, L.trayY - 40);
-      this.callout(530, L.btnY, 80, 'Send', 530, L.btnY - 100);
-      return [{ x: 0, y: L.noteY - 40, w: 720, h: L.trayY - L.noteY + 2 * L.tileH + 60 }, { x: 0, y: L.btnY - 160, w: 720, h: 230 }]; }
+      this.callout(96, L.noteY + 48, 40, 'Noah’s note', 300, L.noteY - 6, 3000, false); // small rings: never over the note's text (alpha #36)
+      this.callout(200, L.trayY + L.tileH / 2, 62, 'tap words', 200, L.trayY - 34);
+      this.callout(530, L.btnY, 76, 'Send', 530, L.btnY - 96);
+      const top = L.trayY + 2 * L.tileH + L.gap + 24; // the two crops never overlap, so no row is shown twice
+      return [{ x: 0, y: L.noteY - 40, w: 720, h: top - (L.noteY - 40) }, { x: 0, y: Math.max(top, L.btnY - 150), w: 720, h: L.btnY + 80 - Math.max(top, L.btnY - 150) }]; }
     if (n === 1) { this.renderPanel();
       this.callout(360, L.helpY + L.helpH / 2, 80, 'the 4 rules stay here', 360, L.helpY + 120);
       this.callout(this.W - 150, 64, 46, '? reopens this card', 440, 170);

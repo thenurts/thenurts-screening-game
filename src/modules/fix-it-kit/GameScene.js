@@ -15,7 +15,7 @@ const ms = (x) => x / SPEED;
 const IDLE_MS = 20000;
 const IMGS = import.meta.glob('./assets/{kit,prob}-*.webp', { eager: true, import: 'default' });
 const img = (name) => IMGS[`./assets/${name}.webp`];
-const L0 = { probY: 124, probH: 270, miaY: 470, trayY: 560, trayH: 200, btnY: 812, kitY: 900, cellW: 164, cellH: 170 };
+const L0 = { probY: 124, probH: 270, miaY: 470, trayY: 560, trayH: 200, btnY: 830, kitY: 900, cellW: 164, cellH: 170 }; // buttons sit in the gap between the tray and the kit (alpha #36)
 /** Practice: learn by doing (find 2 different fixes; fail-safe after 4 tries shows one working fix). */
 let L = L0;
 export const practiceMemo = { done: false, tries: 0, failSafe: false };
@@ -47,8 +47,8 @@ export default class GameScene extends ModuleScene {
     this.bubble = this.add.container(0, 0).setDepth(26);
     this.trayC = this.add.container(0, 0).setDepth(30);
     this.kitC = this.add.container(0, 0).setDepth(30);
-    this.tryBtn = this.btn(270, L.btnY, 'Try it', () => this.tryIt(), { w: 330, h: 96, size: 36, fill: C.sun }).setDepth(40);
-    this.doneBtn = this.btn(590, L.btnY, 'Done', () => this.done(), { w: 190, h: 80, size: 28, fill: C.white }).setDepth(40);
+    this.tryBtn = this.btn(250, L.btnY, 'Try it', () => this.tryIt(), { w: 360, h: 74, size: 34, fill: C.sun }).setDepth(40).setVisible(false);
+    this.doneBtn = this.btn(580, L.btnY, 'Done', () => this.done(), { w: 220, h: 74, size: 30, fill: C.white }).setDepth(40).setVisible(false); // shown with the first problem, not during the 3-2-1 (alpha #36)
     this.overlay = this.add.container(0, 0).setDepth(1100);
     this.input.on('dragstart', (p, o) => { o.setDepth(60); o.homeX = o.x; o.homeY = o.y; });
     this.input.on('drag', (p, o, x, y) => { o.x = x; o.y = y; });
@@ -302,6 +302,7 @@ export default class GameScene extends ModuleScene {
 
   // ---------------------------------------------------------------- rendering
   render() {
+    if (!this.ff) { this.tryBtn.setVisible(true); this.doneBtn.setVisible(true); }
     this.renderProblem(); this.renderTray(); this.renderKit();
     const on = !!this.ps && !this.ps.over && !this.busy;
     this.tryBtn.setAlpha(on && this.tray.length ? 1 : 0.55);

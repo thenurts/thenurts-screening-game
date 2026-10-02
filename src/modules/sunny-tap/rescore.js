@@ -2,7 +2,8 @@
 import { schedule, scoreRound } from './rules.js';
 
 export const primaryKey = 'resilienceScore';
-export function rederive(m) {
+export function rederive(m, version) {
+  if (version != null && Number(version) < 3) return null; // v1.1 rounds (module v2) used the old schedule and points: keep their stored scores
   if (typeof m?.tapLog !== 'string' || !m.seed) return null;
   const taps = m.tapLog.split(' ').filter(Boolean).map((s) => { const x = /^([\d.]+)(?:h([\d.]+)|m)$/.exec(s); return x ? [Number(x[1]), x[2] != null ? 'hit' : 'miss', x[2] != null ? Number(x[2]) : null] : null; }).filter(Boolean);
   const fades = String(m.fadeLog || '').split(' ').filter(Boolean).map(Number);

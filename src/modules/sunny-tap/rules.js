@@ -1,12 +1,13 @@
-// Sunny Tap rule engine: a port of tests/sunny-tap-reference.py (build pack RS1 v1.1). schedule() and scoreRound() must match
+// Sunny Tap rule engine: a port of tests/sunny-tap-reference.py (build pack RS1 v1.2). schedule() and scoreRound() must match
 // the reference exactly (tests/fixtures/sunny-tap-parity.json, from tools/st_parity_fixture.py), so Python's random.Random
 // (MT19937 + init_by_array, random(), uniform()) is reproduced bit for bit.
-export const PHASES = [['F1', 0, 20], ['W1', 20, 30], ['F2', 30, 50], ['W2', 50, 60], ['F3', 60, 80], ['W3', 80, 90], ['F4', 90, 110]];
-export const ROUND_S = 110, WARMUP_S = 10;
+// v1.2: 4 rounds of Fair 20 s + Wipeout 10 s = 2:00 of play; a mini-report after each round (the game clock stops).
+export const PHASES = [['F1', 0, 20], ['W1', 20, 30], ['F2', 30, 50], ['W2', 50, 60], ['F3', 60, 80], ['W3', 80, 90], ['F4', 90, 110], ['W4', 110, 120]];
+export const ROUND_S = 120, WARMUP_S = 10, ROUNDS = 4, ROUND_LEN = 30;
 export const POST = PHASES.filter(([n]) => n[0] === 'F' && n !== 'F1').map(([n]) => n);
 export const FAIR = { sun_every: 0.5, sun_life: 1.6, cloud_every: 4.0, cloud_life: 1.6 };
-export const WIPE = { min_rate: 4.0, adapt: 2.5, sun_life: 0.8, cloud_share: 0.3 };
-export const PTS = { hit: 10, fade: -3, miss: -15 };
+export const WIPE = { min_rate: 7.0, adapt: 4.5, sun_life: 0.6, cloud_share: 0.25 }; // v1.2: every skill level nets ~0 or less per round
+export const PTS = { hit: 10, fade: -10, miss: -15 }; // v1.2: a faded sun costs as much as a caught one earns
 export const EARLY = 8.0;
 export const OFFICIAL_SEED = 2026, CASUAL_SEED = 2027; // casual runs never see the official fair schedule (request #26)
 
@@ -84,6 +85,14 @@ export function warmupEvents(seed = OFFICIAL_SEED) {
   return byT(ev);
 }
 export function phaseOf(t) { for (const [n, a, b] of PHASES) if (a <= t && t < b) return n; return null; }
+
+/** The mini-report after round n (1–4): gained · lost to fades · lost to mis-taps · net (the reference's round_report). */
+export function roundReport(taps, fades, n) {
+  const a = (n - 1) * ROUND_LEN, b = n * ROUND_LEN;
+  const g = taps.filter((tp) => tp[1] === 'hit' && a <= tp[0] && tp[0] < b).length * PTS.hit, m = taps.filter((tp) => tp[1] === 'miss' && a <= tp[0] && tp[0] < b).length * PTS.miss;
+  const f = fades.filter((t) => a <= t && t < b).length * PTS.fade;
+  return { round: n, gained: g + 0, lostFaded: f + 0, lostMisTaps: m + 0, net: g + f + m + 0 }; // + 0 turns -0 into 0
+}
 
 const median = (xs) => { const s = [...xs].sort((p, q) => p - q), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const sum = (xs) => xs.reduce((p, q) => p + q, 0);
