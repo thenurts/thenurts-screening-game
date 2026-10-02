@@ -9,6 +9,7 @@ const MESSAGES = {
   already_registered: 'That email or mobile number is already registered. Please continue as a returning candidate.',
   login_fail: 'We couldn’t find a registration with that email and mobile number. Please check both, or register as a new candidate.',
   auth_failed: 'Your session has expired. Please refresh the page and log in again.',
+  busy: 'Our server is very busy right now. Your results are safe: please wait a moment and try again.',
   setup_needed: `The game isn’t fully set up yet. Please try again later, or contact ${CONTACT}.`,
 };
 

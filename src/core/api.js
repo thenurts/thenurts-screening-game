@@ -4,26 +4,34 @@ import { API_URL, MOCK } from './config.js';
 import { session } from './session.js';
 import { mockCall, mockBeacon } from './mockServer.js';
 
+const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+
 export class ApiError extends Error {
   constructor(code, message, ref) { super(message || code); this.code = code; this.ref = ref; }
 }
 
+// "busy" = the server couldn't get its lock, so nothing was done: always safe to retry (alpha #35 A5). A one-off
+// server_error is retried only for idempotent actions (the server de-duplicates by round_uid / event_id).
+const IDEMPOTENT = new Set(['report', 'sync', 'roundStart', 'roundEnd', 'benchmarks']);
+const BUSY_WAIT_MS = [1500, 3000, 6000, 10000];
 async function call(action, payload = {}, { retries = 2 } = {}) {
   const body = { action, auth: session.auth(), ...payload };
   if (MOCK) {
     try { return await mockCall(body); } catch (e) { throw new ApiError(e.code || 'mock_error', e.message); }
   }
-  let lastErr;
-  for (let i = 0; i <= retries; i++) {
+  let lastErr, busy = 0, failed = 0;
+  for (let i = 0; i <= retries; ) {
     try {
       const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), redirect: 'follow' });
       const j = await r.json();
       if (!j.ok) throw new ApiError(j.error || 'server_error', j.message, j.ref);
       return j.data;
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'busy' && busy < BUSY_WAIT_MS.length) { await wait(BUSY_WAIT_MS[busy++]); continue; }
+      if (e instanceof ApiError && e.code === 'server_error' && IDEMPOTENT.has(action) && failed < 2) { failed++; await wait(1500 * failed); continue; }
       if (e instanceof ApiError) throw e; // don't retry business errors
-      lastErr = e;
-      await new Promise((res) => setTimeout(res, 400 * 2 ** i));
+      lastErr = e; i++;
+      await wait(400 * 2 ** i);
     }
   }
   throw new ApiError('network', lastErr?.message);

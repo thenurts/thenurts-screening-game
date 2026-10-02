@@ -3,7 +3,7 @@ import { api } from './api.js';
 import { session } from './session.js';
 import { log, claimAnonymous, flush, openTrace, takeTrace, resolveRound, queueEnd } from './logger.js';
 import { modules, nextModule, runOrder } from './registry.js';
-import { hideUi, show, h, toast } from './ui/dom.js';
+import { hideUi, show, h, toast, button } from './ui/dom.js';
 import { friendly } from './errors.js';
 import { MOCK } from './config.js';
 import { homeScreen, applicantScreen, registerScreen, loginScreen } from './screens/entry.js';
@@ -192,7 +192,13 @@ async function report() {
   show(h('div', { class: 'tn-screen' }, h('div', { class: 'tn-card' }, h('h2', {}, 'Putting your play profile together…'), h('p', { class: 'tn-muted' }, 'This takes a few seconds.'))));
   await flush();
   let data;
-  try { data = await api.report(session.runNo); } catch (e) { toast(friendly(e, 'load your report'), 'bad'); return; }
+  try { data = await api.report(session.runNo); } catch (e) { // never leave the player stuck on the loading card (alpha #35 A5)
+    toast(friendly(e, 'load your report'), 'bad');
+    show(h('div', { class: 'tn-screen' }, h('div', { class: 'tn-card' }, h('h2', {}, 'Your results are saved'),
+      h('p', { class: 'tn-muted' }, 'We couldn’t show your report just now. Every game you played is already stored.'),
+      button('Try again', () => report(), { icon: '↻', id: 'btn-report-retry' }))));
+    return;
+  }
   backdrop()?.celebrate();
   reportScreen({
     report: data, runNo: session.runNo, casual: session.casual,

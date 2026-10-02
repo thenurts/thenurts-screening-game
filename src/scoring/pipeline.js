@@ -86,8 +86,10 @@ export function scoreAll(input) {
   const scores = [], insights = [], learnPool = [];
   const perUser = users.map((u) => {
     const run = Number(u.currentRun) || 1, rs = byUser[u.userId] || [];
-    const inRun = rs.filter((r) => Number(r.runNo) === run);
-    const off = {}; for (const r of official(inRun)) if (!off[r.module]) off[r.module] = scoreRound(r);
+    // Framework: only the FIRST completed real round of each game counts, whichever run it was in (a later "Start a new
+    // run" must not hide the official results; alpha #35 A4). Later runs are a brute-force flag, not a replacement.
+    const inRun = rs;
+    const off = {}; for (const r of official(rs)) if (!off[r.module]) off[r.module] = scoreRound(r);
     const traits = {};
     for (const [module, s] of Object.entries(off)) {
       if (!s.trait) continue;
@@ -98,7 +100,7 @@ export function scoreAll(input) {
     const entries = Object.entries(off).map(([module, s]) => ({ module, priorCasualPlay: !!s.metrics.priorCasualPlay, facts: ADAPTERS[module]?.learningFacts ? ADAPTERS[module].learningFacts(s.metrics) : learningFactsFromV1(s.metrics) }));
     const learn = learningComposite(entries, cfg);
     if (learn.score != null) learnPool.push(learn.score);
-    const ev = (evByUser[u.userId] || []).filter((e) => Number(e.runNo) === run).sort((a, b) => a.t - b.t);
+    const ev = (evByUser[u.userId] || []).slice().sort((a, b) => a.t - b.t); // every run: a later run can't wash out a cheat
     const eth = ethicsGate(ev, Object.keys(off).length > 0);
     const auto = combineAutonomy(Object.keys(FINALES).filter((m) => off[m]).map((m) => finaleRead(m, off[m].metrics, ADAPTERS[m], cfg)), cfg);
     return { u, run, inRun, off, traits, learn, eth, entries, auto };
@@ -129,8 +131,8 @@ export function scoreAll(input) {
     if (ldFlags.includes('frozen')) red.push('risk: frozen (banked almost nothing)');
     if (auto.red) red.push('autonomy: L1 in both finales (matters when considering Mid or Lead)');
     notes.push(...auto.notes);
-    const realTries = {}; inRun.filter((r) => r.mode === 'real').forEach((r) => { realTries[r.module] = (realTries[r.module] || 0) + 1; });
-    const multi = Object.entries(realTries).filter(([, n]) => n > 1).map(([m]) => ADAPTERS[m]?.title || m);
+    const realTries = {}; inRun.filter((r) => r.mode === 'real').forEach((r) => { const k = `${r.runNo}|${r.module}`; realTries[k] = (realTries[k] || 0) + 1; });
+    const multi = [...new Set(Object.entries(realTries).filter(([, n]) => n > 1).map(([k]) => k.split('|')[1]))].map((m) => ADAPTERS[m]?.title || m);
     if (run > 1 || multi.length) red.push(`brute-force pattern: ${run > 1 ? `run ${run}` : ''}${run > 1 && multi.length ? '; ' : ''}${multi.length ? `restarted ${multi.join(', ')}` : ''}`);
     const unfinished = inRun.filter((r) => r.mode === 'real' && (r.status === 'quit' || r.status === 'abandoned') && !leftInFinale(r)).map((r) => ADAPTERS[r.module]?.title || r.module);
     if (unfinished.length) notes.push(`left unfinished: ${[...new Set(unfinished)].join(', ')}`);
@@ -146,7 +148,8 @@ export function scoreAll(input) {
     if (STAGE_LABEL[stage]) caveats.push(`${STAGE_LABEL[stage]}.`);
 
     // ---- the Scores row
-    const row = { stage: STAGE_LABEL[stage] || 'live', scoringVersion: cfg.scoringVersion, scoredAt: new Date(now).toISOString(), user_id: u.userId, name: u.name || '', function: fn, type, run };
+    const offRuns = [...new Set(Object.values(off).map((s) => Number(s.r.runNo) || 1))].sort((a, b) => a - b);
+    const row = { stage: STAGE_LABEL[stage] || 'live', scoringVersion: cfg.scoringVersion, scoredAt: new Date(now).toISOString(), user_id: u.userId, name: u.name || '', function: fn, type, run: offRuns.length === 1 ? offRuns[0] : offRuns.length ? offRuns.join(', ') : run };
     for (const t of TRAITS_OUT) {
       const x = t === 'learning' ? null : traits[t];
       if (t === 'learning') Object.assign(row, { learning: learnOut.score ?? '', 'learning band': learnOut.band, 'learning pct': lpct ?? '', 'learning evidence': `${learnOut.nParts} parts / ${learnOut.games.length} games`, 'learning reliability': RELIABILITY.learning, 'learning version': '' });
