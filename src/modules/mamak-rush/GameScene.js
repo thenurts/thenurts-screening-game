@@ -288,7 +288,7 @@ export default class GameScene extends ModuleScene {
   render() {
     const st = this.st, t = st.tick;
     this.clockPill.text.setText(`${clock(Math.min(t, this.cfg.ticks + 1))} pm · ends ${clock(this.cfg.ticks + 1)}`);
-    this.starPill.text.setText(`★ ${this.starsNow()}`); // no "out of 27" (alpha #36: a better shift can beat it; the true max will come from Game Ideas)
+    this.starPill.text.setText(`★ ${this.starsNow()}`); // no "out of N" (alpha #36, #40)
     this.renderStrip();
     this.renderQueue();
     this.renderRow();

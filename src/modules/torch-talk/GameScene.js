@@ -3,7 +3,7 @@ import { ModuleScene } from '../../core/ModuleScene.js';
 import { C, hex, FONT } from '../../core/theme.js';
 import { sfx } from '../../core/sfx.js';
 import { charImg } from '../../core/ui/dom.js';
-import { buildRound, trayOrder, QUESTIONS, TAGS, ITEM_BANK_VERSION, TUTORIAL_VERSION, tutorialMemo } from './forms.js';
+import { buildRound, trayOrder, QUESTIONS, TAGS, ITEM_BANK_VERSION, TUTORIAL_VERSION, tutorialMemo, ITEMS } from './forms.js';
 import { check, fixPasses, slotsFor, nicknames, points, ratio } from './checker.js';
 import { score, turnPoints, REACTIONS } from './scoring.js';
 import bgUrl from './assets/bg-garden.webp';
@@ -13,6 +13,7 @@ import notebookUrl from './assets/notebook.webp';
 import walkieUrl from './assets/walkie.webp';
 import pencilUrl from './assets/pencil.webp';
 import tapeUrl from './assets/tape.webp';
+import nickUrl from './assets/howto-1.webp'; // the nickname rule card's picture (request #39), reused before try-it step 4
 
 // Fixed animation budget (identical for everyone). ?speed=N (local/mock only) speeds it up for automated tests.
 const q = new URLSearchParams(location.search);
@@ -26,6 +27,7 @@ const NAMES = { liam: 'Liam', mia: 'Mia', zoey: 'Zoey', noah: 'Noah', raj: 'Raj'
 const ICON = { when: '🕒', where: '📍', who: '👤', what: '📦', howmany: '🔢' };
 // Raj and Amira are supporting characters with busts only (no full-body 'front' pose): their resting pose is 'happy'.
 const REST = (who) => (who === 'raj' || who === 'amira' ? 'happy' : 'front');
+export const RULE_CARD = { title: 'Who knows your nicknames?', body: 'Close Friends (Liam, Mia, Zoey) know your nicknames like Den. Casual Acquaintances (Raj, Amira) don’t, so spell out the real place.' };
 const HELP = '✂ Short   🎯 Say what to do   👤 Who’s reading?   ❓ Ask';
 const FAIL_TEXT = { missing: 'Hmm, something’s missing.', breaker: 'That’s not what the note says!', negated: 'That says the opposite!', order: 'The words are in a confusing order.', bind: 'Who does what? It’s mixed up.', between: 'The words are in a confusing order.' };
 /** Words in the note (italics markers and punctuation stripped), for the paraphrase signal. */
@@ -53,7 +55,7 @@ const norm = (w) => w.replace(/[^A-Za-z0-9'’\-é]/g, '').replace('’', "'").t
 
 export default class GameScene extends ModuleScene {
   preload() {
-    const imgs = { 'tt-bg': bgUrl, 'tt-torch': torchUrl, 'tt-slip': slipUrl, 'tt-notebook': notebookUrl, 'tt-walkie': walkieUrl, 'tt-pencil': pencilUrl, 'tt-tape': tapeUrl };
+    const imgs = { 'tt-bg': bgUrl, 'tt-torch': torchUrl, 'tt-slip': slipUrl, 'tt-notebook': notebookUrl, 'tt-walkie': walkieUrl, 'tt-pencil': pencilUrl, 'tt-tape': tapeUrl, 'tt-nick': nickUrl };
     Object.entries(imgs).forEach(([k, u]) => { if (!this.textures.exists(k)) this.load.image(k, u); });
     const poses = { noah: ['happy', 'worried', 'excited', 'threequarter'], liam: ['front', 'happy', 'worried', 'excited'], mia: ['front', 'happy', 'worried', 'excited'], zoey: ['front', 'happy', 'worried', 'excited'], raj: ['happy', 'worried', 'excited'], amira: ['happy', 'worried', 'excited'] };
     for (const [c, ps] of Object.entries(poses)) for (const p of ps) if (!this.textures.exists(`${c}-${p}`)) this.load.image(`${c}-${p}`, charImg(c, p));
@@ -166,6 +168,7 @@ export default class GameScene extends ModuleScene {
 
   nextTurn() {
     this.clearIdle();
+    if (this.tut && this.items[this.turnIdx + 1]?.id === 'G4a' && !this.ruleCardDone) { this.ruleCardDone = true; return this.ruleCard(() => this.nextTurn()); }
     this.turnIdx++;
     if (this.turnIdx >= this.items.length) return this.endRound();
     const it = (this.item = this.items[this.turnIdx]);
@@ -182,6 +185,21 @@ export default class GameScene extends ModuleScene {
     this.panel.setPosition(this.W, 0); this.tweens.add({ targets: this.panel, x: 0, duration: ms('noteIn'), ease: 'Cubic.easeOut' });
     sfx.play('whoosh');
     this.armIdle();
+  }
+
+  /** Request #39: the explicit nickname rule, shown once before try-it step 4 (the same words and picture as how-to card 2). */
+  ruleCard(then) {
+    this.phase = 'rule'; const { W } = this, v = this.view(), t0 = performance.now();
+    const c = this.add.container(0, 0).setDepth(960);
+    c.add(this.add.rectangle(W / 2, this.H / 2, v.vw + 40, v.vh + 40, hex(C.ink), 0.55).setInteractive());
+    const top = Math.max(v.top + 60, 150), h = 980;
+    c.add(this.add.graphics().fillStyle(hex(C.cream), 1).fillRoundedRect(40, top, W - 80, h, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(40, top, W - 80, h, 36));
+    c.add(this.txt(W / 2, top + 64, RULE_CARD.title, { fontSize: '40px' }));
+    c.add(this.txt(W / 2, top + 170, RULE_CARD.body, { fontSize: '27px', fontStyle: '600', wordWrap: { width: W - 150 }, lineSpacing: 4 }));
+    const img = this.add.image(W / 2, top + 290, 'tt-nick').setOrigin(0.5, 0); img.setScale(Math.min((W - 130) / img.width, 520 / img.height)); c.add(img);
+    const ok = this.btn(W / 2, top + h - 70, 'Got it', () => { this.ruleOk = null; c.destroy(); this.trace('tt_rulecard', { ms: Math.round(performance.now() - t0) }); then(); }, { w: 320 });
+    c.add(ok); this.ruleOk = () => ok.emit('pointerup'); // test hook
+    this.ruleCardShown = true;
   }
 
   // ---------------------------------------------------------------- panel rendering
@@ -507,7 +525,7 @@ export default class GameScene extends ModuleScene {
     this.clearIdle(); this.hideOverlay();
     const it = this.item, words = [...this.msg];
     if (this.setbackAt && this.phase === 'compose') { this.trace('comm_setback_next', { msToNextSend: Math.round(performance.now() - this.setbackAt), action: 'continue' }); this.setbackAt = null; }
-    let outcome;
+    let outcome; this.sentFix = this.phase === 'fix';
     if (this.phase === 'fix') {
       const pass = fixPasses(words, it);
       this.fix = { words, pass };
@@ -572,9 +590,10 @@ export default class GameScene extends ModuleScene {
     const label = outcome === 'echo' ? `${it.mixup.echo}?` : outcome === 'pass' ? '✓' : '✗';
     this.slip.add([s, this.txt(10, 8, label, { fontSize: outcome === 'echo' ? '52px' : '84px', color: outcome === 'pass' ? C.green : outcome === 'fail' ? C.red : C.ink })]);
     this.slip.setAlpha(1).setScale(0.3); this.tweens.add({ targets: this.slip, scale: 1, duration: 260, ease: 'Back.easeOut' });
-    const hold = ms('react');
+    if (outcome === 'pass' && !this.sentFix && this.cur && (!this.tut || this.cur.stepOk)) this.resultLine(this.cur);
+    const hold = ms('react') + (this.resultPill ? 700 / SPEED : 0); // a little longer to read the points line
     this.time.delayedCall(hold, () => {
-      this.slip.setAlpha(0); this.notebook.setAlpha(0); this.nbText.setAlpha(0);
+      this.slip.setAlpha(0); this.notebook.setAlpha(0); this.nbText.setAlpha(0); this.resultPill?.destroy(); this.resultPill = null;
       this.pose(this.noah, 'noah', 'happy'); this.pose(this.friend, it.recipient, REST(it.recipient));
       if (outcome === 'echo') { this.phase = 'fix'; this.cap = FIX_CAP; this.msg = []; this.renderPanel(); this.slideUp(); this.armIdle(); return; }
       if (this.tut && !this.cur.stepOk) return this.retryStep(this.cur);
@@ -583,6 +602,20 @@ export default class GameScene extends ModuleScene {
       if (this.tut) this.floatText(this.W / 2, this.L.barY - 20, this.tries === 1 ? 'First try!' : '✓ Got it', C.green);
       this.endTurn();
     });
+  }
+
+  /** Request #39: a passed message shows its points, so a padded one visibly earns less ("Got it · 4/10 · long message"). */
+  resultLine(rec) {
+    const base = rec.base ?? rec.points, why = [];
+    if (base < 10) why.push(rec.used > rec.ideal ? 'long message' : 'could be clearer');
+    if (rec.points < base) why.push(`asks −${base - rec.points}`);
+    const text = [`Got it · ${rec.points}/10`, ...why].join(' · ');
+    this.lastResult = text; // test hook
+    const t = this.txt(0, 2, text, { fontSize: '30px', fontStyle: '800' }), w = t.width + 56;
+    const c = this.add.container(this.W / 2, this.slip.y - 150).setDepth(55);
+    c.add([this.add.graphics().fillStyle(hex(C.white), 1).fillRoundedRect(-w / 2, -34, w, 68, 34).lineStyle(4, hex(C.ink), 1).strokeRoundedRect(-w / 2, -34, w, 68, 34), t]);
+    this.world.add(c); this.resultPill = c;
+    c.setScale(0.4); this.tweens.add({ targets: c, scale: 1, duration: 240, ease: 'Back.easeOut' });
   }
 
   /** Try-it step not done yet: the friend says what went wrong, then the same note comes back. After 2 tries, a fail-safe. */
@@ -695,7 +728,25 @@ export default class GameScene extends ModuleScene {
       this.callout(530, L.btnY, 76, 'Send', 530, L.btnY - 96);
       const top = L.trayY + 2 * L.tileH + L.gap + 24; // the two crops never overlap, so no row is shown twice
       return [{ x: 0, y: L.noteY - 40, w: 720, h: top - (L.noteY - 40) }, { x: 0, y: Math.max(top, L.btnY - 150), w: 720, h: L.btnY + 80 - Math.max(top, L.btnY - 150) }]; }
-    if (n === 1) { this.renderPanel();
+    if (n === 1) { // two real recipient strips + messages: a Close Friend gets the nickname, a Casual Acquaintance the real place
+      const keep = { item: this.item, msg: this.msg, cap: this.cap, phase: this.phase };
+      this.panel.removeAll(true); this.phase = 'compose';
+      const byId = Object.fromEntries(ITEMS.map((x) => [x.id, x]));
+      const rows = [[{ ...byId['A-03'], recipient: 'liam', tag: 'Close Friend' }, ['take', 'paint', 'and', 'brushes', 'den', '2pm']],
+        [{ ...byId['A-07'], recipient: 'raj', tag: 'Casual Acquaintance' }, ['bring', 'glue', 'string', "Mia's", 'garage', 'noon']]];
+      const y0 = 240;
+      this.panel.add(this.add.graphics().fillStyle(hex(C.cream), 0.97).fillRoundedRect(14, y0 - 30, this.W - 28, 640, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(14, y0 - 30, this.W - 28, 640, 36));
+      rows.forEach(([it, words], i) => {
+        const y = y0 + i * 300; this.item = it; this.msg = words; this.cap = words.length;
+        this.panel.add([this.recipientStrip(y), this.barView(y + 96)]);
+        this.panel.add(this.txt(636, y + 96 + 56, '✓', { fontSize: '64px', color: C.green, stroke: C.white, strokeThickness: 8 }));
+        const k = i ? words.indexOf('garage') : words.indexOf('den'), at = this.barSlots[k]; // ring the word that matters
+        if (i) this.callout(at.x, at.y, 52, 'the real place', 470, at.y + 76, 3000, false);
+        else this.callout(at.x, at.y, 44, 'nickname OK', 470, at.y + 76, 3000, false);
+      });
+      Object.assign(this, keep);
+      return { x: 0, y: y0 - 40, w: 720, h: 660 }; }
+    if (n === 2) { this.renderPanel();
       this.callout(360, L.helpY + L.helpH / 2, 80, 'the 4 rules stay here', 360, L.helpY + 120);
       this.callout(this.W - 150, 64, 46, '? reopens this card', 440, 170);
       return { x: 0, y: 20, w: 720, h: L.helpY + 190 }; }

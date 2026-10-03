@@ -1,10 +1,11 @@
 // Torch Talk · effective communication (Noah). Brief: ./README.md · build pack: 11-game-concepts.md (C1 v1.1)
 import h0 from './assets/howto-0.webp';
 import h1 from './assets/howto-1.webp';
+import h2 from './assets/howto-2.webp';
 
 export default {
   id: 'torch-talk',
-  version: 5, // v5: learning v2 (#28: first completed tutorial only); v4 = how-to v3 (try-it steps) + no flashback; v3 = the v2.2 patch: item bank v2.2 with clarifier points, no round cap (itemBankVersion 3)
+  version: 6, // v6: points shown on every passed message + the nickname rule card (#39); v5: learning v2 (#28: first completed tutorial only); v4 = how-to v3 (try-it steps) + no flashback; v3 = the v2.2 patch: item bank v2.2 with clarifier points, no round cap (itemBankVersion 3)
   title: 'Torch Talk',
   tagline: 'Flash Noah’s messages across the garden. Every word costs a flash!',
   trait: 'communication',
@@ -17,7 +18,8 @@ export default {
   // How-to v3 (request #17): one opening picture + the recap card; the learning happens in the try-it steps (Practice).
   howTo: [
     { title: 'Your goal', body: 'Pass Noah’s note to a friend by torch. Tap words to build a message, then tap Send. Every word = 1 flash: send the shortest message your friend will get right.', shot: h0 },
-    { title: 'Remember', body: '✂ Short · 🎯 Clear: say what to do · 👤 Who’s reading? · ❓ Ask if something’s missing. No timer. Right but long = fewer points. Wrong = 0. Tap Practice to try it step by step.', shot: h1 },
+    { title: 'Who knows your nicknames?', body: 'Close Friends (Liam, Mia, Zoey) know your nicknames like Den. Casual Acquaintances (Raj, Amira) don’t, so spell out the real place.', shot: h1 }, // request #39
+    { title: 'Remember', body: '✂ Short · 🎯 Clear: say what to do · 👤 Who’s reading? · ❓ Ask if something’s missing. No timer. Right but long = fewer points. Wrong = 0. Tap Practice to try it step by step.', shot: h2 },
   ],
   practice: { durationSec: null, showTimer: false, scored: false }, // the 5 try-it steps (6 notes); no cap
   round: { durationSec: null, showTimer: false }, // v2.2: no timer at all; the round ends after turn 10 (idleMs is logged)

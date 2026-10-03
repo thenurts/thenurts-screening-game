@@ -38,7 +38,7 @@ const STREAM_B = [
 const PARKED = { id: 'tapau', item: 'roti', announce: 10, arrive: 21, waits: 3, customer: 'amira' }; // back at 7:20 (tick 21), collects automatically, waits to 7:23
 const SETBACK = { tick: 18, station: 'griddle', ticks: 3, noticeFrom: 13 }; // announced from 7:12: griddle off 7:17–7:19
 export const W = { valueDone: 0.30, expiredHigh: 0.20, halfDone: 0.20, parkedReturn: 0.15, errorsUnderLoad: 0.15 };
-export const BEST_STARS = { A: 27, B: 27 }; // o1.bestStars: the best known plan per form (demand 33 ★ > capacity)
+export const BEST_STARS = { A: 28, B: 28 }; // o1.bestStars: the TRUE maximum per form (exact search, reference v1.3; was 27). Demand 33 ★ > capacity
 
 export const FORMS = {
   A: { stream: STREAM_A, parked: PARKED, setback: SETBACK, ticks: 36, bestStars: BEST_STARS.A },
