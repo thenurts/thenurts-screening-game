@@ -16,7 +16,7 @@ var NurtsScoring = (function(exports) {
 	//#endregion
 	//#region src/scoring/config.js
 	var DEFAULTS = {
-		scoringVersion: "sc-2",
+		scoringVersion: "sc-3",
 		stage: "alpha",
 		"norms.minProvisional": 5,
 		"norms.minBands": 30,
@@ -5153,8 +5153,8 @@ var NurtsScoring = (function(exports) {
 		errorsUnderLoad: .15
 	};
 	var BEST_STARS = {
-		A: 27,
-		B: 27
+		A: 28,
+		B: 28
 	};
 	var FORMS = {
 		A: {

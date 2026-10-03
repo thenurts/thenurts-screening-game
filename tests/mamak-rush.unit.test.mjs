@@ -24,13 +24,13 @@ test('JS act/metrics/orgScore match the Python reference on every fixture run (1
   }
 });
 
-test('the JS careful bot plays exactly the reference careful plan (org 98.9 on both forms)', () => {
+test('the JS careful bot plays exactly the reference careful plan (org 97.9 on both forms)', () => {
   for (const f of ['A', 'B']) {
     const st = newState(FORMS[f]); const acts = [];
     while (!shiftOver(st)) { const [tg, sta] = careful(st); acts.push([tg, sta]); act(st, tg, sta); }
     assert.deepEqual(acts, runs.find((r) => r.form === f && r.bot === 'careful').actions);
-    assert.equal(orgScore(metrics(st)), 98.9); assert.equal(metrics(st).starsServed, 26);
-    assert.deepEqual(facets(metrics(st)), { planScore: 98.4, pressureScore: 100 });
+    assert.equal(orgScore(metrics(st)), 97.9); assert.equal(metrics(st).starsServed, 26);
+    assert.deepEqual(facets(metrics(st)), { planScore: 97, pressureScore: 100 });
   }
 });
 

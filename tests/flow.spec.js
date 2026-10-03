@@ -62,6 +62,7 @@ async function playRound(page, strategy = 't3') {
         return 'chose';
       }
       if (s.manifest.id === 'torch-talk') {
+        if (s.lastResult) { (window.__ttResults ||= new Set()).add(s.lastResult); s.lastResult = null; } // request #39 result line
         if (!s.running || !s.item) return 'wait';
         const it = s.item;
         if (s.phase === 'compose') {
@@ -221,9 +222,9 @@ test('applicant: register → how to → practice → real round → report → 
     await fetch(GAS + '/__set/ScoringConfig?' + encodeURIComponent(JSON.stringify([[vr, 2, 'sc-1'], [ar, 1, 'autonomyFactor'], [ar, 2, '{"Junior":1}']])));
     await fetch(GAS + '/__run/refreshSummary');
     const up = (await (await fetch(GAS + '/__dump')).json()).sheets;
-    expect(up.ScoringConfig.find((r) => r[0] === 'scoringVersion')[1]).toBe('sc-2');
+    expect(up.ScoringConfig.find((r) => r[0] === 'scoringVersion')[1]).toBe('sc-3');
     expect(up.ScoringConfig.some((r) => r[0] === 'autonomyFactor')).toBeFalsy(); expect(up.ScoringConfig.some((r) => r[0] === 'autonomy.enabled')).toBeTruthy();
-    expect(up.Scores[1][up.Scores[0].indexOf('scoringVersion')]).toBe('sc-2');
+    expect(up.Scores[1][up.Scores[0].indexOf('scoringVersion')]).toBe('sc-3');
   }
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
@@ -473,8 +474,12 @@ test('torch talk: Form A first; ideal bot scores 100, filler bot less; order + p
     await reset(page);
     await page.click('#btn-casual');
     await page.click('#btn-start');
+    await page.evaluate(() => { window.__ttResults = new Set(); });
     await playRound(page, strat);
     await expect(page.locator('#btn-continue')).toBeVisible({ timeout: 90_000 });
+    const lines = await page.evaluate(() => [...(window.__ttResults || [])]);
+    if (strat === 'ideal') expect(lines).toContain('Got it · 10/10'); // request #39: points on every passed message
+    else expect(lines.some((x) => / · long message$/.test(x)), lines.join(' | ')).toBeTruthy();
     await page.waitForTimeout(1500);
     const dbj = await backend(page);
     const r = LIVE
@@ -605,7 +610,7 @@ test('developer mode: PIN → Dev Test picker → chosen games + options → row
   expect(errors).toEqual([]);
 });
 
-test('the nurts mamak v1.2: careful plan = 98.9 on Form A (26 of 27 ★), tapau collected automatically; the clock moves only on actions; gas out 7:17–7:19', async ({ page }, info) => {
+test('the nurts mamak v1.2: careful plan = 97.9 on Form A (26 of 28 ★), tapau collected automatically; the clock moves only on actions; gas out 7:17–7:19', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'scoring is device-independent; run once');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/' + Q + 'candidate=1&speed=10&first=mamak-rush');
@@ -634,8 +639,8 @@ test('the nurts mamak v1.2: careful plan = 98.9 on Form A (26 of 27 ★), tapau 
   const m = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[10] === 'completed' && x[7] === 'real').map((x) => JSON.parse(x[12])).at(-1)
     : dbj.rounds.filter((x) => x.status === 'completed' && x.mode === 'real').map((x) => x.metrics).at(-1);
   expect(m.form).toBe('A');
-  expect(m.orgScore).toBe(98.9);
-  expect(m.starsServed).toBe(26); expect(m.bestPossible).toBe(27);
+  expect(m.orgScore).toBe(97.9);
+  expect(m.starsServed).toBe(26); expect(m.bestPossible).toBe(28);
   expect(m.tapauCollected).toBe('7:20');
   expect(m.learn.firstUse[1]).toBeGreaterThanOrEqual(3); expect(m.learn.firstUse[0]).toBe(m.learn.firstUse[1]); // careful play passes every probe
   expect(m.minutesPlayed).toBe(36);
@@ -660,7 +665,7 @@ test('torch talk how-to v3: the try-it steps catch a sentence writer, fail-safe 
   const tips = new Set();
   await page.waitForFunction(() => window.__tnGame?.scene.getScenes(true).some((x) => x.scene.key === 'mod:torch-talk'), null, { timeout: 30_000 });
   for (let i = 0; i < 600; i++) {
-    const r = await S(`(s) => { if (s.ended) return 'end'; if (!s.running || s.phase !== 'compose' || !s.item) return 'wait';
+    const r = await S(`(s) => { if (s.ended) return 'end'; if (s.ruleOk) { s.ruleOk(); return 'rule'; } if (!s.running || s.phase !== 'compose' || !s.item) return 'wait';
       if (s.tries >= 2) { s.send(); return 'safe'; }
       if (s.lastTip) window.__tips = [...(window.__tips || []), s.lastTip];
       s.msg = ${JSON.stringify(wrong)}[s.item.id].split(' '); s.send(); return 'sent'; }`);
@@ -673,6 +678,9 @@ test('torch talk how-to v3: the try-it steps catch a sentence writer, fail-safe 
   expect([...tips].join(' | ')).toContain('Plants don’t drink juice!');
   expect([...tips].join(' | ')).toContain('What’s the Rocket?');
   await expect(page.locator('#btn-start')).toBeVisible({ timeout: 20_000 });
+  const dbt = await backend(page); // request #39: the nickname rule card came up once, before step 4
+  const prTrace = JSON.stringify(dbt.traces);
+  expect(prTrace).toContain('tt_rulecard');
   // request #15: during the real round, an ended turn's panel never shows again (frame check)
   await page.evaluate(() => {
     window.__frames = [];
@@ -776,7 +784,7 @@ test('big calls: wise = 100 on Form A; Check shows strength + cost and hides aft
 test('how-to screenshots are staged from each game\'s real UI (standard #19b)', async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile', 'one device');
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  for (const [id, cards] of [['lucky-dip', 3], ['torch-talk', 2], ['fair-board', 3], ['mamak-rush', 6], ['fix-it-kit', 4], ['big-calls', 5], ['sunny-tap', 3]]) {
+  for (const [id, cards] of [['lucky-dip', 3], ['torch-talk', 3], ['fair-board', 3], ['mamak-rush', 6], ['fix-it-kit', 4], ['big-calls', 5], ['sunny-tap', 3]]) {
     await page.goto('/' + Q + 'speed=10&first=' + id);
     await reset(page);
     await page.click('#btn-casual');

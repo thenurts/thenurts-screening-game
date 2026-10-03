@@ -33,7 +33,7 @@ test('L1: every game re-derives its stored score from the raw logs with its own 
 test('L2–L7 on one candidate: traits, organisation 60/40, ethics flag, alpha labels, insight card', () => {
   const out = scoreAll(input());
   const s = out.scores[0];
-  assert.equal(s.stage, 'ALPHA: test data'); assert.equal(s.scoringVersion, 'sc-2');
+  assert.equal(s.stage, 'ALPHA: test data'); assert.equal(s.scoringVersion, 'sc-3');
   for (const t of ['organisation', 'resilience', 'judgement', 'critical', 'creative', 'communication', 'risk']) assert.notEqual(s[t], '', t);
   const mk = FX.rounds.find((r) => r.module === 'mamak-rush' && r.mode === 'real').metrics;
   assert.equal(s.organisation, orgScoreV2(mk).score);

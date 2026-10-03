@@ -1,4 +1,4 @@
-"""The Nurts Mamak: reference simulator (O1 build pack v1.2).
+"""The Nurts Mamak: reference simulator (O1 build pack v1.2; reference v1.3: BEST_STARS 28).
 Player-facing time: tick n = 7:(n-1) pm on the mamak wall clock (1 action = 1 minute; shift 7:00-7:36). Never show "tick" to players. Run: python3 mamak-reference.py → PASS.
 The game's JS must match act(), metrics() and org_score() exactly (parity fixture exported from this file). Tick-based: the clock moves ONE tick per station tap.
 Selecting an order is free. Nothing moves while the player thinks, so speed never matters."""
@@ -96,7 +96,7 @@ W = dict(valueDone=0.30, expiredHigh=0.20, halfDone=0.20, parkedReturn=0.15, err
 def org_score(m):
     return round(100 * (W["valueDone"] * m["valueShare"] + W["expiredHigh"] * (1 - m["expiredHigh"]) +
                         W["halfDone"] * (1 - m["halfDone"]) + W["parkedReturn"] * m["parkedReturn"] + W["errorsUnderLoad"] * (1 - min(1, m["errorsUnderLoad"] * 4))), 1)
-BEST_STARS = {"A": 27, "B": 27}   # o1.bestStars: best known plan per form (beam search 1,500 wide + the careful bot). Demand is 33 stars / 46 steps vs 36 minutes, so nobody can serve everything
+BEST_STARS = {"A": 28, "B": 28}   # o1.bestStars v1.3 (2026-10-02): the TRUE maximum per form, from an exact search (dead-order + bound pruning); was 27 (beam search). Alpha: a 28-star run was seen. Demand is 33 stars / 46 steps vs 36 minutes
 def run(policy, seed=0, slip=0.0):
     st = new_state(); arrive(st); rng = random.Random(seed)
     while st["tick"] <= TICKS:

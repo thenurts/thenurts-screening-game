@@ -171,3 +171,33 @@ test('how-to v3 try-it steps: Python build check passes and the JS checker agree
   assert.deepEqual(nicknames(by.G4a), ['rocket']); assert.deepEqual(nicknames(by.G4b), ['rocket']);
   assert.ok(!trayOrder(by.G5).includes('4pm') && trayOrder(by.G5).includes(null), 'G5: the time only appears after asking');
 });
+
+// Request #39: 1,000 random bashes + 1,000 keyword sprays per item score identically in JS and the reference
+// (tools/tt_bash_fixture.py). The messages are regenerated here with Python's Mersenne Twister, so only answers are stored.
+import { PyRandom } from '../src/modules/sunny-tap/rules.js';
+test('random bashes and keyword sprays: JS matches the reference on every message (#39)', () => {
+  const fx = JSON.parse(readFileSync('tests/fixtures/torch-talk-bash.json', 'utf8'));
+  const all = Object.fromEntries([...ITEMS, ...TUT.steps].map((x) => [x.id, x]));
+  const bitLen = (n) => 32 - Math.clz32(n);
+  const rb = (r, n) => { const k = bitLen(n); let x; do x = r.u32() >>> (32 - k); while (x >= n); return x; };
+  const pick = (r, pool, n) => { const a = [...pool]; for (let i = 0; i < n; i++) { const j = i + rb(r, a.length - i); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, n); };
+  const shuffle = (r, a) => { for (let i = a.length - 1; i > 0; i--) { const j = rb(r, i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const full = (it) => it.tiles.concat(it.gap ? it.gap.answerTile.split(' ') : []);
+  const bash = (r, it) => { const f = full(it), n = Math.min(8 + rb(r, 3), it.cap, f.length); return pick(r, f, n); };
+  const spray = (r, it) => {
+    const f = full(it), req = [];
+    for (const s of it.slots) for (const w of s.accept[rb(r, s.accept.length)].split(' ')) if (!req.includes(w)) req.push(w);
+    const n = Math.max(req.length, Math.min(8 + rb(r, 3), it.cap));
+    const rest = f.filter((t) => t !== 'not' && !req.includes(t));
+    return shuffle(r, req.concat(pick(r, rest, Math.min(n - req.length, rest.length))));
+  };
+  const code = (m, it) => { const c = check(m, it); return c === 'pass' ? points(m, it) : -(1 + fx.reasons.indexOf(c)); };
+  let cases = 0;
+  fx.items.forEach((id, k) => {
+    const it = all[id], r = new PyRandom(1000 + k);
+    assert.ok(it, id);
+    for (let i = 0; i < fx.n; i++) { const m = bash(r, it); assert.equal(code(m, it), fx.bash[k][i], `bash ${id} #${i}: ${m.join(' ')}`); cases++; }
+    for (let i = 0; i < fx.n; i++) { const m = spray(r, it); assert.equal(code(m, it), fx.spray[k][i], `spray ${id} #${i}: ${m.join(' ')}`); cases++; }
+  });
+  assert.equal(cases, 88000);
+});
