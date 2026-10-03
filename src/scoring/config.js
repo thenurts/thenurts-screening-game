@@ -2,7 +2,7 @@
 // (one row per key, JSON value); every derived number is stamped with `scoringVersion`. Change a value → bump the
 // version → The Nurts → Rescore all.
 export const DEFAULTS = {
-  scoringVersion: 'sc-2', // sc-2: autonomy measured (#32–34)
+  scoringVersion: 'sc-3', // sc-3: Mamak's true maximum 28 ★ (#40); sc-2: autonomy measured (#32–34)
   stage: 'alpha', // alpha · beta · soft · hard (request #31)
   // L4 norms
   'norms.minProvisional': 5, 'norms.minBands': 30, 'bands.strongTop': 0.30, 'bands.probeBottom': 0.20,
