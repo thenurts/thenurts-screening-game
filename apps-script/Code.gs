@@ -85,6 +85,7 @@ function onOpen() {
     .addItem('Refresh Candidate Summary', 'refreshSummary')
     .addItem('Rescore all', 'rescoreAll')
     .addItem('Make a one-pager for the selected candidate', 'onePager')
+    .addItem('Turn on outcome reminders (90 days / 12 months)', 'turnOnOutcomeReminders')
     .addSeparator()
     .addItem('Delete Dev Test rows', 'deleteDevRows')
     .addItem('Archive and purge…', 'archiveAndPurge')
@@ -515,7 +516,7 @@ function buildSummary_() {
 // ---------------------------------------------------------------- scoring layer (requests #28–31; claude/13-scoring-layer-design.md)
 // The formulas live in scoring.gs (a build of src/scoring/, the same code the tests run). Raw tabs are never changed here:
 // every derived tab is rebuilt from them and stamped with scoringVersion + stage.
-var SCORING_TABS = { config: 'ScoringConfig', scores: 'Scores', norms: 'Norms', insights: 'Insights', calibration: 'Calibration', validity: 'Validity', purges: 'Purges', onePager: 'One-pager' };
+var SCORING_TABS = { config: 'ScoringConfig', scores: 'Scores', norms: 'Norms', insights: 'Insights', calibration: 'Calibration', validity: 'Validity', purges: 'Purges', onePager: 'One-pager', outcomes: 'Outcomes', ethicsMonitor: 'Ethics monitor' };
 
 /** A cell value: numbers stay numbers, text is made formula-safe. */
 function cell_(v) { return v == null ? '' : typeof v === 'number' || typeof v === 'boolean' ? v : safe_(v); }
@@ -553,12 +554,14 @@ function tabObjects_(name) {
 function runScoring_(users, regs, rounds, away) {
   setupScoringTabs_(); // existing Sheets get the new tabs on their first rescore
   var ic = idx_('Interactions');
+  // a round closed without metrics (an abandon) is read from its last live snapshot, so leaving after a setback is visible (FW-14)
+  var partial = {}; rows_('RoundTraces').forEach(function (t) { if (t[TC.partial_metrics]) partial[t[TC.round_uid]] = t[TC.partial_metrics]; });
   var reg = {}; regs.forEach(function (r) { reg[r[1]] = { employmentType: r[5], desiredFunction: r[6] }; });
   var input = {
     config: readConfig_(), now: Date.now(), away: away || {}, registrations: reg,
     users: users.map(function (u) { return { userId: u[UC.user_id], name: u[UC.name], currentRun: Number(u[UC.current_run]) || 1, runsCompleted: Number(u[UC.runs_completed]) || 0 }; }),
     rounds: rounds.map(function (r) {
-      var m = null; try { m = r[RC.metrics_json] ? JSON.parse(r[RC.metrics_json]) : null; } catch (x) { m = null; }
+      var m = null; try { m = r[RC.metrics_json] ? JSON.parse(r[RC.metrics_json]) : partial[r[RC.round_uid]] ? JSON.parse(partial[r[RC.round_uid]]) : null; } catch (x) { m = null; }
       return { userId: r[RC.user_id], isCasual: r[RC.is_casual] === true || r[RC.is_casual] === 'TRUE' || r[RC.user_id] === CASUAL_ID || r[RC.user_id] === DEV_ID, runNo: Number(r[RC.run_no]) || 1, module: r[RC.module], moduleVersion: String(r[RC.module_version]), mode: r[RC.mode], status: r[RC.status], startedAt: new Date(r[RC.started_at]).getTime() || 0, metrics: m };
     }),
     interactions: rows_('Interactions').filter(function (r) { return /^eth_/.test(r[ic.interaction]); }).map(function (r) {
@@ -580,8 +583,10 @@ function runScoring_(users, regs, rounds, away) {
   var keys = res.scores.length ? Object.keys(res.scores[0]) : ['stage', 'scoringVersion', 'scoredAt', 'user_id'];
   writeTab_(SCORING_TABS.scores, keys, res.scores);
   writeTab_(SCORING_TABS.norms, ['module', 'moduleVersion', 'trait', 'n', 'p20', 'p50', 'p70', 'status', 'stage', 'scoringVersion'], res.norms);
-  writeTab_(SCORING_TABS.insights, ['stage', 'user_id', 'name', 'role', 'headline', 'autonomy', 'probe first', 'red flags', 'read with care', 'not measured', 'scoringVersion'], res.insights);
-  var val = NurtsScoring.validity(res.scores, tabObjects_(SCORING_TABS.calibration), res.config);
+  writeTab_(SCORING_TABS.insights, ['stage', 'user_id', 'name', 'role', 'headline', 'autonomy', 'risk', 'probe first', 'red flags', 'evidence', 'read with care', 'not measured', 'scoringVersion'], res.insights);
+  writeTab_(SCORING_TABS.ethicsMonitor, ['month', 'offered', 'opened', 'open rate %', 'flagged', 'flag rate %', 'self-corrected', 'reported', 'baseline open rate %', 'status'], res.ethicsMonitor || [], true);
+  var val = NurtsScoring.validity(res.scores, tabObjects_(SCORING_TABS.calibration), res.config)
+    .concat(NurtsScoring.outcomesValidity(res.scores, tabObjects_(SCORING_TABS.outcomes), res.config)); // FW-5: the 90-day / 12-month outcomes
   writeTab_(SCORING_TABS.validity, ['trait', 'rater item', 'n', 'AUC', 'mean score Y', 'mean score N', 'band × answer', 'rater agreement', 'note', 'status'], val);
   return res;
 }
@@ -609,6 +614,18 @@ function setupScoringTabs_() {
       cols.forEach(function (c, i) {
         var choices = NurtsScoring.CALIBRATION_CHOICES[c]; if (!choices) return;
         cal.getRange(2, i + 1, cal.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(choices, true).setAllowInvalid(false).build());
+      });
+    } catch (x) { /* no data validation in the test harness */ }
+  }
+  if (!ss.getSheetByName(SCORING_TABS.outcomes)) { // FW-5: one row per hire, filled in by staff; reminders at 90 days and 12 months
+    var oc = ss.insertSheet(SCORING_TABS.outcomes); var ocols = NurtsScoring.OUTCOME_COLUMNS;
+    oc.getRange(1, 1, 1, ocols.length).setValues([ocols]).setFontWeight('bold').setBackground('#F1D5FA'); oc.setFrozenRows(1);
+    oc.getRange(1, 1, oc.getMaxRows(), 1).setNumberFormat('@');
+    try {
+      ocols.forEach(function (c, i) {
+        var choices = NurtsScoring.OUTCOME_CHOICES[c];
+        if (choices) oc.getRange(2, i + 1, oc.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(choices, true).setAllowInvalid(false).build());
+        if (c === 'hireDate') oc.getRange(2, i + 1, oc.getMaxRows() - 1, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build());
       });
     } catch (x) { /* no data validation in the test harness */ }
   }
@@ -645,14 +662,45 @@ function onePager() {
 }
 function makeOnePager_(userId) {
   var card = tabObjects_(SCORING_TABS.insights).filter(function (o) { return o.user_id === userId; })[0]; if (!card) return false;
+  card = NurtsScoring.onePagerCard(card); // FW-12: ethics details stay in the recruiter-only Insights tab
   var ss = ss_(); var sh = ss.getSheetByName(SCORING_TABS.onePager) || ss.insertSheet(SCORING_TABS.onePager); sh.clear();
   var rows = [['The Nurts · candidate insight card', ''], [card.name + '  ·  ' + card.role, card.stage], ['', ''],
-    ['Headline', card.headline], ['Autonomy', card.autonomy || '–'], ['Probe first', card['probe first']], ['Red flags', card['red flags'] || 'none'], ['Read with care', card['read with care'] || '–'], ['Not measured', card['not measured']],
+    ['Headline', card.headline], ['Autonomy', card.autonomy || '–'], ['Risk', card.risk || '–'], ['Probe first', card['probe first']], ['Red flags', card['red flags'] || 'none'], ['Evidence', card.evidence || '–'], ['Read with care', card['read with care'] || '–'], ['Not measured', card['not measured']],
     ['', ''], ['How to use this', 'One input, reviewed by a person, alongside the CV, a structured interview and a work trial. Never an automatic rejection.'], ['Scoring', card.scoringVersion]];
   sh.getRange(1, 1, rows.length, 2).setValues(rows.map(function (r) { return [cell_(r[0]), cell_(r[1])]; }));
   sh.getRange(1, 1, rows.length, 1).setFontWeight('bold');
   try { sh.setColumnWidth(1, 140); sh.setColumnWidth(2, 620); sh.getRange(1, 2, rows.length, 1).setWrap(true); } catch (x) { /* harness */ }
   return true;
+}
+
+/** FW-5: daily job. For each hire whose 90-day or 12-month outcome is due and still blank, emails outcomes.remindTo (default
+ * hello@thenurts.com) a link to that Outcomes row, once, and stamps the "reminder sent" column. Candidate details stay in the Sheet. */
+function sendOutcomeReminders() {
+  var sh = ss_().getSheetByName(SCORING_TABS.outcomes); if (!sh || sh.getLastRow() < 2) return 0;
+  var cols = NurtsScoring.OUTCOME_COLUMNS, head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, head.length).getValues().map(function (r) { var o = {}; head.forEach(function (h, i) { o[h] = r[i]; }); return o; });
+  var due = NurtsScoring.outcomeReminders(rows, Date.now()); if (!due.length) return 0;
+  var cfg = NurtsScoring.mergeConfig(readConfig_()), to = String(cfg['outcomes.remindTo'] || 'hello@thenurts.com');
+  var names = {}; rows_('Users').forEach(function (u) { names[u[UC.user_id]] = u[UC.name]; });
+  var url = ss_().getUrl ? ss_().getUrl() : '', gid = sh.getSheetId ? sh.getSheetId() : 0, tz = 'Asia/Kuala_Lumpur';
+  due.forEach(function (d) {
+    var o = rows[d.index], row = d.index + 2, link = url + '#gid=' + gid + '&range=A' + row;
+    var ask = d.kind === '90-day' ? 'productivity (1–5), needed hand-holding (Y/N) and reliability (1–5)' : 'still here, resigned or terminated';
+    MailApp.sendEmail(to, 'The Nurts: ' + d.kind + ' check for ' + (names[o.user_id] || 'a hire') + ' (Outcomes row ' + row + ')',
+      'It is time for the ' + d.kind + ' check on ' + (names[o.user_id] || 'a hire') + ', hired as ' + [o['level hired at'], o['function'], o['type']].filter(Boolean).join(' ') + '.\n\n' +
+      'Please fill in ' + ask + ' in the Outcomes tab:\n' + link + '\n\nThese answers are how The Nurts checks which game results actually predict success.');
+    sh.getRange(row, head.indexOf(d.kind === '90-day' ? '90-day reminder sent' : '12-month reminder sent') + 1).setValue(Utilities.formatDate(now_(), tz, 'yyyy-MM-dd'));
+  });
+  return due.length;
+}
+
+/** Menu → Turn on outcome reminders: creates the daily 9 am job once (asks for permission to send email the first time). */
+function turnOnOutcomeReminders() {
+  setupScoringTabs_();
+  if (!ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'sendOutcomeReminders'; })) {
+    ScriptApp.newTrigger('sendOutcomeReminders').timeBased().everyDays(1).atHour(9).create();
+  }
+  try { SpreadsheetApp.getUi().alert('Outcome reminders are on: each morning, any 90-day or 12-month check that is due is emailed once.'); } catch (x) { /* editor or harness */ }
 }
 
 /** Menu → Archive and purge… (request #31): only after typing PURGE. Copies the whole spreadsheet to a private archive
@@ -677,12 +725,12 @@ function purge_(reason, confirm) {
     var stage = readConfig_().stage || NurtsScoring.DEFAULTS.stage;
     var copy = DriveApp.getFileById(ss.getId()).makeCopy('The Nurts results archive ' + Utilities.formatDate(now_(), 'Asia/Kuala_Lumpur', 'yyyy-MM-dd HHmm') + ' (' + stage + ')', DriveApp.getFolderById(folderId));
     var n = 0;
-    ['Interactions', 'Registrations', 'Users', 'Casual', 'Rounds', 'RoundTraces', SCORING_TABS.calibration].forEach(function (tab) {
+    ['Interactions', 'Registrations', 'Users', 'Casual', 'Rounds', 'RoundTraces', SCORING_TABS.calibration, SCORING_TABS.outcomes].forEach(function (tab) {
       var sh = ss.getSheetByName(tab); if (!sh || sh.getLastRow() < 2) return;
       n += sh.getLastRow() - 1; sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
     });
     ss.getSheets().forEach(function (sh) { if (/^Scores /.test(sh.getName())) ss.deleteSheet(sh); });
-    ['Candidate Summary', SCORING_TABS.scores, SCORING_TABS.norms, SCORING_TABS.insights, SCORING_TABS.validity, SCORING_TABS.onePager].forEach(function (tab) { var sh = ss.getSheetByName(tab); if (sh) sh.clear(); });
+    ['Candidate Summary', SCORING_TABS.scores, SCORING_TABS.norms, SCORING_TABS.insights, SCORING_TABS.validity, SCORING_TABS.onePager, SCORING_TABS.ethicsMonitor].forEach(function (tab) { var sh = ss.getSheetByName(tab); if (sh) sh.clear(); });
     var pg = ss.getSheetByName(SCORING_TABS.purges);
     pg.getRange(pg.getLastRow() + 1, 1, 1, 6).setValues([[now_(), stage, safe_(reason || ''), copy.getUrl(), n, safe_(activeEmail_())]]);
     refreshSummary();

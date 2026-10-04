@@ -16,7 +16,7 @@ var NurtsScoring = (function(exports) {
 	//#endregion
 	//#region src/scoring/config.js
 	var DEFAULTS = {
-		scoringVersion: "sc-3",
+		scoringVersion: "sc-4",
 		stage: "alpha",
 		"norms.minProvisional": 5,
 		"norms.minBands": 30,
@@ -35,7 +35,8 @@ var NurtsScoring = (function(exports) {
 			expiredHigh: .2,
 			halfDone: .2
 		},
-		"res.hookWeight": 0,
+		"resilience.hookWeight": 0,
+		"resilience.continueWeight": 0,
 		"secondary.weight": 0,
 		"learn.weights": {
 			firstUse: .3,
@@ -46,6 +47,7 @@ var NurtsScoring = (function(exports) {
 		},
 		"learn.minParts": 2,
 		"learn.minGames": 2,
+		"learn.firstUseOnlyGames": 3,
 		"learn.redFlagMinParts": 3,
 		"learn.itemNormsReady": false,
 		"learn.provisionalBands": {
@@ -174,7 +176,11 @@ var NurtsScoring = (function(exports) {
 			.6
 		],
 		"autonomy.validAuc": .6,
-		"validity.descriptiveBelow": 20
+		"validity.descriptiveBelow": 20,
+		"outcomes.minHires": 10,
+		"outcomes.remindTo": "hello@thenurts.com",
+		"ethics.leakRatio": 2,
+		"ethics.baselineMonths": 3
 	};
 	/** DEFAULTS overlaid with the Sheet's values (unknown keys are kept, so new settings can be added without code). */
 	function mergeConfig(over = {}) {
@@ -198,7 +204,7 @@ var NurtsScoring = (function(exports) {
 		hard: ""
 	};
 	var STAGE_NO_NORMS = { alpha: true };
-	var OBSOLETE_KEYS = ["autonomyFactor"];
+	var OBSOLETE_KEYS = ["autonomyFactor", "res.hookWeight"];
 	//#endregion
 	//#region src/modules/lucky-dip/scoring.js
 	var SCORING$1 = {
@@ -7149,9 +7155,90 @@ var NurtsScoring = (function(exports) {
 		if (module === "big-calls") return (m === null || m === void 0 ? void 0 : m.unluckyNext) === "followed" ? 1 : (m === null || m === void 0 ? void 0 : m.unluckyNext) === "strayed" ? 0 : null;
 		return null;
 	}
+	/** Indicative traits (Framework v0.6): shown as a band with ±; they never raise a red flag or set the best-fit level on their own. */
+	var INDICATIVE = Object.keys(RELIABILITY).filter((t) => RELIABILITY[t] === "indicative");
+	/** FW-14: did this unfinished round get past its game's setback? (So leaving it counts as "left after a setback".) */
+	function pastSetback(module, m) {
+		if (!m) return false;
+		if (module === "sunny-tap") return !!m.reportQuit || Array.isArray(m.reports) && m.reports.length > 0;
+		if (module === "torch-talk") return Array.isArray(m.turnLog) && m.turnLog.length >= 6;
+		return setbackHook(module, m) != null;
+	}
+	/** Resilience (Framework v0.6 + v0.8): Sunny Tap, plus the setback hooks and continueLatency at their ScoringConfig weights
+	* (both 0 until validated). Hooks map to 0–1 (a ratio stays, a delta d becomes 1 + d, clamped); continue = the player's own
+	* post-game Continue time ÷ their median Continue time at the mini-reports (auto-continues left out), capped at 1. */
+	function resilienceComposite(sunny, hooks, m, cfg = DEFAULTS) {
+		if (sunny == null) return null;
+		const wh = Number(cfg["resilience.hookWeight"]) || 0, wc = Number(cfg["resilience.continueWeight"]) || 0;
+		const parts = [[1, sunny]];
+		const hs = hooks.filter((h) => h != null).map((h) => Math.max(0, Math.min(1, h > 1 || h < 0 ? 1 + h : h)));
+		if (wh > 0 && hs.length) parts.push([wh, 100 * hs.reduce((a, b) => a + b, 0) / hs.length]);
+		const lat = ((m === null || m === void 0 ? void 0 : m.continueLatency) || []).filter((x) => x > 0).sort((a, b) => a - b), base = num(m === null || m === void 0 ? void 0 : m.baselineContinueMs);
+		if (wc > 0 && lat.length && base) parts.push([wc, 100 * Math.min(1, base / lat[lat.length >> 1])]);
+		const extra = parts.slice(1).reduce((a, [w]) => a + w, 0);
+		parts[0][0] = Math.max(0, 1 - extra);
+		return r1(parts.reduce((a, [w, v]) => a + w * v, 0) / parts.reduce((a, [w]) => a + w, 0));
+	}
+	//#endregion
+	//#region src/scoring/ethicsMonitor.js
+	var monthOf = (t) => new Date(Number(t) + 288e5).toISOString().slice(0, 7);
+	/** events: [{ userId, interaction, value, t }] (eth_* rows) · users: the registered user ids to count (no Casual / Dev Test). */
+	function ethicsMonitor(events, users, cfg = DEFAULTS) {
+		const keep = new Set(users), by = {};
+		for (const e of [...events].sort((a, b) => a.t - b.t)) {
+			var _by$m, _e$userId, _e$value3;
+			if (!keep.has(e.userId) || !/^eth_/.test(e.interaction)) continue;
+			const m = monthOf(e.t), u = (_by$m = by[m] || (by[m] = {}))[_e$userId = e.userId] || (_by$m[_e$userId] = {
+				offered: false,
+				opened: false,
+				up: false,
+				back: false,
+				reported: false
+			});
+			if (e.interaction === "eth_offer") u.offered = true;
+			if (e.interaction === "eth_modify") {
+				var _e$value, _e$value2;
+				u.opened = true;
+				if (((_e$value = e.value) === null || _e$value === void 0 ? void 0 : _e$value.confirmed) && ((_e$value2 = e.value) === null || _e$value2 === void 0 ? void 0 : _e$value2.direction) === "up") {
+					u.up = true;
+					u.back = false;
+				}
+			}
+			if (e.interaction === "eth_revert" && u.up) u.back = true;
+			if (e.interaction === "eth_report_problem" && /developer tool/i.test(((_e$value3 = e.value) === null || _e$value3 === void 0 ? void 0 : _e$value3.option) || "")) {
+				u.reported = true;
+				if (u.up) u.back = true;
+			}
+		}
+		const pct = (a, b) => b ? Math.round(1e3 * a / b) / 10 : "";
+		const months = Object.keys(by).sort(), rows = [];
+		const baseN = Number(cfg["ethics.baselineMonths"]) || 3, ratio = Number(cfg["ethics.leakRatio"]) || 2;
+		const first = months.slice(0, baseN).flatMap((x) => Object.values(by[x])), o = first.filter((u) => u.offered || u.opened).length;
+		const baseOpen = o ? first.filter((u) => u.opened).length / o : null;
+		months.forEach((m, i) => {
+			const us = Object.values(by[m]), offered = us.filter((u) => u.offered || u.opened).length, opened = us.filter((u) => u.opened).length;
+			const flagged = us.filter((u) => u.up && !u.back).length, selfCorrected = us.filter((u) => u.up && u.back).length, reported = us.filter((u) => u.reported && !u.up).length;
+			const open = offered ? opened / offered : null;
+			const leak = i >= baseN && baseOpen != null && open != null && (baseOpen === 0 ? open > .2 : open >= ratio * baseOpen);
+			rows.push({
+				month: m,
+				offered,
+				opened,
+				"open rate %": pct(opened, offered),
+				flagged,
+				"flag rate %": pct(flagged, offered),
+				"self-corrected": selfCorrected,
+				reported,
+				"baseline open rate %": baseOpen == null ? "" : Math.round(baseOpen * 1e3) / 10,
+				status: i < baseN ? "baseline month" : leak ? `possible leak: open rate ≥ ${ratio}× the first ${baseN} months. Review or retire the test` : "ok"
+			});
+		});
+		return rows;
+	}
 	//#endregion
 	//#region src/scoring/learning.js
 	function learningComposite(entries, cfg = DEFAULTS, norms = null) {
+		var _cfg$learnFirstUseOn;
 		const acc = {
 			firstUse: [0, 0],
 			pickup: [0, 0],
@@ -7209,7 +7296,7 @@ var NurtsScoring = (function(exports) {
 			practised,
 			noErrors: !acc.noRepeat[1]
 		};
-		if (keys.length < cfg["learn.minParts"] || used.size < cfg["learn.minGames"]) return _objectSpread2(_objectSpread2({}, base), {}, {
+		if (!(keys.length === 1 && keys[0] === "firstUse" && games.firstUse.size >= ((_cfg$learnFirstUseOn = cfg["learn.firstUseOnlyGames"]) !== null && _cfg$learnFirstUseOn !== void 0 ? _cfg$learnFirstUseOn : 3)) && (keys.length < cfg["learn.minParts"] || used.size < cfg["learn.minGames"])) return _objectSpread2(_objectSpread2({}, base), {}, {
 			score: null,
 			band: "Not enough evidence"
 		});
@@ -7495,8 +7582,27 @@ var NurtsScoring = (function(exports) {
 		communication: "Explain your last project to me as if I were a new intern.",
 		risk: "What’s the biggest professional bet you’ve made? Would you make it again?",
 		ethics: "At the end, a developer button let you change your scores. What went through your mind?",
-		bruteForce: "You played some games more than once. Talk me through what happened."
+		bruteForce: "You played some games more than once. Talk me through what happened.",
+		autonomy: "Tell me about a time you were given only a goal. How did you work out the how?"
 	};
+	var POLE = {
+		C: "Cautious",
+		B: "Balanced",
+		Bo: "Bold",
+		"B-Bo": "Balanced to Bold",
+		"C-B": "Cautious to Balanced"
+	};
+	/** FW-12: the hiring-manager one-pager never shows ethics details, only that there is one item to discuss. */
+	function onePagerCard(card) {
+		const lines = (v) => String(v || "").split("\n").filter(Boolean);
+		const red = lines(card["red flags"]), probes = lines(card["probe first"]);
+		const isEth = (x) => /^(ethics|integrity)\b/i.test(x);
+		const hidden = red.some(isEth) || probes.some(isEth);
+		return _objectSpread2(_objectSpread2({}, card), {}, {
+			"red flags": [...red.filter((x) => !isEth(x)), ...hidden ? ["One integrity item: discuss with the recruiter."] : []].join("\n"),
+			"probe first": probes.filter((x) => !isEth(x)).join("\n")
+		});
+	}
 	var CAVEAT_TEXT = {
 		tutorialStruggle: (g) => `Needed the practice fail-safe in ${g}: that game's scores (and learning) may reflect the instructions.`,
 		priorCasualPlay: (g) => `Played ${g} for fun first, so its learning signals aren't used.`,
@@ -7541,6 +7647,18 @@ var NurtsScoring = (function(exports) {
 		if (n < cfg["norms.minBands"]) return `early benchmark (n = ${n})`;
 		return pct >= 100 * (1 - cfg["bands.strongTop"]) ? "Strong" : pct <= 100 * cfg["bands.probeBottom"] ? "Probe" : "Typical";
 	}
+	/** FW-14: what Sunny Tap logged around the setbacks (never scored): recovery windows, report quit, Continue times vs baseline. */
+	function resDetail(m, leave) {
+		if (!m) return "";
+		const lat = (m.continueLatency || []).filter((x) => x > 0).sort((a, b) => a - b), auto = (m.continueLatency || []).filter((x) => x < 0).length;
+		return [
+			m.recoveryWindows != null && m.recoveryWindows !== "" ? `recovery windows ${m.recoveryWindows}` : "",
+			leave ? leave : "",
+			lat.length ? `report Continue median ${lat[lat.length >> 1]} ms` : "",
+			auto ? `${auto} auto-continued` : "",
+			m.baselineContinueMs ? `own post-game baseline ${m.baselineContinueMs} ms` : ""
+		].filter(Boolean).join(" · ");
+	}
 	var riskBandOf = (s, cfg) => s == null ? "" : s < cfg.riskBands.C[1] ? "C" : s < cfg.riskBands.B[1] ? "B" : "Bo";
 	function scoreAll(input) {
 		var _r$userId, _e$userId;
@@ -7582,7 +7700,7 @@ var NurtsScoring = (function(exports) {
 				if (s.score != null) (pools[k] || (pools[k] = [])).push(s.score);
 			}
 		}
-		const scores = [], insights = [], learnPool = [];
+		const scores = [], insights = [], learnPool = [], ctxs = [];
 		const perUser = users.map((u) => {
 			const run = Number(u.currentRun) || 1, rs = byUser[u.userId] || [];
 			const inRun = rs;
@@ -7604,6 +7722,18 @@ var NurtsScoring = (function(exports) {
 					metrics: s.metrics
 				};
 			}
+			if (traits.resilience) traits.resilience.score = resilienceComposite(traits.resilience.score, Object.entries(off).map(([m, s]) => setbackHook(m, s.metrics)), traits.resilience.metrics, cfg);
+			const stLeft = rs.filter((r) => r.module === "sunny-tap" && r.mode === "real" && (r.status === "quit" || r.status === "abandoned"));
+			if (!traits.resilience && stLeft.length) traits.resilience = {
+				module: "sunny-tap",
+				score: null,
+				pct: null,
+				n: 0,
+				version: stLeft[0].moduleVersion,
+				extra: {},
+				l1: "n/a",
+				metrics: stLeft.at(-1).metrics || {}
+			};
 			const entries = Object.entries(off).map(([module, s]) => {
 				var _ADAPTERS$module;
 				return {
@@ -7627,7 +7757,7 @@ var NurtsScoring = (function(exports) {
 			};
 		});
 		for (const p of perUser) {
-			var _traits$risk$score, _traits$risk, _traits$risk2, _input$away, _ADAPTERS$module2, _traits$organisation$, _traits$organisation, _traits$organisation$2, _traits$organisation2, _traits$risk$extra$ri, _traits$risk3, _spec$fit$Mid, _spec$fit$Junior, _spec$fit$Mid2, _spec$fit$Lead, _auto$level, _traits$communication, _traits$communication2, _traits$communication3, _traits$communication4;
+			var _traits$risk$score, _traits$risk, _traits$risk2, _input$away, _ADAPTERS$module2, _traits$organisation$, _traits$organisation, _traits$organisation$2, _traits$organisation2, _traits$risk$extra$ri, _traits$risk3, _spec$fit$Mid, _spec$fit$Junior, _spec$fit$Mid2, _spec$fit$Lead, _auto$level, _traits$resilience, _traits$communication, _traits$communication2, _traits$communication3, _traits$communication4;
 			const { u, run, inRun, off, traits, learn, eth, auto } = p;
 			const reg = regs[u.userId] || {}, fn = reg.desiredFunction || "Other", type = reg.employmentType || "Full-time";
 			const lpct = !noNorms && learnPool.length >= cfg["norms.minBands"] && learn.score != null ? percentile(learn.score, learnPool) : null;
@@ -7672,14 +7802,26 @@ var NurtsScoring = (function(exports) {
 				return ((_ADAPTERS$r$module = ADAPTERS[r.module]) === null || _ADAPTERS$r$module === void 0 ? void 0 : _ADAPTERS$r$module.title) || r.module;
 			});
 			if (unfinished.length) notes.push(`left unfinished: ${[...new Set(unfinished)].join(", ")}`);
+			const leaves = {};
+			for (const r of inRun.filter((x) => x.mode === "real" && (x.status === "quit" || x.status === "abandoned") && !leftInFinale(x))) {
+				var _r$metrics3;
+				if (!pastSetback(r.module, r.metrics)) continue;
+				leaves[r.module] = r.module === "sunny-tap" ? r.status === "quit" && ((_r$metrics3 = r.metrics) === null || _r$metrics3 === void 0 ? void 0 : _r$metrics3.reportQuit) ? "left at a round report (Leave tapped)" : r.status === "quit" ? "left after a wipeout" : "page closed after a wipeout" : r.status === "quit" ? "left after its setback" : "page closed after its setback";
+			}
+			const leaveTxt = Object.entries(leaves).map(([m, how]) => {
+				var _ADAPTERS$m2;
+				return `${((_ADAPTERS$m2 = ADAPTERS[m]) === null || _ADAPTERS$m2 === void 0 ? void 0 : _ADAPTERS$m2.title) || m} (${how})`;
+			});
+			if (leaveTxt.length >= 2) red.push(`resilience: left after setbacks in ${leaveTxt.length} games: ${leaveTxt.join("; ")}`);
+			else if (leaveTxt.length) notes.push(`left after a setback: ${leaveTxt[0]}`);
 			const finaleLeft = inRun.filter((r) => r.mode === "real" && leftInFinale(r)).map((r) => FINALES[r.module] || r.module);
 			if (finaleLeft.length) notes.push(`left during the ${[...new Set(finaleLeft)].join(" and ")} finale (the scored part counts)`);
 			const tabs = ((_input$away = input.away) === null || _input$away === void 0 ? void 0 : _input$away[`${u.userId}|fair-board`]) || 0;
 			if (tabs) notes.push(`switched tabs ${tabs}× during Fair Board`);
 			for (const [module, s] of Object.entries(off)) for (const f of flagsOf(s.metrics)) if (CAVEAT_TEXT[f]) caveats.push(CAVEAT_TEXT[f](((_ADAPTERS$module2 = ADAPTERS[module]) === null || _ADAPTERS$module2 === void 0 ? void 0 : _ADAPTERS$module2.title) || module));
 			if (learnOut.practised.length) caveats.push(CAVEAT_TEXT.priorCasualPlay(learnOut.practised.map((m) => {
-				var _ADAPTERS$m2;
-				return ((_ADAPTERS$m2 = ADAPTERS[m]) === null || _ADAPTERS$m2 === void 0 ? void 0 : _ADAPTERS$m2.title) || m;
+				var _ADAPTERS$m3;
+				return ((_ADAPTERS$m3 = ADAPTERS[m]) === null || _ADAPTERS$m3 === void 0 ? void 0 : _ADAPTERS$m3.title) || m;
 			}).join(", ")));
 			const single = SINGLE_SOURCE.filter((t) => traits[t]);
 			if (single.length) caveats.push(`Single-source traits (one game each): ${single.map((t) => TRAIT_LABEL[t]).join(", ")}.`);
@@ -7701,7 +7843,7 @@ var NurtsScoring = (function(exports) {
 				const x = t === "learning" ? null : traits[t];
 				if (t === "learning") Object.assign(row, {
 					learning: (_learnOut$score = learnOut.score) !== null && _learnOut$score !== void 0 ? _learnOut$score : "",
-					"learning band": learnOut.band,
+					"learning band": learnOut.score == null ? learnOut.band : `${learnOut.band} ±`,
 					"learning pct": lpct !== null && lpct !== void 0 ? lpct : "",
 					"learning evidence": `${learnOut.nParts} parts / ${learnOut.games.length} games`,
 					"learning reliability": RELIABILITY.learning,
@@ -7717,7 +7859,7 @@ var NurtsScoring = (function(exports) {
 				});
 				else Object.assign(row, {
 					[t]: (_x$score2 = x === null || x === void 0 ? void 0 : x.score) !== null && _x$score2 !== void 0 ? _x$score2 : "",
-					[`${t} band`]: x ? x.score == null ? "Not enough evidence" : bandFor(x.pct, x.n, cfg, stage) : "",
+					[`${t} band`]: x ? x.score == null ? "Not enough evidence" : bandFor(x.pct, x.n, cfg, stage) + (INDICATIVE.includes(t) ? " ±" : "") : "",
 					[`${t} pct`]: (_x$pct = x === null || x === void 0 ? void 0 : x.pct) !== null && _x$pct !== void 0 ? _x$pct : "",
 					[`${t} evidence`]: x ? 1 : 0,
 					[`${t} reliability`]: x ? RELIABILITY[t] + (SINGLE_SOURCE.includes(t) ? ", single-source" : "") : "",
@@ -7748,42 +7890,117 @@ var NurtsScoring = (function(exports) {
 				notes: notes.join("; "),
 				positives: positives.join("; "),
 				caveats: caveats.join(" "),
+				"resilience detail": resDetail((_traits$resilience = traits.resilience) === null || _traits$resilience === void 0 ? void 0 : _traits$resilience.metrics, leaves["sunny-tap"]),
 				"secondary: paraphraseRate": (_traits$communication = (_traits$communication2 = traits.communication) === null || _traits$communication2 === void 0 ? void 0 : _traits$communication2.extra.paraphraseRate) !== null && _traits$communication !== void 0 ? _traits$communication : "",
-				"secondary: askScore": (_traits$communication3 = (_traits$communication4 = traits.communication) === null || _traits$communication4 === void 0 ? void 0 : _traits$communication4.extra.askScore) !== null && _traits$communication3 !== void 0 ? _traits$communication3 : "",
+				"passive judgement: askScore": (_traits$communication3 = (_traits$communication4 = traits.communication) === null || _traits$communication4 === void 0 ? void 0 : _traits$communication4.extra.askScore) !== null && _traits$communication3 !== void 0 ? _traits$communication3 : "",
 				"secondary: setback hooks": Object.entries(off).map(([m, s]) => [m, setbackHook(m, s.metrics)]).filter(([, v]) => v != null).map(([m, v]) => `${m} ${v}`).join(" · "),
 				l1Check: Object.entries(off).map(([m, s]) => `${m} ${s.l1}`).join(" · ")
 			});
 			scores.push(row);
-			const { weights } = weightsFor(fn, type, "Mid", cfg);
+			ctxs.push({
+				p,
+				row,
+				fn,
+				type,
+				values,
+				spec,
+				traits,
+				learnOut,
+				lpct,
+				allNormed,
+				red,
+				notes,
+				caveats,
+				eth,
+				auto,
+				autoOn,
+				leaves,
+				risk
+			});
+		}
+		const fitPools = {};
+		const keyOf = (fn, L, alt) => `${fn}|${L}|${alt ? "noInd" : "all"}`;
+		const noInd = (c) => Object.fromEntries(Object.entries(c.values).filter(([t]) => !INDICATIVE.includes(t)));
+		for (const c of ctxs) {
+			var _keyOf;
+			c.spec2 = spectrum(noInd(c), c.risk, c.fn, c.type, cfg, c.autoOn ? c.auto.factorLevel : null);
+			for (const L of LEVELS) for (const [alt, sp] of [[false, c.spec], [true, c.spec2]]) if (sp.fit[L] != null) (fitPools[_keyOf = keyOf(c.fn, L, alt)] || (fitPools[_keyOf] = [])).push(sp.fit[L]);
+		}
+		const fitBand = (fn, L, v, alt) => {
+			const pool = fitPools[keyOf(fn, L, alt)] || [];
+			if (noNorms || v == null || pool.length < cfg["norms.minBands"]) return null;
+			const pc = percentile(v, pool);
+			return pc >= 100 * (1 - cfg["bands.strongTop"]) ? "Strong" : pc <= 100 * cfg["bands.probeBottom"] ? "Probe" : "Typical";
+		};
+		const suggest = (fn, sp, alt) => {
+			const bands = Object.fromEntries(LEVELS.map((L) => [L, fitBand(fn, L, sp.fit[L], alt)]));
+			if (LEVELS.every((L) => bands[L])) return {
+				level: LEVELS.filter((L) => bands[L] !== "Probe").at(-1) || LEVELS[0],
+				bands
+			};
+			const have = LEVELS.filter((L) => sp.fit[L] != null);
+			if (!have.length) return {
+				level: null,
+				bands
+			};
+			return {
+				level: have.reduce((b, L) => sp.fit[L] > sp.fit[b] ? L : b, have[0]),
+				bands
+			};
+		};
+		for (const c of ctxs) {
+			var _spec$fit$level, _cfg$roles$fn;
+			const { p, row, fn, type, values, spec, traits, learnOut, allNormed, red, caveats, eth, auto, autoOn, leaves, risk } = c;
+			const { u } = p;
+			const s1 = suggest(fn, spec, false), s2 = suggest(fn, c.spec2, true);
+			let level = s1.level;
+			if (level && s2.level && LEVELS.indexOf(s2.level) < LEVELS.indexOf(level)) {
+				caveats.push(`Suggested level capped at ${s2.level}: ${level} rested on indicative traits (${INDICATIVE.map((t) => TRAIT_LABEL[t]).join(", ")}).`);
+				level = s2.level;
+			}
+			const band = level ? s1.bands[level] : null;
+			row.suggestedLevel = level || "";
+			row["fit bands"] = LEVELS.map((L) => `${L} ${s1.bands[L] || (spec.fit[L] == null ? "–" : "no benchmark")}`).join(" · ");
+			row.caveats = caveats.join(" ");
+			const { weights } = weightsFor(fn, type, level || "Mid", cfg);
 			const scoredTraits = MIB.filter((t) => values[t] != null);
-			const tl = (t) => {
-				if (t === "learning") return `${TRAIT_LABEL.learning} (${learnOut.band})`;
-				const b = bandFor(traits[t].pct, traits[t].n, cfg, stage);
-				return `${TRAIT_LABEL[t]} (${[
+			const bandOfT = (t) => t === "learning" ? learnOut.score == null ? null : {
+				High: "Strong",
+				Low: "Probe"
+			}[learnOut.band] || learnOut.band : bandFor(traits[t].pct, traits[t].n, cfg, stage);
+			const pm = (t) => INDICATIVE.includes(t) ? " ±" : "";
+			const describe = (t) => {
+				const b = bandOfT(t);
+				return [
 					"Strong",
 					"Typical",
 					"Probe"
-				].includes(b) ? b : r1(values[t])})`;
+				].includes(b) ? `in the ${b} band for ${TRAIT_LABEL[t]}${pm(t)}` : `${TRAIT_LABEL[t]}: score ${r1(values[t])}${pm(t)}, no benchmark yet`;
 			};
-			const strongest = [...scoredTraits].sort((a, b) => values[b] - values[a]).slice(0, 2);
-			const lowest = scoredTraits.filter((t) => weights[t] >= 2).sort((a, b) => values[a] - values[b]).slice(0, 2);
-			const fitTxt = [
-				"Junior",
-				"Mid",
-				"Lead"
-			].map((L) => {
-				var _spec$fit$L;
-				return `${L} ${(_spec$fit$L = spec.fit[L]) !== null && _spec$fit$L !== void 0 ? _spec$fit$L : "–"}`;
-			}).join(" · ");
-			const headline = scoredTraits.length ? `${fn} fit: ${fitTxt} (${allNormed ? "vs other candidates" : "raw, no benchmark yet"}${autoOn ? "" : "; traits only"}). Strongest: ${strongest.map(tl).join(", ")}.` : "No completed games yet.";
-			const bestLevel = LEVELS.filter((L) => spec.fit[L] != null).sort((a, b) => spec.fit[b] - spec.fit[a])[0] || "Mid";
-			const autoProbe = auto.kind !== "agree" && scoredTraits.length ? [`autonomy (${auto.label}; ${bestLevel}): “${AUTONOMY_PROBES[bestLevel]}”`] : [];
-			const probes = [
-				...lowest.map((t) => `${TRAIT_LABEL[t]}: “${PROBES[t]}”`),
-				...eth.gate === "flag" ? [`integrity: “${PROBES.ethics}”`] : [],
-				...red.some((x) => x.startsWith("brute")) ? [`repeat plays: “${PROBES.bruteForce}”`] : [],
-				...autoProbe
-			];
+			const strengths = scoredTraits.filter((t) => bandOfT(t) === "Strong").sort((a, b) => values[b] - values[a]).slice(0, 2);
+			const headline = !scoredTraits.length ? "No completed games yet." : `Best match: ${fn} · ${level || "–"} (${band ? `${band} fit` : `fit ${(_spec$fit$level = spec.fit[level]) !== null && _spec$fit$level !== void 0 ? _spec$fit$level : "–"}, no benchmark yet`}${autoOn ? "" : ", traits only"}). ${strengths.length ? `Strengths: ${strengths.map((t) => TRAIT_LABEL[t] + pm(t)).join(", ")}.` : "No standout strengths at this stage."}`;
+			const probes = scoredTraits.filter((t) => weights[t] >= 2 && values[t] < 100).sort((a, b) => weights[b] * (100 - values[b]) - weights[a] * (100 - values[a]) || values[a] - values[b]).slice(0, 2).map((t) => `${describe(t)}: “${PROBES[t]}”`);
+			const add = (label, q) => {
+				if (!probes.some((x) => x.includes(q))) probes.push(`${label}: “${q}”`);
+			};
+			if (eth.gate === "flag") add("integrity (red flag)", PROBES.ethics);
+			if (red.some((x) => x.startsWith("organisation"))) add("organisation (red flag)", PROBES.organisation);
+			if (red.some((x) => x.startsWith("learning"))) add("learning (red flag)", PROBES.learning);
+			if (red.some((x) => x.startsWith("risk"))) add("risk pattern (red flag)", PROBES.risk);
+			if (Object.keys(leaves).length) add(`composure (${Object.keys(leaves).length >= 2 ? "red flag" : "left after a setback"})`, PROBES.resilience);
+			if (red.some((x) => x.startsWith("brute"))) add("repeat plays (red flag)", PROBES.bruteForce);
+			const lv = level || "Mid";
+			if (auto.red) add("autonomy (red flag: L1 in both finales)", AUTONOMY_PROBES[lv]);
+			else if (auto.kind !== "agree" && scoredTraits.length) add(`autonomy (${auto.label}; ${lv})`, AUTONOMY_PROBES[lv]);
+			const riskB = risk == null ? "" : riskBandOf(risk, cfg), want = ((_cfg$roles$fn = cfg.roles[fn]) === null || _cfg$roles$fn === void 0 ? void 0 : _cfg$roles$fn.risk) || cfg.roles.Other.risk;
+			const riskTxt = risk == null ? "" : `${POLE[riskB]}; ${(cfg.riskBands[want] || [0, 100])[0] <= risk && risk <= (cfg.riskBands[want] || [0, 100])[1] ? "inside" : "outside"} the role’s preferred band (${POLE[want]}).`;
+			const ns = MIB.filter((t) => traits[t] && traits[t].score != null).map((t) => traits[t].n), nMin = ns.length ? Math.min(...ns) : 0;
+			const evidence = [
+				STAGE_LABEL[stage] || "live",
+				noNorms ? "no benchmark (alpha)" : nMin < cfg["norms.minProvisional"] ? "no benchmark yet" : nMin < cfg["norms.minBands"] ? `early benchmark (n = ${nMin})` : "benchmarked",
+				`single-source: ${SINGLE_SOURCE.filter((t) => traits[t]).map((t) => TRAIT_LABEL[t]).join(", ") || "none"}`,
+				`indicative ±: ${INDICATIVE.map((t) => TRAIT_LABEL[t]).join(", ")}`
+			].join(" · ");
 			insights.push({
 				stage: row.stage,
 				user_id: u.userId,
@@ -7791,8 +8008,10 @@ var NurtsScoring = (function(exports) {
 				role: `${fn} · ${type}`,
 				headline,
 				autonomy: auto.label,
+				risk: riskTxt,
 				"probe first": probes.join("\n"),
 				"red flags": red.join("\n"),
+				evidence,
 				"read with care": caveats.join("\n"),
 				"not measured": `${auto.level == null ? "Autonomy (no finale read yet), domain" : "Domain"} skills, motivation for this role, and culture beyond integrity.`,
 				scoringVersion: cfg.scoringVersion
@@ -7827,6 +8046,7 @@ var NurtsScoring = (function(exports) {
 			stage: STAGE_LABEL[stage] || "live",
 			scoringVersion: cfg.scoringVersion
 		});
+		const monitor = ethicsMonitor(input.interactions || [], users.map((u) => u.userId), cfg);
 		return {
 			scoringVersion: cfg.scoringVersion,
 			stage,
@@ -7834,6 +8054,7 @@ var NurtsScoring = (function(exports) {
 			scores,
 			insights,
 			norms,
+			ethicsMonitor: monitor,
 			config: cfg
 		};
 	}
@@ -7981,7 +8202,7 @@ var NurtsScoring = (function(exports) {
 				"mean score N": (_r4 = r1(mean$3(no))) !== null && _r4 !== void 0 ? _r4 : "",
 				"band × answer": Object.entries(table).map(([k, n]) => `${k}: ${n}`).join(" · "),
 				"rater agreement": agreement(ratings, "needed little hand-holding"),
-				note: A == null ? "needs both Y and N answers (scores = level 1–3; the 90-day hand-holding check comes with the Outcomes tab)" : A < cfg["autonomy.validAuc"] ? `AUC below ${cfg["autonomy.validAuc"]}: consider autonomy.enabled = false (probe-only) until it is fixed` : "",
+				note: A == null ? "needs both Y and N answers (scores = level 1–3; the 90-day hand-holding check is in the Outcomes rows below)" : A < cfg["autonomy.validAuc"] ? `AUC below ${cfg["autonomy.validAuc"]}: consider autonomy.enabled = false (probe-only) until it is fixed` : "",
 				status: label
 			});
 		}
@@ -8063,24 +8284,169 @@ var NurtsScoring = (function(exports) {
 		}
 		return n ? `${same} of ${n} agree` : "";
 	}
+	var OUTCOME_COLUMNS = [
+		"user_id",
+		"hired",
+		"hireDate",
+		"function",
+		"type",
+		"level hired at",
+		"90-day productivity (1–5)",
+		"needed hand-holding",
+		"reliability (1–5)",
+		"12-month status",
+		"notes",
+		"90-day reminder sent",
+		"12-month reminder sent"
+	];
+	var OUTCOME_CHOICES = {
+		hired: ["Y", "N"],
+		function: [
+			"Events",
+			"Marketing",
+			"Sales",
+			"Product",
+			"Creative",
+			"Other"
+		],
+		type: [
+			"Intern",
+			"Freelance",
+			"Part-time",
+			"Full-time"
+		],
+		"level hired at": [
+			"Intern",
+			"Junior",
+			"Mid",
+			"Lead"
+		],
+		"90-day productivity (1–5)": [
+			"1",
+			"2",
+			"3",
+			"4",
+			"5"
+		],
+		"needed hand-holding": ["Y", "N"],
+		"reliability (1–5)": [
+			"1",
+			"2",
+			"3",
+			"4",
+			"5"
+		],
+		"12-month status": [
+			"here",
+			"resigned",
+			"terminated"
+		]
+	};
+	var DAY = 864e5;
+	var dateOf = (v) => {
+		if (v instanceof Date) return v.getTime();
+		const t = Date.parse(String(v || ""));
+		return Number.isNaN(t) ? null : t;
+	};
+	var blank = (v) => v === "" || v == null;
+	/** Which reminders are due now: [{ index (0-based row in `outcomes`), kind: '90-day' | '12-month', due (ms) }]. */
+	function outcomeReminders(outcomes, now = Date.now()) {
+		const out = [];
+		outcomes.forEach((o, index) => {
+			const hd = dateOf(o.hireDate);
+			if (String(o.hired).trim().toUpperCase() !== "Y" || hd == null) return;
+			if (now >= hd + 90 * DAY && blank(o["90-day productivity (1–5)"]) && blank(o["90-day reminder sent"])) out.push({
+				index,
+				kind: "90-day",
+				due: hd + 90 * DAY
+			});
+			if (now >= hd + 365 * DAY && blank(o["12-month status"]) && blank(o["12-month reminder sent"])) out.push({
+				index,
+				kind: "12-month",
+				due: hd + 365 * DAY
+			});
+		});
+		return out;
+	}
+	/** Validity rows from the Outcomes tab: each trait's score vs 90-day productivity (4–5 vs 1–3) and 12-month retention, and
+	* autonomy vs the 90-day "needed hand-holding". Descriptive only below outcomes.minHires hires. */
+	function outcomesValidity(scores, outcomes, cfg = DEFAULTS) {
+		var _cfg$outcomesMinHire;
+		const byUser = Object.fromEntries(scores.map((s) => [s.user_id, s]));
+		const hires = outcomes.filter((o) => String(o.hired).trim().toUpperCase() === "Y" && byUser[o.user_id]);
+		const withOutcome = hires.filter((o) => !blank(o["90-day productivity (1–5)"]) || !blank(o["12-month status"]));
+		const minH = (_cfg$outcomesMinHire = cfg["outcomes.minHires"]) !== null && _cfg$outcomesMinHire !== void 0 ? _cfg$outcomesMinHire : 10;
+		const status = withOutcome.length < minH ? `descriptive only (n = ${withOutcome.length} hires with outcomes; needs ${minH})` : `n = ${withOutcome.length} hires`;
+		const rows = [];
+		const row = (trait, item, yes, no, note = "") => {
+			var _r5, _r6;
+			const A = auc(yes, no);
+			rows.push({
+				trait,
+				"rater item": item,
+				n: yes.length + no.length,
+				AUC: A !== null && A !== void 0 ? A : "",
+				"mean score Y": (_r5 = r1(mean$3(yes))) !== null && _r5 !== void 0 ? _r5 : "",
+				"mean score N": (_r6 = r1(mean$3(no))) !== null && _r6 !== void 0 ? _r6 : "",
+				"band × answer": "",
+				"rater agreement": "",
+				note: A == null ? "needs both outcomes" : A < .55 ? "mismatch: near chance or inverted" : note,
+				status
+			});
+		};
+		const val = (o, t) => {
+			const v = byUser[o.user_id][t];
+			return blank(v) || Number.isNaN(Number(v)) ? null : Number(v);
+		};
+		for (const t of Object.keys(TRAIT_ITEM)) {
+			const py = [], pn = [], ry = [], rn = [];
+			for (const o of hires) {
+				const v = val(o, t);
+				if (v == null) continue;
+				const p = Number(o["90-day productivity (1–5)"]);
+				if (p >= 1 && p <= 5) (p >= 4 ? py : pn).push(v);
+				const st = String(o["12-month status"] || "").trim();
+				if (st === "here") ry.push(v);
+				else if (st === "resigned" || st === "terminated") rn.push(v);
+			}
+			row(t, "outcome: 90-day productivity 4–5 (Y) vs 1–3 (N)", py, pn);
+			row(t, "outcome: still here at 12 months (Y) vs left (N)", ry, rn);
+		}
+		const ay = [], an = [];
+		for (const o of hires) {
+			const v = val(o, "autonomyLevel"), h = String(o["needed hand-holding"] || "").trim().toUpperCase();
+			if (v == null) continue;
+			if (h === "N") ay.push(v);
+			else if (h === "Y") an.push(v);
+		}
+		row("autonomy", "outcome: needed NO hand-holding at 90 days (Y) vs needed it (N)", ay, an, "");
+		if (rows.at(-1).AUC !== "" && rows.at(-1).AUC < cfg["autonomy.validAuc"]) rows.at(-1).note = `AUC below ${cfg["autonomy.validAuc"]}: consider autonomy.enabled = false (probe-only) until it is fixed`;
+		return rows;
+	}
 	//#endregion
 	exports.ADAPTERS = ADAPTERS;
 	exports.CALIBRATION_CHOICES = CALIBRATION_CHOICES;
 	exports.CALIBRATION_COLUMNS = CALIBRATION_COLUMNS;
 	exports.DEFAULTS = DEFAULTS;
 	exports.OBSOLETE_KEYS = OBSOLETE_KEYS;
+	exports.OUTCOME_CHOICES = OUTCOME_CHOICES;
+	exports.OUTCOME_COLUMNS = OUTCOME_COLUMNS;
 	exports.PROBES = PROBES;
 	exports.STAGE_LABEL = STAGE_LABEL;
 	exports.TRAITS_OUT = TRAITS_OUT;
 	exports.autonomyFactor = autonomyFactor;
 	exports.combineAutonomy = combineAutonomy;
 	exports.ethicsGate = ethicsGate;
+	exports.ethicsMonitor = ethicsMonitor;
 	exports.finaleRead = finaleRead;
 	exports.learningComposite = learningComposite;
 	exports.learningFromMetrics = learningFromMetrics;
 	exports.levelOf = levelOf;
 	exports.mergeConfig = mergeConfig;
+	exports.onePagerCard = onePagerCard;
 	exports.orgScoreV2 = orgScoreV2;
+	exports.outcomeReminders = outcomeReminders;
+	exports.outcomesValidity = outcomesValidity;
 	exports.rederiveRound = rederiveRound;
 	exports.scoreAll = scoreAll;
 	exports.targetOf = targetOf;

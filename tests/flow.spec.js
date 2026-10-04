@@ -210,7 +210,9 @@ test('applicant: register → how to → practice → real round → report → 
     const sc = sheets.Scores, ins = sheets.Insights;
     expect(sc[1][sc[0].indexOf('stage')]).toBe('ALPHA: test data');
     expect(sc[1][sc[0].indexOf('l1Check')]).not.toContain('mismatch');
-    expect(ins[1][ins[0].indexOf('headline')]).toMatch(/fit: Junior/);
+    expect(ins[1][ins[0].indexOf('headline')]).toMatch(/^Best match: \w+ · (Junior|Mid|Lead) \(/); // FW-12 wording
+    expect(ins[1][ins[0].indexOf('evidence')]).toMatch(/^ALPHA: test data · /);
+    expect(sheets['Ethics monitor'][1][0]).toMatch(/^\d{4}-\d{2}$/); expect(sheets['Ethics monitor'][1][1]).toBe(1); // FW-8: one candidate offered this month
     expect(sheets.Norms.slice(1).every((r) => r[7] === 'off (alpha)')).toBeTruthy();
     expect(sheets.ScoringConfig.length).toBeGreaterThan(10);
     // autonomy (requests #32–34): the bot closes both finales as a purpose-setter → L3 in both
@@ -218,13 +220,31 @@ test('applicant: register → how to → practice → real round → report → 
     expect(ins[1][ins[0].indexOf('autonomy')]).toBe('L3'); expect(cs[1][hd.indexOf('autonomy')]).toBe('L3');
     expect(sheets.Validity.some((r) => r[0] === 'autonomy')).toBeTruthy();
     // an older ScoringConfig (update 16) is upgraded in place: new keys added, obsolete keys dropped, scoringVersion moved up
-    const cfg = sheets.ScoringConfig, vr = cfg.findIndex((r) => r[0] === 'scoringVersion') + 1, ar = cfg.findIndex((r) => r[0] === 'autonomy.enabled') + 1;
-    await fetch(GAS + '/__set/ScoringConfig?' + encodeURIComponent(JSON.stringify([[vr, 2, 'sc-1'], [ar, 1, 'autonomyFactor'], [ar, 2, '{"Junior":1}']])));
+    const cfg = sheets.ScoringConfig, vr = cfg.findIndex((r) => r[0] === 'scoringVersion') + 1, ar = cfg.findIndex((r) => r[0] === 'autonomy.enabled') + 1, hr = cfg.findIndex((r) => r[0] === 'resilience.hookWeight') + 1;
+    await fetch(GAS + '/__set/ScoringConfig?' + encodeURIComponent(JSON.stringify([[vr, 2, 'sc-1'], [ar, 1, 'autonomyFactor'], [ar, 2, '{"Junior":1}'], [hr, 1, 'res.hookWeight']])));
     await fetch(GAS + '/__run/refreshSummary');
     const up = (await (await fetch(GAS + '/__dump')).json()).sheets;
-    expect(up.ScoringConfig.find((r) => r[0] === 'scoringVersion')[1]).toBe('sc-3');
+    expect(up.ScoringConfig.find((r) => r[0] === 'scoringVersion')[1]).toBe('sc-4');
     expect(up.ScoringConfig.some((r) => r[0] === 'autonomyFactor')).toBeFalsy(); expect(up.ScoringConfig.some((r) => r[0] === 'autonomy.enabled')).toBeTruthy();
-    expect(up.Scores[1][up.Scores[0].indexOf('scoringVersion')]).toBe('sc-3');
+    expect(up.ScoringConfig.some((r) => r[0] === 'res.hookWeight')).toBeFalsy(); expect(up.ScoringConfig.find((r) => r[0] === 'resilience.hookWeight')[1]).toBe('0');
+    expect(up.Scores[1][up.Scores[0].indexOf('scoringVersion')]).toBe('sc-4');
+    // FW-5: the Outcomes tab + reminders (once each) + outcome rows in Validity
+    expect(up.Outcomes[0][0]).toBe('user_id');
+    const uid = up.Scores[1][up.Scores[0].indexOf('user_id')];
+    await fetch(GAS + '/__set/Outcomes?' + encodeURIComponent(JSON.stringify([[2, 1, uid], [2, 2, 'Y'], [2, 3, '2025-01-01'], [2, 4, 'Marketing'], [2, 6, 'Junior']])));
+    await fetch(GAS + '/__run/sendOutcomeReminders'); await fetch(GAS + '/__run/sendOutcomeReminders');
+    const od = await (await fetch(GAS + '/__dump')).json();
+    expect(od.mail.map((m) => m.subject)).toEqual([expect.stringMatching(/^The Nurts: 90-day check for .* \(Outcomes row 2\)$/), expect.stringMatching(/^The Nurts: 12-month check/)]);
+    expect(od.mail[0].to).toBe('hello@thenurts.com'); expect(od.mail[0].body).toContain('#gid='); expect(od.mail[0].body).not.toContain(uid.split('|')[0]); // a link, not the candidate's email
+    expect(od.sheets.Outcomes[1][11]).toMatch(/^\d{4}/); expect(od.sheets.Outcomes[1][12]).toMatch(/^\d{4}/);
+    await fetch(GAS + '/__run/refreshSummary');
+    expect((await (await fetch(GAS + '/__dump')).json()).sheets.Validity.some((r) => /^outcome: /.test(r[1]))).toBeTruthy();
+    // FW-7: when Adrian bumps scoringVersion and rescores, the previous version's Scores are kept for comparison
+    const vr2 = (await (await fetch(GAS + '/__dump')).json()).sheets.ScoringConfig.findIndex((r) => r[0] === 'scoringVersion') + 1;
+    await fetch(GAS + '/__set/ScoringConfig?' + encodeURIComponent(JSON.stringify([[vr2, 2, 'sc-9']])));
+    await fetch(GAS + '/__run/refreshSummary');
+    const snap = (await (await fetch(GAS + '/__dump')).json()).sheets;
+    expect(snap['Scores sc-4'][1][snap['Scores sc-4'][0].indexOf('scoringVersion')]).toBe('sc-4'); expect(snap.Scores[1][snap.Scores[0].indexOf('scoringVersion')]).toBe('sc-9');
   }
   // Tier C: fine detail lives in one trace record per round, not in Interactions rows
   expect(rows.some((r) => r.startsWith('g:'))).toBeFalsy();
@@ -439,6 +459,30 @@ test('abandon: closing the page mid-round leaves an abandoned round with its liv
   expect(t).toBeTruthy();
   expect(t.partial).toBeTruthy(); // score-so-far at the moment they left
   expect(t.items.length).toBeGreaterThan(0);
+});
+
+test('FW-14: leaving at a Sunny Tap round report is an explicit reportQuit (the auto-continue waits); its metrics are kept', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'device-independent; run once');
+  const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/' + Q + 'speed=10&first=sunny-tap');
+  await reset(page);
+  await page.click('#btn-casual');
+  await page.click('#btn-start');
+  const S = (f) => page.evaluate(`(() => { const s = window.__tnGame.scene.getScenes(true).find((x) => x.scene.key === 'mod:sunny-tap'); return s ? (${f})(s) : 'gone'; })()`);
+  for (let i = 0; i < 2000; i++) { const r = await S('(s) => s.reportOpen ? "report" : (s.botStep(), "tap")'); if (r === 'report') break; await page.waitForTimeout(20); }
+  expect(await S('(s) => s.reportOpen')).toBe(1);
+  await S('(s) => s.reportLeave()');
+  await page.waitForTimeout(3000); // longer than the sped-up 20 s auto-continue: it must wait while "Leave this round?" is open
+  expect(await S('(s) => [s.reportOpen, s.autoTimer.paused]')).toEqual([1, true]);
+  await S('(s) => s.leave()'); // the dialog's Leave button
+  await expect(page.locator('#btn-start')).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  const dbj = await backend(page);
+  const m = LIVE ? dbj.raw.Rounds.slice(1).filter((x) => x[4] === 'sunny-tap' && x[10] === 'quit').map((x) => JSON.parse(x[12])).at(-1)
+    : dbj.rounds.filter((x) => x.module === 'sunny-tap' && x.status === 'quit').map((x) => x.metrics).at(-1);
+  expect([m.reportQuit, m.explicitQuit, m.recoveryWindows]).toEqual([1, true, 0]);
+  expect(m.flags).toContain('reportQuit'); expect('baselineContinueMs' in m).toBeTruthy();
+  expect(errors).toEqual([]);
 });
 
 test('lucky dip bots: always-Keep / always-Dip / threshold-3 score 0 / 100 / 50', async ({ page }, info) => {

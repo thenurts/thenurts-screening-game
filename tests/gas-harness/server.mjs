@@ -23,6 +23,7 @@ function coerce(v, textFmt) {
 class Sheet {
   constructor(name) { this.name = name; this.data = []; this.fmt = {}; }
   getName() { return this.name; }
+  getSheetId() { return 1000 + this.name.length; }
   getLastRow() { return this.data.length; }
   getLastColumn() { return this.data.reduce((m, r) => Math.max(m, r.length), 0); }
   getMaxRows() { return 1000; }
@@ -65,7 +66,7 @@ let state;
 function fresh() {
   const sheets = [new Sheet('Sheet1')];
   const props = { DEV_PIN: process.env.DEV_PIN ?? '2468' }; // test-only PIN (same as the mock)
-  const cache = new Map(); const files = [];
+  const cache = new Map(); const files = []; const mail = [];
   const ss = {
     getSheetByName: (n) => sheets.find((s) => s.name === n) || null,
     insertSheet: (n, i) => { const s = new Sheet(n); if (i === 0) sheets.unshift(s); else sheets.push(s); return s; },
@@ -73,6 +74,7 @@ function fresh() {
     deleteSheet: (s) => sheets.splice(sheets.indexOf(s), 1),
     setSpreadsheetTimeZone() {},
     getId: () => 'sheet-1',
+    getUrl: () => 'https://docs.example/sheet-1',
   };
   const ctx = {
     console, Date, JSON, Math, Object, String, Number, Array, Error, RegExp,
@@ -99,12 +101,13 @@ function fresh() {
       createFolder: () => ({ getId: () => 'folder-1' }),
       getFolderById: () => ({ createFile: (blob) => { if (process.env.GAS_FAIL_DRIVE) throw new Error('Simulated Drive failure'); files.push(blob.name); return { getUrl: () => 'https://drive.example/' + blob.name }; } }),
     },
-    ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased() { return this; }, everyHours() { return this; }, create() {} }) },
+    ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased() { return this; }, everyHours() { return this; }, everyDays() { return this; }, atHour() { return this; }, create() {} }) },
+    MailApp: { sendEmail: (to, subject, body) => mail.push({ to, subject, body }) },
   };
   vm.createContext(ctx);
   vm.runInContext(code, ctx, { filename: 'Code.gs' });
   ctx.setup();
-  state = { ctx, sheets, files, cache };
+  state = { ctx, sheets, files, cache, mail };
 }
 fresh();
 
@@ -117,7 +120,7 @@ http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'OPTIONS') { res.statusCode = 405; return res.end(); } // Apps Script can't answer preflights either
-    if (req.url.startsWith('/__dump')) return res.end(JSON.stringify({ sheets: dump(), files: state.files }));
+    if (req.url.startsWith('/__dump')) return res.end(JSON.stringify({ sheets: dump(), files: state.files, mail: state.mail }));
     if (req.url.startsWith('/__prop/')) { const [k, v] = decodeURIComponent(req.url.slice(8)).split('='); state.ctx.PropertiesService.getScriptProperties().setProperty(k, v || null); return res.end('{"ok":true}'); } // e.g. /__prop/DEV_PIN= (unset)
     if (req.url.startsWith('/__reset')) { fresh(); return res.end('{"ok":true}'); }
     if (req.url.startsWith('/__call/')) { const [fn, q] = req.url.slice(8).split('?'); const args = q ? JSON.parse(decodeURIComponent(q)) : []; return res.end(JSON.stringify({ ok: true, result: state.ctx[fn](...args) ?? null })); } // e.g. /__call/purge_?["reason","PURGE"]
