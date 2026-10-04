@@ -46,7 +46,7 @@ export function validity(scores, ratings, cfg = DEFAULTS) {
     const A = auc(yes, no);
     rows.push({ trait: 'autonomy', 'rater item': 'needed little hand-holding', n: yes.length + no.length, AUC: A ?? '', 'mean score Y': r1(mean(yes)) ?? '', 'mean score N': r1(mean(no)) ?? '',
       'band × answer': Object.entries(table).map(([k, n]) => `${k}: ${n}`).join(' · '), 'rater agreement': agreement(ratings, 'needed little hand-holding'),
-      note: A == null ? 'needs both Y and N answers (scores = level 1–3; the 90-day hand-holding check comes with the Outcomes tab)' : A < cfg['autonomy.validAuc'] ? `AUC below ${cfg['autonomy.validAuc']}: consider autonomy.enabled = false (probe-only) until it is fixed` : '', status: label }); }
+      note: A == null ? 'needs both Y and N answers (scores = level 1–3; the 90-day hand-holding check is in the Outcomes rows below)' : A < cfg['autonomy.validAuc'] ? `AUC below ${cfg['autonomy.validAuc']}: consider autonomy.enabled = false (probe-only) until it is fixed` : '', status: label }); }
   // ethics: the gate vs "any integrity concerns"; risk: the game band vs the rater's style
   const eth = {}; let riskSame = 0, riskN = 0;
   for (const r of ratings) {
@@ -71,4 +71,55 @@ function agreement(ratings, item) {
   let same = 0, n = 0;
   for (const v of Object.values(by)) { const a = v.Adrian, b = v.Rachel; if (!a || !b || a === '?' || b === '?' || a === "don't know" || b === "don't know") continue; n++; if (a === b) same++; }
   return n ? `${same} of ${n} agree` : '';
+}
+
+// ---- FW-5: the Outcomes tab (staff-only) = the real feedback loop. One row per hire; reminders at 90 days and 12 months.
+export const OUTCOME_COLUMNS = ['user_id', 'hired', 'hireDate', 'function', 'type', 'level hired at', '90-day productivity (1–5)', 'needed hand-holding',
+  'reliability (1–5)', '12-month status', 'notes', '90-day reminder sent', '12-month reminder sent'];
+export const OUTCOME_CHOICES = {
+  hired: ['Y', 'N'], function: ['Events', 'Marketing', 'Sales', 'Product', 'Creative', 'Other'], type: ['Intern', 'Freelance', 'Part-time', 'Full-time'],
+  'level hired at': ['Intern', 'Junior', 'Mid', 'Lead'], '90-day productivity (1–5)': ['1', '2', '3', '4', '5'], 'needed hand-holding': ['Y', 'N'],
+  'reliability (1–5)': ['1', '2', '3', '4', '5'], '12-month status': ['here', 'resigned', 'terminated'],
+};
+const DAY = 864e5;
+const dateOf = (v) => { if (v instanceof Date) return v.getTime(); const t = Date.parse(String(v || '')); return Number.isNaN(t) ? null : t; };
+const blank = (v) => v === '' || v == null;
+
+/** Which reminders are due now: [{ index (0-based row in `outcomes`), kind: '90-day' | '12-month', due (ms) }]. */
+export function outcomeReminders(outcomes, now = Date.now()) {
+  const out = [];
+  outcomes.forEach((o, index) => {
+    const hd = dateOf(o.hireDate); if (String(o.hired).trim().toUpperCase() !== 'Y' || hd == null) return;
+    if (now >= hd + 90 * DAY && blank(o['90-day productivity (1–5)']) && blank(o['90-day reminder sent'])) out.push({ index, kind: '90-day', due: hd + 90 * DAY });
+    if (now >= hd + 365 * DAY && blank(o['12-month status']) && blank(o['12-month reminder sent'])) out.push({ index, kind: '12-month', due: hd + 365 * DAY });
+  });
+  return out;
+}
+
+/** Validity rows from the Outcomes tab: each trait's score vs 90-day productivity (4–5 vs 1–3) and 12-month retention, and
+ * autonomy vs the 90-day "needed hand-holding". Descriptive only below outcomes.minHires hires. */
+export function outcomesValidity(scores, outcomes, cfg = DEFAULTS) {
+  const byUser = Object.fromEntries(scores.map((s) => [s.user_id, s]));
+  const hires = outcomes.filter((o) => String(o.hired).trim().toUpperCase() === 'Y' && byUser[o.user_id]);
+  const withOutcome = hires.filter((o) => !blank(o['90-day productivity (1–5)']) || !blank(o['12-month status']));
+  const minH = cfg['outcomes.minHires'] ?? 10;
+  const status = withOutcome.length < minH ? `descriptive only (n = ${withOutcome.length} hires with outcomes; needs ${minH})` : `n = ${withOutcome.length} hires`;
+  const rows = [];
+  const row = (trait, item, yes, no, note = '') => { const A = auc(yes, no); rows.push({ trait, 'rater item': item, n: yes.length + no.length, AUC: A ?? '', 'mean score Y': r1(mean(yes)) ?? '', 'mean score N': r1(mean(no)) ?? '', 'band × answer': '', 'rater agreement': '', note: A == null ? 'needs both outcomes' : A < 0.55 ? 'mismatch: near chance or inverted' : note, status }); };
+  const val = (o, t) => { const v = byUser[o.user_id][t]; return blank(v) || Number.isNaN(Number(v)) ? null : Number(v); };
+  for (const t of Object.keys(TRAIT_ITEM)) {
+    const py = [], pn = [], ry = [], rn = [];
+    for (const o of hires) {
+      const v = val(o, t); if (v == null) continue;
+      const p = Number(o['90-day productivity (1–5)']); if (p >= 1 && p <= 5) (p >= 4 ? py : pn).push(v);
+      const st = String(o['12-month status'] || '').trim(); if (st === 'here') ry.push(v); else if (st === 'resigned' || st === 'terminated') rn.push(v);
+    }
+    row(t, 'outcome: 90-day productivity 4–5 (Y) vs 1–3 (N)', py, pn);
+    row(t, 'outcome: still here at 12 months (Y) vs left (N)', ry, rn);
+  }
+  const ay = [], an = [];
+  for (const o of hires) { const v = val(o, 'autonomyLevel'), h = String(o['needed hand-holding'] || '').trim().toUpperCase(); if (v == null) continue; if (h === 'N') ay.push(v); else if (h === 'Y') an.push(v); }
+  row('autonomy', 'outcome: needed NO hand-holding at 90 days (Y) vs needed it (N)', ay, an, '');
+  if (rows.at(-1).AUC !== '' && rows.at(-1).AUC < cfg['autonomy.validAuc']) rows.at(-1).note = `AUC below ${cfg['autonomy.validAuc']}: consider autonomy.enabled = false (probe-only) until it is fixed`;
+  return rows;
 }

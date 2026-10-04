@@ -200,16 +200,25 @@ export class ModuleScene extends Phaser.Scene {
 
   askQuit() {
     if (this.ended) return;
-    this.running = false; this.pauseClock();
+    this.running = false; this.pauseClock(); this.onAskQuit?.();
     const layer = this.add.container(0, 0).setDepth(1200);
     const dim = this.add.rectangle(W / 2, H / 2, W * 4, H * 4, 0x0b0b0b, 0.55).setInteractive();
     const panel = this.add.graphics().fillStyle(hex(C.ink), 1).fillRoundedRect(70, 420 + 10, 580, 420, 36)
       .fillStyle(hex(C.white), 1).fillRoundedRect(70, 420, 580, 420, 36).lineStyle(5, hex(C.ink), 1).strokeRoundedRect(70, 420, 580, 420, 36);
     const warn = this.mode === 'real' ? 'This attempt will be recorded\nas not finished.' : 'Your practice will end.';
     layer.add([dim, panel, this.txt(W / 2, 500, 'Leave this round?', { fontSize: '42px' }), this.txt(W / 2, 590, warn, { fontSize: '28px', fontStyle: '600', color: C.charcoal }),
-      this.btn(W / 2, 700, 'Keep playing', () => { layer.destroy(); this.resumeClock(); this.running = !!this.startedAt; }, { w: 460 }),
-      this.btn(W / 2, 800, 'Leave', () => { this.ended = true; this.onDone({ status: 'quit', elapsedMs: Math.round(this.elapsed) }); }, { w: 460, fill: C.white, h: 72, size: 28 })]);
+      this.btn(W / 2, 700, 'Keep playing', () => { layer.destroy(); this.resumeClock(); this.running = !!this.startedAt; this.onQuitCancelled?.(); }, { w: 460 }),
+      this.btn(W / 2, 800, 'Leave', () => this.leave(), { w: 460, fill: C.white, h: 72, size: 28 })]);
     this.tweens.add({ targets: layer, alpha: { from: 0, to: 1 }, duration: 150 });
+  }
+
+  /** An explicit Leave tap (Framework v0.8: only this counts as quitting; a closed tab is an abandon). The round's metrics so far
+   * go with it, marked explicitQuit, so the scoring layer can tell where the player left (e.g. Sunny Tap's reportQuit). */
+  leave() {
+    this.explicitQuit = true;
+    let m = null; try { m = this.metrics?.() ?? null; } catch { m = null; }
+    this.ended = true;
+    this.onDone({ status: 'quit', metrics: m ? { ...m, explicitQuit: true } : null, elapsedMs: Math.round(this.elapsed) });
   }
 
   visibility() {

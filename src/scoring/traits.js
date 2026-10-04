@@ -40,3 +40,30 @@ export function setbackHook(module, m) {
   if (module === 'big-calls') return m?.unluckyNext === 'followed' ? 1 : m?.unluckyNext === 'strayed' ? 0 : null;
   return null;
 }
+
+/** Indicative traits (Framework v0.6): shown as a band with ±; they never raise a red flag or set the best-fit level on their own. */
+export const INDICATIVE = Object.keys(RELIABILITY).filter((t) => RELIABILITY[t] === 'indicative');
+
+/** FW-14: did this unfinished round get past its game's setback? (So leaving it counts as "left after a setback".) */
+export function pastSetback(module, m) {
+  if (!m) return false;
+  if (module === 'sunny-tap') return !!m.reportQuit || (Array.isArray(m.reports) && m.reports.length > 0); // after the first wipeout
+  if (module === 'torch-talk') return Array.isArray(m.turnLog) && m.turnLog.length >= 6; // the T6 mix-up
+  return setbackHook(module, m) != null;
+}
+
+/** Resilience (Framework v0.6 + v0.8): Sunny Tap, plus the setback hooks and continueLatency at their ScoringConfig weights
+ * (both 0 until validated). Hooks map to 0–1 (a ratio stays, a delta d becomes 1 + d, clamped); continue = the player's own
+ * post-game Continue time ÷ their median Continue time at the mini-reports (auto-continues left out), capped at 1. */
+export function resilienceComposite(sunny, hooks, m, cfg = DEFAULTS) {
+  if (sunny == null) return null;
+  const wh = Number(cfg['resilience.hookWeight']) || 0, wc = Number(cfg['resilience.continueWeight']) || 0;
+  const parts = [[1, sunny]];
+  const hs = hooks.filter((h) => h != null).map((h) => Math.max(0, Math.min(1, h > 1 || h < 0 ? 1 + h : h)));
+  if (wh > 0 && hs.length) parts.push([wh, (100 * hs.reduce((a, b) => a + b, 0)) / hs.length]);
+  const lat = (m?.continueLatency || []).filter((x) => x > 0).sort((a, b) => a - b), base = num(m?.baselineContinueMs);
+  if (wc > 0 && lat.length && base) parts.push([wc, 100 * Math.min(1, base / lat[lat.length >> 1])]);
+  const extra = parts.slice(1).reduce((a, [w]) => a + w, 0);
+  parts[0][0] = Math.max(0, 1 - extra);
+  return r1(parts.reduce((a, [w, v]) => a + w * v, 0) / parts.reduce((a, [w]) => a + w, 0));
+}

@@ -27,7 +27,10 @@ export function learningComposite(entries, cfg = DEFAULTS, norms = null) {
   const keys = Object.keys(parts), used = new Set(keys.flatMap((k) => [...games[k]]));
   const round3 = (x) => Math.round(x * 1000) / 1000;
   const base = { parts: Object.fromEntries(keys.map((k) => [k, round3(parts[k])])), nParts: keys.length, games: [...used], practised, noErrors: !acc.noRepeat[1] };
-  if (keys.length < cfg['learn.minParts'] || used.size < cfg['learn.minGames']) return { ...base, score: null, band: 'Not enough evidence' };
+  // FW-11 (Adrian, 2026-10-04): first-use probes from ≥ learn.firstUseOnlyGames games are enough on their own, so a perfect player who
+  // skipped the tutorials (pickup n/a) and made no mistakes (noRepeat / trapPairs n/a) isn't left without a learning read
+  const probesOnly = keys.length === 1 && keys[0] === 'firstUse' && games.firstUse.size >= (cfg['learn.firstUseOnlyGames'] ?? 3);
+  if (!probesOnly && (keys.length < cfg['learn.minParts'] || used.size < cfg['learn.minGames'])) return { ...base, score: null, band: 'Not enough evidence' };
   const w = cfg['learn.weights'], tw = keys.reduce((a, k) => a + w[k], 0);
   const score = Math.round((100 * keys.reduce((a, k) => a + w[k] * parts[k], 0)) / tw);
   let band;

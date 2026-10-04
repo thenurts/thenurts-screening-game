@@ -3,7 +3,8 @@
 // decision: it turns raw play into evidence a person reviews (Framework rule: no automatic rejection).
 import { mergeConfig, MIB, STAGE_LABEL, STAGE_NO_NORMS } from './config.js';
 import { ADAPTERS } from './modules.js';
-import { traitOf, setbackHook, RELIABILITY, SINGLE_SOURCE, TRAIT_LABEL } from './traits.js';
+import { traitOf, setbackHook, RELIABILITY, SINGLE_SOURCE, TRAIT_LABEL, INDICATIVE, pastSetback, resilienceComposite } from './traits.js';
+import { ethicsMonitor } from './ethicsMonitor.js';
 import { learningComposite } from './learning.js';
 import { learningFactsFromV1 } from './learnFacts.js';
 import { ethicsGate } from './ethicsGate.js';
@@ -23,7 +24,17 @@ export const PROBES = {
   risk: 'What’s the biggest professional bet you’ve made? Would you make it again?',
   ethics: 'At the end, a developer button let you change your scores. What went through your mind?',
   bruteForce: 'You played some games more than once. Talk me through what happened.',
+  autonomy: 'Tell me about a time you were given only a goal. How did you work out the how?',
 };
+const POLE = { C: 'Cautious', B: 'Balanced', Bo: 'Bold', 'B-Bo': 'Balanced to Bold', 'C-B': 'Cautious to Balanced' };
+/** FW-12: the hiring-manager one-pager never shows ethics details, only that there is one item to discuss. */
+export function onePagerCard(card) {
+  const lines = (v) => String(v || '').split('\n').filter(Boolean);
+  const red = lines(card['red flags']), probes = lines(card['probe first']);
+  const isEth = (x) => /^(ethics|integrity)\b/i.test(x);
+  const hidden = red.some(isEth) || probes.some(isEth);
+  return { ...card, 'red flags': [...red.filter((x) => !isEth(x)), ...(hidden ? ['One integrity item: discuss with the recruiter.'] : [])].join('\n'), 'probe first': probes.filter((x) => !isEth(x)).join('\n') };
+}
 const CAVEAT_TEXT = {
   tutorialStruggle: (g) => `Needed the practice fail-safe in ${g}: that game's scores (and learning) may reflect the instructions.`,
   priorCasualPlay: (g) => `Played ${g} for fun first, so its learning signals aren't used.`,
@@ -56,6 +67,13 @@ function bandFor(pct, n, cfg, stage) {
   if (n < cfg['norms.minBands']) return `early benchmark (n = ${n})`;
   return pct >= 100 * (1 - cfg['bands.strongTop']) ? 'Strong' : pct <= 100 * cfg['bands.probeBottom'] ? 'Probe' : 'Typical';
 }
+/** FW-14: what Sunny Tap logged around the setbacks (never scored): recovery windows, report quit, Continue times vs baseline. */
+function resDetail(m, leave) {
+  if (!m) return '';
+  const lat = (m.continueLatency || []).filter((x) => x > 0).sort((a, b) => a - b), auto = (m.continueLatency || []).filter((x) => x < 0).length;
+  return [m.recoveryWindows != null && m.recoveryWindows !== '' ? `recovery windows ${m.recoveryWindows}` : '', leave ? leave : '',
+    lat.length ? `report Continue median ${lat[lat.length >> 1]} ms` : '', auto ? `${auto} auto-continued` : '', m.baselineContinueMs ? `own post-game baseline ${m.baselineContinueMs} ms` : ''].filter(Boolean).join(' · ');
+}
 const riskBandOf = (s, cfg) => (s == null ? '' : s < cfg.riskBands.C[1] ? 'C' : s < cfg.riskBands.B[1] ? 'B' : 'Bo');
 
 export function scoreAll(input) {
@@ -83,7 +101,7 @@ export function scoreAll(input) {
     for (const [k, r] of Object.entries(firsts)) { if (r.metrics?.truncated) continue; const s = scoreRound(r); if (s.score != null) (pools[k] ||= []).push(s.score); }
   }
 
-  const scores = [], insights = [], learnPool = [];
+  const scores = [], insights = [], learnPool = [], ctxs = [];
   const perUser = users.map((u) => {
     const run = Number(u.currentRun) || 1, rs = byUser[u.userId] || [];
     // Framework: only the FIRST completed real round of each game counts, whichever run it was in (a later "Start a new
@@ -97,6 +115,10 @@ export function scoreAll(input) {
       const pct = noNorms || pool.length < cfg['norms.minProvisional'] ? null : percentile(s.score, pool);
       traits[s.trait] = { module, score: s.score, pct, n: pool.length, version: s.r.moduleVersion, extra: s.extra, l1: s.l1, metrics: s.metrics };
     }
+    // FW-12/14 resilience: Sunny Tap + hooks/continue at their config weights (0 until validated); an unfinished Sunny Tap = not enough evidence
+    if (traits.resilience) traits.resilience.score = resilienceComposite(traits.resilience.score, Object.entries(off).map(([m, s]) => setbackHook(m, s.metrics)), traits.resilience.metrics, cfg);
+    const stLeft = rs.filter((r) => r.module === 'sunny-tap' && r.mode === 'real' && (r.status === 'quit' || r.status === 'abandoned'));
+    if (!traits.resilience && stLeft.length) traits.resilience = { module: 'sunny-tap', score: null, pct: null, n: 0, version: stLeft[0].moduleVersion, extra: {}, l1: 'n/a', metrics: stLeft.at(-1).metrics || {} };
     const entries = Object.entries(off).map(([module, s]) => ({ module, priorCasualPlay: !!s.metrics.priorCasualPlay, facts: ADAPTERS[module]?.learningFacts ? ADAPTERS[module].learningFacts(s.metrics) : learningFactsFromV1(s.metrics) }));
     const learn = learningComposite(entries, cfg);
     if (learn.score != null) learnPool.push(learn.score);
@@ -136,6 +158,16 @@ export function scoreAll(input) {
     if (run > 1 || multi.length) red.push(`brute-force pattern: ${run > 1 ? `run ${run}` : ''}${run > 1 && multi.length ? '; ' : ''}${multi.length ? `restarted ${multi.join(', ')}` : ''}`);
     const unfinished = inRun.filter((r) => r.mode === 'real' && (r.status === 'quit' || r.status === 'abandoned') && !leftInFinale(r)).map((r) => ADAPTERS[r.module]?.title || r.module);
     if (unfinished.length) notes.push(`left unfinished: ${[...new Set(unfinished)].join(', ')}`);
+    // FW-14 (Framework v0.8): leaving after a setback. A Sunny Tap report quit counts only as an explicit Leave tap (reportQuit);
+    // a closed tab is an abandon. One game = a note + the resilience probe; ≥ 2 games = the red flag (corroborated).
+    const leaves = {};
+    for (const r of inRun.filter((x) => x.mode === 'real' && (x.status === 'quit' || x.status === 'abandoned') && !leftInFinale(x))) {
+      if (!pastSetback(r.module, r.metrics)) continue;
+      leaves[r.module] = r.module === 'sunny-tap' ? (r.status === 'quit' && r.metrics?.reportQuit ? 'left at a round report (Leave tapped)' : r.status === 'quit' ? 'left after a wipeout' : 'page closed after a wipeout') : r.status === 'quit' ? 'left after its setback' : 'page closed after its setback';
+    }
+    const leaveTxt = Object.entries(leaves).map(([m, how]) => `${ADAPTERS[m]?.title || m} (${how})`);
+    if (leaveTxt.length >= 2) red.push(`resilience: left after setbacks in ${leaveTxt.length} games: ${leaveTxt.join('; ')}`);
+    else if (leaveTxt.length) notes.push(`left after a setback: ${leaveTxt[0]}`);
     const finaleLeft = inRun.filter((r) => r.mode === 'real' && leftInFinale(r)).map((r) => FINALES[r.module] || r.module);
     if (finaleLeft.length) notes.push(`left during the ${[...new Set(finaleLeft)].join(' and ')} finale (the scored part counts)`);
     const tabs = input.away?.[`${u.userId}|fair-board`] || 0;
@@ -152,9 +184,9 @@ export function scoreAll(input) {
     const row = { stage: STAGE_LABEL[stage] || 'live', scoringVersion: cfg.scoringVersion, scoredAt: new Date(now).toISOString(), user_id: u.userId, name: u.name || '', function: fn, type, run: offRuns.length === 1 ? offRuns[0] : offRuns.length ? offRuns.join(', ') : run };
     for (const t of TRAITS_OUT) {
       const x = t === 'learning' ? null : traits[t];
-      if (t === 'learning') Object.assign(row, { learning: learnOut.score ?? '', 'learning band': learnOut.band, 'learning pct': lpct ?? '', 'learning evidence': `${learnOut.nParts} parts / ${learnOut.games.length} games`, 'learning reliability': RELIABILITY.learning, 'learning version': '' });
+      if (t === 'learning') Object.assign(row, { learning: learnOut.score ?? '', 'learning band': learnOut.score == null ? learnOut.band : `${learnOut.band} ±`, 'learning pct': lpct ?? '', 'learning evidence': `${learnOut.nParts} parts / ${learnOut.games.length} games`, 'learning reliability': RELIABILITY.learning, 'learning version': '' });
       else if (t === 'risk') Object.assign(row, { risk: x?.score ?? '', 'risk band': x ? riskBandOf(x.score, cfg) : '', 'risk pct': '', 'risk evidence': x ? 1 : 0, 'risk reliability': x ? RELIABILITY.risk : '', 'risk version': x?.version ?? '' });
-      else Object.assign(row, { [t]: x?.score ?? '', [`${t} band`]: x ? (x.score == null ? 'Not enough evidence' : bandFor(x.pct, x.n, cfg, stage)) : '', [`${t} pct`]: x?.pct ?? '', [`${t} evidence`]: x ? 1 : 0, [`${t} reliability`]: x ? RELIABILITY[t] + (SINGLE_SOURCE.includes(t) ? ', single-source' : '') : '', [`${t} version`]: x?.version ?? '' });
+      else Object.assign(row, { [t]: x?.score ?? '', [`${t} band`]: x ? (x.score == null ? 'Not enough evidence' : bandFor(x.pct, x.n, cfg, stage) + (INDICATIVE.includes(t) ? ' ±' : '')) : '', [`${t} pct`]: x?.pct ?? '', [`${t} evidence`]: x ? 1 : 0, [`${t} reliability`]: x ? RELIABILITY[t] + (SINGLE_SOURCE.includes(t) ? ', single-source' : '') : '', [`${t} version`]: x?.version ?? '' });
     }
     Object.assign(row, {
       'organisation planning': traits.organisation?.extra.planning ?? '', 'organisation pressure': traits.organisation?.extra.pressure ?? '',
@@ -166,26 +198,74 @@ export function scoreAll(input) {
       autonomy: auto.label, autonomyLevel: auto.level ?? '', 'autonomy detail': auto.detail,
       'autonomy factor': !cfg['autonomy.enabled'] ? 'off (autonomy.enabled = false): traits only' : autoOn ? `applied (L${auto.factorLevel} vs each level’s target)` : 'not applied (not measured, provisional or n/a): traits only',
       redFlags: red.join('; '), notes: notes.join('; '), positives: positives.join('; '), caveats: caveats.join(' '),
-      'secondary: paraphraseRate': traits.communication?.extra.paraphraseRate ?? '', 'secondary: askScore': traits.communication?.extra.askScore ?? '',
+      'resilience detail': resDetail(traits.resilience?.metrics, leaves['sunny-tap']),
+      'secondary: paraphraseRate': traits.communication?.extra.paraphraseRate ?? '', 'passive judgement: askScore': traits.communication?.extra.askScore ?? '', // FW-10: logged, never scored
       'secondary: setback hooks': Object.entries(off).map(([m, s]) => [m, setbackHook(m, s.metrics)]).filter(([, v]) => v != null).map(([m, v]) => `${m} ${v}`).join(' · '),
       l1Check: Object.entries(off).map(([m, s]) => `${m} ${s.l1}`).join(' · '),
     });
     scores.push(row);
 
-    // ---- L7 insight card (deterministic sentences: every word traces back to a number above)
-    const { weights } = weightsFor(fn, type, 'Mid', cfg);
+    ctxs.push({ p, row, fn, type, values, spec, traits, learnOut, lpct, allNormed, red, notes, caveats, eth, auto, autoOn, leaves, risk });
+  }
+
+  // ---- fit bands (FW-12): each level's fit against other candidates for the same function, once norms are on and n ≥ 30
+  const fitPools = {}; const keyOf = (fn, L, alt) => `${fn}|${L}|${alt ? 'noInd' : 'all'}`;
+  const noInd = (c) => Object.fromEntries(Object.entries(c.values).filter(([t]) => !INDICATIVE.includes(t)));
+  for (const c of ctxs) {
+    c.spec2 = spectrum(noInd(c), c.risk, c.fn, c.type, cfg, c.autoOn ? c.auto.factorLevel : null); // without the indicative traits
+    for (const L of LEVELS) for (const [alt, sp] of [[false, c.spec], [true, c.spec2]]) if (sp.fit[L] != null) (fitPools[keyOf(c.fn, L, alt)] ||= []).push(sp.fit[L]);
+  }
+  const fitBand = (fn, L, v, alt) => { const pool = fitPools[keyOf(fn, L, alt)] || []; if (noNorms || v == null || pool.length < cfg['norms.minBands']) return null; const pc = percentile(v, pool); return pc >= 100 * (1 - cfg['bands.strongTop']) ? 'Strong' : pc <= 100 * cfg['bands.probeBottom'] ? 'Probe' : 'Typical'; };
+  // the suggested entry level: the highest level whose fit clears Typical (banded), else the best-fitting level (ties → lower)
+  const suggest = (fn, sp, alt) => {
+    const bands = Object.fromEntries(LEVELS.map((L) => [L, fitBand(fn, L, sp.fit[L], alt)]));
+    if (LEVELS.every((L) => bands[L])) { const ok = LEVELS.filter((L) => bands[L] !== 'Probe'); return { level: ok.at(-1) || LEVELS[0], bands }; } // none clears Typical → the entry level, shown with its Probe band
+    const have = LEVELS.filter((L) => sp.fit[L] != null); if (!have.length) return { level: null, bands };
+    return { level: have.reduce((b, L) => (sp.fit[L] > sp.fit[b] ? L : b), have[0]), bands };
+  };
+
+  for (const c of ctxs) {
+    const { p, row, fn, type, values, spec, traits, learnOut, allNormed, red, caveats, eth, auto, autoOn, leaves, risk } = c;
+    const { u } = p;
+    const s1 = suggest(fn, spec, false), s2 = suggest(fn, c.spec2, true);
+    let level = s1.level;
+    if (level && s2.level && LEVELS.indexOf(s2.level) < LEVELS.indexOf(level)) { // indicative traits can't set the level on their own (Framework v0.6)
+      caveats.push(`Suggested level capped at ${s2.level}: ${level} rested on indicative traits (${INDICATIVE.map((t) => TRAIT_LABEL[t]).join(', ')}).`); level = s2.level;
+    }
+    const band = level ? s1.bands[level] : null;
+    row.suggestedLevel = level || '';
+    row['fit bands'] = LEVELS.map((L) => `${L} ${s1.bands[L] || (spec.fit[L] == null ? '–' : 'no benchmark')}`).join(' · ');
+    row.caveats = caveats.join(' ');
+
+    // ---- L7 insight card (FW-12, Framework v0.6 §4): deterministic sentences; results, not people
+    const { weights } = weightsFor(fn, type, level || 'Mid', cfg);
     const scoredTraits = MIB.filter((t) => values[t] != null);
-    const tl = (t) => { if (t === 'learning') return `${TRAIT_LABEL.learning} (${learnOut.band})`; const b = bandFor(traits[t].pct, traits[t].n, cfg, stage); return `${TRAIT_LABEL[t]} (${['Strong', 'Typical', 'Probe'].includes(b) ? b : r1(values[t])})`; };
-    const strongest = [...scoredTraits].sort((a, b) => values[b] - values[a]).slice(0, 2);
-    const lowest = scoredTraits.filter((t) => weights[t] >= 2).sort((a, b) => values[a] - values[b]).slice(0, 2);
-    const fitTxt = ['Junior', 'Mid', 'Lead'].map((L) => `${L} ${spec.fit[L] ?? '–'}`).join(' · ');
-    const headline = scoredTraits.length ? `${fn} fit: ${fitTxt} (${allNormed ? 'vs other candidates' : 'raw, no benchmark yet'}${autoOn ? '' : '; traits only'}). Strongest: ${strongest.map(tl).join(', ')}.` : 'No completed games yet.';
-    // autonomy probe (Framework v0.7): when the read is a range, inconsistent, provisional or missing, matched to the best-fitting level
-    const bestLevel = LEVELS.filter((L) => spec.fit[L] != null).sort((a, b) => spec.fit[b] - spec.fit[a])[0] || 'Mid';
-    const autoProbe = auto.kind !== 'agree' && scoredTraits.length ? [`autonomy (${auto.label}; ${bestLevel}): “${AUTONOMY_PROBES[bestLevel]}”`] : [];
-    const probes = [...lowest.map((t) => `${TRAIT_LABEL[t]}: “${PROBES[t]}”`), ...(eth.gate === 'flag' ? [`integrity: “${PROBES.ethics}”`] : []), ...(red.some((x) => x.startsWith('brute')) ? [`repeat plays: “${PROBES.bruteForce}”`] : []), ...autoProbe];
-    insights.push({ stage: row.stage, user_id: u.userId, name: u.name || '', role: `${fn} · ${type}`, headline, autonomy: auto.label, 'probe first': probes.join('\n'),
-      'red flags': red.join('\n'), 'read with care': caveats.join('\n'),
+    const bandOfT = (t) => (t === 'learning' ? (learnOut.score == null ? null : { High: 'Strong', Low: 'Probe' }[learnOut.band] || learnOut.band) : bandFor(traits[t].pct, traits[t].n, cfg, stage));
+    const pm = (t) => (INDICATIVE.includes(t) ? ' ±' : '');
+    const describe = (t) => { const b = bandOfT(t); return ['Strong', 'Typical', 'Probe'].includes(b) ? `in the ${b} band for ${TRAIT_LABEL[t]}${pm(t)}` : `${TRAIT_LABEL[t]}: score ${r1(values[t])}${pm(t)}, no benchmark yet`; };
+    const strengths = scoredTraits.filter((t) => bandOfT(t) === 'Strong').sort((a, b) => values[b] - values[a]).slice(0, 2);
+    const headline = !scoredTraits.length ? 'No completed games yet.'
+      : `Best match: ${fn} · ${level || '–'} (${band ? `${band} fit` : `fit ${spec.fit[level] ?? '–'}, no benchmark yet`}${autoOn ? '' : ', traits only'}). ${strengths.length ? `Strengths: ${strengths.map((t) => TRAIT_LABEL[t] + pm(t)).join(', ')}.` : 'No standout strengths at this stage.'}`;
+    // probe first: the two traits with the largest role weight × shortfall (weight ≥ 2), then every red flag and the autonomy probe
+    const lowest = scoredTraits.filter((t) => weights[t] >= 2 && values[t] < 100).sort((a, b) => weights[b] * (100 - values[b]) - weights[a] * (100 - values[a]) || values[a] - values[b]).slice(0, 2);
+    const probes = lowest.map((t) => `${describe(t)}: “${PROBES[t]}”`);
+    const add = (label, q) => { if (!probes.some((x) => x.includes(q))) probes.push(`${label}: “${q}”`); };
+    if (eth.gate === 'flag') add('integrity (red flag)', PROBES.ethics);
+    if (red.some((x) => x.startsWith('organisation'))) add('organisation (red flag)', PROBES.organisation);
+    if (red.some((x) => x.startsWith('learning'))) add('learning (red flag)', PROBES.learning);
+    if (red.some((x) => x.startsWith('risk'))) add('risk pattern (red flag)', PROBES.risk);
+    if (Object.keys(leaves).length) add(`composure (${Object.keys(leaves).length >= 2 ? 'red flag' : 'left after a setback'})`, PROBES.resilience);
+    if (red.some((x) => x.startsWith('brute'))) add('repeat plays (red flag)', PROBES.bruteForce);
+    const lv = level || 'Mid';
+    if (auto.red) add('autonomy (red flag: L1 in both finales)', AUTONOMY_PROBES[lv]);
+    else if (auto.kind !== 'agree' && scoredTraits.length) add(`autonomy (${auto.label}; ${lv})`, AUTONOMY_PROBES[lv]);
+    const riskB = risk == null ? '' : riskBandOf(risk, cfg), want = cfg.roles[fn]?.risk || cfg.roles.Other.risk;
+    const riskTxt = risk == null ? '' : `${POLE[riskB]}; ${(cfg.riskBands[want] || [0, 100])[0] <= risk && risk <= (cfg.riskBands[want] || [0, 100])[1] ? 'inside' : 'outside'} the role’s preferred band (${POLE[want]}).`;
+    const ns = MIB.filter((t) => traits[t] && traits[t].score != null).map((t) => traits[t].n), nMin = ns.length ? Math.min(...ns) : 0;
+    const evidence = [STAGE_LABEL[stage] || 'live', noNorms ? 'no benchmark (alpha)' : nMin < cfg['norms.minProvisional'] ? 'no benchmark yet' : nMin < cfg['norms.minBands'] ? `early benchmark (n = ${nMin})` : 'benchmarked',
+      `single-source: ${SINGLE_SOURCE.filter((t) => traits[t]).map((t) => TRAIT_LABEL[t]).join(', ') || 'none'}`, `indicative ±: ${INDICATIVE.map((t) => TRAIT_LABEL[t]).join(', ')}`].join(' · ');
+    insights.push({ stage: row.stage, user_id: u.userId, name: u.name || '', role: `${fn} · ${type}`, headline, autonomy: auto.label, risk: riskTxt, 'probe first': probes.join('\n'),
+      'red flags': red.join('\n'), evidence, 'read with care': caveats.join('\n'),
       'not measured': `${auto.level == null ? 'Autonomy (no finale read yet), domain' : 'Domain'} skills, motivation for this role, and culture beyond integrity.`, scoringVersion: cfg.scoringVersion });
   }
 
@@ -198,5 +278,6 @@ export function scoreAll(input) {
   if (learnPool.length) norms.push({ module: 'suite', moduleVersion: '', trait: 'learning', n: learnPool.length, p20: quantile(learnPool, 0.2), p50: quantile(learnPool, 0.5), p70: quantile(learnPool, 0.7),
     status: noNorms ? 'off (alpha)' : learnPool.length < cfg['norms.minBands'] ? 'provisional bands (70 / 40)' : 'bands', stage: STAGE_LABEL[stage] || 'live', scoringVersion: cfg.scoringVersion });
 
-  return { scoringVersion: cfg.scoringVersion, stage, stageLabel: STAGE_LABEL[stage], scores, insights, norms, config: cfg };
+  const monitor = ethicsMonitor(input.interactions || [], users.map((u) => u.userId), cfg); // FW-8
+  return { scoringVersion: cfg.scoringVersion, stage, stageLabel: STAGE_LABEL[stage], scores, insights, norms, ethicsMonitor: monitor, config: cfg };
 }

@@ -18,8 +18,8 @@ It turns the raw tabs (Rounds, RoundTraces, Interactions) into evidence a person
 | L3 | `learning.js`, `learnFacts.js`, `ethicsGate.js` | learning v2 (30/20/20/15/15, n/a rules, ≥ 2 parts from ≥ 2 games, Low / Typical / High); the ethics gate (noFlag · note · flag · notOffered, + positive "reported") |
 | L4 | `pipeline.js` | norms per `module@version`: < 5 no benchmark · 5–29 early (probes only) · ≥ 30 Strong (top 30%) / Typical / Probe (bottom 20%); off in Alpha |
 | L5 | `fit.js` | role fit per function × type × level (the Framework table, caps, floors, Intern caps, Lead +1), the risk-band factor, the suitability spectrum, best-fit function; autonomy "not yet measured" (factor 1) |
-| L6 | `pipeline.js` | red flags · notes · positives · caveats (Framework rule 4; never auto-reject) |
-| L7 | `pipeline.js` | Scores row, Insights card (template sentences), Norms; `validity.js` = the Calibration → Validity loop |
+| L6 | `pipeline.js` | red flags · notes · positives · caveats (Framework rule 4; never auto-reject). Leaving after a setback (FW-14): one game = a note + the composure probe, ≥ 2 games = a red flag; a Sunny Tap report quit counts only from the explicit Leave tap (`reportQuit`) |
+| L7 | `pipeline.js` | Scores row (fit bands, suggested level, resilience detail), Insights card (Framework v0.6 §4: "Best match …", probe first, results not people, evidence line; `onePagerCard` hides ethics details), Norms; `ethicsMonitor.js` = the monthly Ethics monitor (FW-8); `validity.js` = Calibration → Validity, plus the Outcomes tab rows and reminder dates (FW-5) |
 
 ## ScoringConfig
 `config.js` holds the defaults; the Sheet's **ScoringConfig** tab (created on the first rescore) overrides any key, one row per key with a JSON value. Change a value → bump `scoringVersion` → **The Nurts → Rescore all**. The previous version's Scores tab is kept as `Scores <version>`.

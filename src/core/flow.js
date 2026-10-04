@@ -155,8 +155,14 @@ export function deviceClass() {
   return coarse && short < 600 ? 'phone' : coarse && short < 1100 ? 'tablet' : 'desktop';
 }
 
+// FW-14: how long this player takes to tap Continue on the standard post-game screens (their own pace), so Sunny Tap's
+// continueLatency can later be read against it. Logged only; never scored (resilience.continueWeight = 0).
+const continueMs = [];
+const medianOf = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? (s.length % 2 ? s[s.length >> 1] : Math.round((s[s.length / 2 - 1] + s[s.length / 2]) / 2)) : ''; };
+
 function roundDone(manifest, mode, base, res, key) {
   if (res.metrics) res.metrics.deviceClass = deviceClass();
+  if (res.metrics && Array.isArray(res.metrics.continueLatency)) res.metrics.baselineContinueMs = medianOf(continueMs);
   const ctx = { roundUid: base.roundUid, moduleVersion: manifest.version };
   const ev = mode === 'practice' ? (res.status === 'completed' ? 'practice_end' : 'practice_quit') : res.status === 'completed' ? 'round_complete' : 'round_quit';
   log(manifest.id, ev, res.status === 'completed' ? res.metrics : { elapsedMs: res.elapsedMs }, ctx);
@@ -164,7 +170,7 @@ function roundDone(manifest, mode, base, res, key) {
   game.scene.wake('backdrop');
   if (mode === 'real' && res.status === 'completed' && res.metrics) {
     if (session.playForFun) markPractised(manifest.id);
-    else if (session.priorCasual?.includes(manifest.id)) { // practised in play-for-fun first: learning's pickup / firstUse are n/a here
+    else if (session.priorCasual?.includes(manifest.id)) { // practised in play-for-fun first: the scoring layer drops ALL this module's learning parts (FW-9)
       const m = res.metrics; m.priorCasualPlay = true;
       if (m.learn) { const { pickup, firstUse, ...rest } = m.learn; m.learn = { ...rest, priorPractice: true }; }
       m.flags = [m.flags, 'priorCasualPlay'].filter(Boolean).join(',');
@@ -177,9 +183,11 @@ function roundDone(manifest, mode, base, res, key) {
   if (mode === 'practice' || res.status !== 'completed') return preGame(manifest, mode === 'practice' && res.status === 'completed' ? res.metrics : null);
   session.completed = [...new Set([...session.completed, manifest.id])];
   backdrop()?.celebrate();
+  const shownAt = performance.now();
   const scr = postGameScreen({
     manifest, metrics: res.metrics, benchmark: null, completed: session.completed, casual: session.casual, order: session.order,
     onContinue: () => {
+      continueMs.push(Math.round(performance.now() - shownAt));
       log(manifest.id, 'continue', '', ctx);
       const next = nextModule(session.completed, session.order);
       next ? preGame(next) : endOfSuite();

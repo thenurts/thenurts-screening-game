@@ -2,18 +2,20 @@
 // (one row per key, JSON value); every derived number is stamped with `scoringVersion`. Change a value → bump the
 // version → The Nurts → Rescore all.
 export const DEFAULTS = {
-  scoringVersion: 'sc-3', // sc-3: Mamak's true maximum 28 ★ (#40); sc-2: autonomy measured (#32–34)
+  scoringVersion: 'sc-4', // sc-4: Framework v0.8 builds (FW-5/8/12/14: outcomes, ethics monitor, insight wording, Sunny Tap signal rules); sc-3: Mamak's true maximum 28 ★ (#40); sc-2: autonomy measured (#32–34)
   stage: 'alpha', // alpha · beta · soft · hard (request #31)
   // L4 norms
   'norms.minProvisional': 5, 'norms.minBands': 30, 'bands.strongTop': 0.30, 'bands.probeBottom': 0.20,
   // L2 traits
   'o1.facetWeights': { planning: 0.60, pressure: 0.40 }, 'o1.pressureSplit': { errorsUnderLoad: 0.60, parkedReturn: 0.40 },
   'o1.planningSplit': { valueShare: 0.30, expiredHigh: 0.20, halfDone: 0.20 },
-  'res.hookWeight': 0, // setback hooks: logged only until validated (Framework to set; suggested 0.20)
+  'resilience.hookWeight': 0, // FW-12: setback hooks, 0 at launch → 0.20 once Soft Launch validates them (Framework v0.6)
+  'resilience.continueWeight': 0, // FW-14: Sunny Tap continueLatency vs the player's own baseline; logged only (max 0.10 after validation)
   'secondary.weight': 0, // secondary signals start at 0 (logged only)
   // L3 learning (Framework v0.4–0.5)
   'learn.weights': { firstUse: 0.30, pickup: 0.20, noRepeat: 0.20, trapPairs: 0.15, adaptation: 0.15 },
-  'learn.minParts': 2, 'learn.minGames': 2, 'learn.redFlagMinParts': 3, 'learn.itemNormsReady': false,
+  'learn.minParts': 2, 'learn.minGames': 2, 'learn.firstUseOnlyGames': 3, // FW-11: probes alone count from ≥ 3 games (pending Framework confirmation)
+  'learn.redFlagMinParts': 3, 'learn.itemNormsReady': false,
   'learn.provisionalBands': { high: 70, low: 40 }, // until 30+ learning scores exist
   // L5 role fit (Framework role profiles)
   roles: {
@@ -40,8 +42,12 @@ export const DEFAULTS = {
   'autonomy.targets': { Junior: 1, Mid: 2, Lead: 3 }, 'autonomy.typeMax': { Intern: 1 }, 'autonomy.typeMin': { Freelance: 2 },
   'autonomy.shortFactor': [1, 0.8, 0.6], // meets the target · one level short · two short
   'autonomy.validAuc': 0.6, // Validity: below this vs "needed little hand-holding" → switch the factor off until fixed
-  // Validity (request #30)
+  // Validity (request #30) and the Outcomes feedback loop (FW-5)
   'validity.descriptiveBelow': 20,
+  'outcomes.minHires': 10, // the Outcomes rows of Validity are descriptive only below this many hires with outcomes
+  'outcomes.remindTo': 'hello@thenurts.com', // who gets the 90-day and 12-month reminder emails
+  // FW-8 ethics monitor: a month whose open rate is ≥ leakRatio × the first baselineMonths' rate → "possible leak: review"
+  'ethics.leakRatio': 2, 'ethics.baselineMonths': 3,
 };
 
 /** DEFAULTS overlaid with the Sheet's values (unknown keys are kept, so new settings can be added without code). */
@@ -54,4 +60,4 @@ export function mergeConfig(over = {}) {
 export const MIB = ['organisation', 'learning', 'resilience', 'judgement', 'critical', 'creative', 'communication'];
 export const STAGE_LABEL = { alpha: 'ALPHA: test data', beta: 'Beta, not for decisions', soft: 'Calibration', hard: '' };
 export const STAGE_NO_NORMS = { alpha: true };
-export const OBSOLETE_KEYS = ['autonomyFactor']; // removed from the Sheet's ScoringConfig on the next rescore
+export const OBSOLETE_KEYS = ['autonomyFactor', 'res.hookWeight']; // res.hookWeight → resilience.hookWeight (sc-4) // removed from the Sheet's ScoringConfig on the next rescore
