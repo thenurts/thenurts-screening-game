@@ -157,10 +157,16 @@ export default class GameScene extends ModuleScene {
     c.add(this.txt(X1, Y0 + 24, `${this.points} points`, { fontSize: '22px', fontStyle: '700', align: 'right' }).setOrigin(1, 0.5));
     const go = (auto) => this.continueReport(n, auto);
     c.add(this.btn(W / 2, 910, n < ROUNDS ? 'Continue' : 'Done', () => go(false), { w: 320, h: 92, size: 34 }));
+    // FW-14: an explicit way out on the report (the core "Leave this round?" check); only this tap counts as reportQuit
+    const exit = this.txt(W / 2, 1030, 'Leave game', { fontSize: '26px', fontStyle: '700', color: C.white, stroke: C.ink, strokeThickness: 6 }).setInteractive({ useHandCursor: true });
+    exit.on('pointerup', () => this.askQuit()); c.add(exit); this.reportLeave = () => exit.emit('pointerup'); // test hook
     this.reportGo = () => go(false); // test hook
     this.autoTimer = this.time.delayedCall(AUTO_CONTINUE_MS / SPEED, () => go(true));
     this.snapshot(); // a page closed here records the quit-at-report
   }
+
+  onAskQuit() { if (this.autoTimer) this.autoTimer.paused = true; } // the auto-continue waits while "Leave this round?" is open
+  onQuitCancelled() { if (this.autoTimer) this.autoTimer.paused = false; }
 
   continueReport(n, auto) {
     if (this.reportOpen !== n) return;
@@ -260,13 +266,16 @@ export default class GameScene extends ModuleScene {
     if (m.panicCarry) flags.push('panicCarry');
     if (m.resilienceScore == null) flags.push('notEnoughEvidence');
     if (this.calm) flags.push('calm');
-    if (this.reportOpen) flags.push('quitAtReport'); // only seen in a partial snapshot: the page closed while a mini-report was showing
+    // FW-14 (Framework v0.8): reportQuit = an explicit Leave tap on a mini-report; a page closed there is only an abandon (partial snapshot)
+    if (this.reportOpen) flags.push(this.explicitQuit ? 'reportQuit' : 'abandonAtReport');
+    const played = quitAt == null ? ROUND_S : quitAt; // recovery windows = the fair phases of rounds 2–4 played in full
     const wipeTaps = ['W1', 'W2', 'W3', 'W4'].map((w) => this.taps.filter((tp) => phaseOf(tp[0]) === w).length);
     return {
       resilienceScore: m.resilienceScore, speedShock: r3n(m.speedShock), accuracyShock: r3n(m.accuracyShock), hold: r3n(m.hold), errorCarryover: m.errorCarryover,
       points: m.displayScore, accuracy: Object.fromEntries(Object.entries(m.accuracy).map(([k, v]) => [k, r3n(v)])),
       hits: this.taps.filter((x) => x[1] === 'hit').length, misTaps: this.taps.filter((x) => x[1] === 'miss').length, fades: this.fades.length,
       reports: this.reports.map((r) => [r.gained, r.lostFaded, r.lostMisTaps, r.net]), continueLatency: this.continues || [], atReport: this.reportOpen || '',
+      reportQuit: this.explicitQuit && this.reportOpen ? this.reportOpen : '', recoveryWindows: [1, 2, 3].filter((k) => played >= k * ROUND_LEN + 20).length,
       wipeTaps, // passivity in wipeouts (logged only)
       f1HitRate: this.f1HitRate ?? '', wipeRate: this.calm ? 0 : this.wipeRate ?? '', seed: this.seed, calm: this.calm,
       tapLog: this.taps.map((tp) => `${r3(tp[0])}${tp[1] === 'hit' ? 'h' + tp[2] : 'm'}`).join(' '), fadeLog: this.fades.map(r3).join(' '),
